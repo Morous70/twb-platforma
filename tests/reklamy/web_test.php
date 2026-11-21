@@ -32,13 +32,13 @@ test('instalace: kontrola hesla, pak přihlášení', function () use ($s, $b) {
     eq(303, $r['code']);
     $r = $b->jdi('index.php');
     eq(200, $r['code']);
-    ok(str_contains($r['body'], '<h1>Přehled</h1>'));
+    ok(str_contains($r['body'], '<h1>Přehled <a class="pomoc"'));
     ok(str_contains($r['body'], 'Zálohy nejsou nastavené'));
     eq(302, $b->jdi('install.php')['code'], 'instalace podruhé nejde');
 });
 
 test('všechny stránky se načtou bez chyb', function () use ($b) {
-    foreach (['prehled', 'kampane', 'kampan', 'bannery', 'weby', 'galerie', 'promenne', 'konverze', 'statistiky', 'nastaveni', 'protokol'] as $p) {
+    foreach (['prehled', 'kampane', 'kampan', 'bannery', 'weby', 'galerie', 'promenne', 'konverze', 'statistiky', 'napoveda', 'nastaveni', 'protokol'] as $p) {
         $r = $b->jdi("index.php?p=$p");
         eq(200, $r['code'], $p);
         ok(str_contains($r['body'], '<h1>'), $p);

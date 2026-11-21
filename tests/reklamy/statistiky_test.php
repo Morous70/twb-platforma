@@ -115,3 +115,23 @@ test('stránka Statistiky: období, seskupení, graf, tabulka a stažení CSV', 
     ok(str_contains($r['body'], "\r\nCelkem;;40;4;10,00;1;25,00;123,45"));
     eq(200, $b->jdi('index.php?p=statistiky&podle=neznamo&kampan=abc')['code']);
 });
+
+test('nápověda: obsah projde kontrolou, stránky, hledání, tlačítko „?“ podle stránky', function () use ($b) {
+    $n = (new App(KOREN . '/apps/reklamy', ['data_dir' => docasna('nap')]))->napoveda();
+    [$chyby, $overit] = $n->zkontroluj();
+    eq([], $chyby);
+    eq(0, $overit);
+    ok(count($n->poradi()) >= 15);
+    foreach (array_keys(Reklamy\Ui::MENU) as $p) ok(isset($n->obsah()['context'][$p]), "stránka $p nemá nápovědu");
+    $r = $b->jdi('index.php?p=napoveda');
+    eq(200, $r['code']);
+    ok(str_contains($r['body'], '<h1>Co aplikace umí</h1>') && str_contains($r['body'], 'Kampaně a bannery'), 'první stránka a obsah');
+    $r = $b->jdi('index.php?p=napoveda&s=konverze');
+    ok(str_contains($r['body'], '<h1>Konverze a trackery</h1>') && str_contains($r['body'], '<code>t.js</code>'));
+    ok(str_contains($r['body'], 'href="index.php?p=napoveda&amp;s=konverze-se-neprirazuji"'), 'související stránka');
+    eq(404, $b->jdi('index.php?p=napoveda&s=../config')['code']);
+    $r = $b->jdi('index.php?p=napoveda&q=' . rawurlencode('frekvence cookies'));
+    ok(str_contains($r['body'], 'Cílení a frekvence'), 'hledání');
+    $r = $b->jdi('index.php?p=statistiky');
+    ok(str_contains($r['body'], 'class="pomoc" href="index.php?p=napoveda&amp;s=statistiky"'), 'tlačítko ? u nadpisu');
+});

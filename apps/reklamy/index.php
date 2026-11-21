@@ -27,10 +27,11 @@ if ($p === 'odhlasit') {
     $ui->presmeruj('index.php');
 }
 
-$stranky = ['prehled', 'kampane', 'kampan', 'bannery', 'banner', 'weby', 'web', 'zona', 'galerie', 'promenne', 'konverze', 'tracker', 'statistiky', 'nastaveni', 'protokol'];
+$stranky = ['prehled', 'kampane', 'kampan', 'bannery', 'banner', 'weby', 'web', 'zona', 'galerie', 'promenne', 'konverze', 'tracker', 'statistiky', 'napoveda', 'nastaveni', 'protokol'];
 if (!in_array($p, $stranky, true)) { http_response_code(404); $p = 'prehled'; }
-$menu = ['kampan' => 'kampane', 'banner' => 'bannery', 'web' => 'weby', 'zona' => 'weby', 'tracker' => 'konverze'][$p] ?? $p;
-$titulek = Ui::MENU[$p] ?? '';
+$menu = ['kampan' => 'kampane', 'banner' => 'bannery', 'web' => 'weby', 'zona' => 'weby', 'tracker' => 'konverze', 'protokol' => 'nastaveni'][$p] ?? $p;
+$titulek = Ui::MENU[$p] ?? ['protokol' => 'Protokol'][$p] ?? '';
+$kontext = $p;   // stránky smějí $p přepsat
 ob_start();
 try {
     require __DIR__ . "/stranky/$p.php";
@@ -42,4 +43,4 @@ try {
     echo '<p>' . Ui::h($e->getMessage()) . '</p><p><a href="' . Ui::h(Ui::odkaz($menu)) . '">Zpět</a></p>';
 }
 $obsah = (string)ob_get_clean();
-$ui->stranka($titulek, $menu, $obsah);
+$ui->stranka($titulek, $menu, $obsah, $kontext);

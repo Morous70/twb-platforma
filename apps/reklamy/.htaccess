@@ -6,6 +6,7 @@ Options -Indexes
 # moduly platformy se načítají jen z PHP (písma a editor slidů vydávají api.php a asset.php)
 <IfModule mod_alias.c>
     RedirectMatch 404 "/modules/"
+    RedirectMatch 404 "/help/"
 </IfModule>
 <IfModule mod_headers.c>
     Header always set X-Content-Type-Options "nosniff"

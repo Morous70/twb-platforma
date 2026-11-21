@@ -199,6 +199,9 @@ final class App
     /** Složka modulů platformy (v balíčku modules/ vedle aplikace, při vývoji ../../modules). */
     public static function moduly(): string { return dirname((new \ReflectionClass(Pisma::class))->getFileName(), 3); }
 
+    /** Nápověda (Markdown ve složce help/, modul napoveda). */
+    public function napoveda(): \TWB\Napoveda\Napoveda { return $this->sluzba('napoveda', fn() => new \TWB\Napoveda\Napoveda($this->adresar . '/help')); }
+
     public function pisma(): Pisma
     {
         return $this->sluzba('pisma', fn() => new Pisma($this->nastaveni(), $this->host->protokol, self::moduly() . '/pisma/fonty', $this->data . '/fonts',

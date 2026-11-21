@@ -23,15 +23,15 @@ pre, .kod-blok { background: var(--kod); border: 1px solid var(--okraj); border-
 .lista { display: flex; align-items: center; gap: 1rem; padding: .5rem 1rem; background: var(--plocha); border-bottom: 1px solid var(--okraj); position: sticky; top: 0; z-index: 5; }
 .logo { display: flex; align-items: center; gap: .5rem; font-weight: 700; color: var(--text); text-decoration: none; white-space: nowrap; }
 .logo.velke { font-size: 1.3rem; justify-content: center; margin-bottom: 1rem; }
-#menu { display: flex; gap: .2rem; flex: 1; flex-wrap: wrap; }
-#menu a { padding: .4rem .7rem; border-radius: 6px; text-decoration: none; color: var(--slaby); }
+#menu { display: flex; gap: .1rem; flex: 1; flex-wrap: wrap; }
+#menu a { padding: .35rem .55rem; font-size: .93rem; border-radius: 6px; text-decoration: none; color: var(--slaby); }
 #menu a:hover { background: var(--pozadi); color: var(--text); }
 #menu a.aktivni { background: var(--hlavni); color: #fff; }
 .menu-prepinac { display: none; margin-left: auto; }
 .odhlasit { margin: 0; }
 main { max-width: 1200px; margin: 0 auto; padding: 1.5rem 1rem 3rem; }
 footer { text-align: center; color: var(--slaby); font-size: .8rem; padding: 1rem; }
-@media (max-width: 860px) {
+@media (max-width: 1100px) {
   .menu-prepinac { display: block; }
   .lista { flex-wrap: wrap; }
   #menu { display: none; flex-basis: 100%; flex-direction: column; }
@@ -148,3 +148,26 @@ svg.graf .g-osa { fill: var(--slaby); font-size: 11px; }
 svg.graf .g-popis { fill: var(--text); font-size: 12px; }
 table.statistiky tr.soucet th { border-top: 2px solid var(--okraj); }
 table.statistiky td, table.statistiky th { white-space: nowrap; }
+
+/* nápověda */
+.napoveda-odkaz { color: var(--slaby); text-decoration: none; padding: .4rem .7rem; border-radius: 6px; white-space: nowrap; }
+.napoveda-odkaz:hover, .napoveda-odkaz.aktivni { color: var(--text); background: var(--pozadi); }
+h1 .pomoc { display: inline-flex; align-items: center; justify-content: center; width: 1.4rem; height: 1.4rem; border-radius: 50%; border: 1px solid var(--okraj);
+  font-size: .85rem; text-decoration: none; vertical-align: middle; color: var(--slaby); background: var(--plocha); }
+h1 .pomoc:hover { color: var(--hlavni); border-color: var(--hlavni); }
+.napoveda { display: grid; grid-template-columns: 260px minmax(0, 1fr); gap: 1.2rem; align-items: start; }
+.napoveda-obsah { position: sticky; top: 4rem; max-height: calc(100vh - 5rem); overflow: auto; font-size: .9rem; }
+.napoveda-obsah h3 { font-size: .8rem; text-transform: uppercase; letter-spacing: .04em; color: var(--slaby); margin: 1rem 0 .3rem; }
+.napoveda-obsah .skupina { font-weight: 600; margin: .5rem 0 .1rem; }
+.napoveda-obsah ul { list-style: none; margin: 0; padding: 0; }
+.napoveda-obsah a { display: block; padding: .15rem .4rem; border-radius: 4px; text-decoration: none; }
+.napoveda-obsah a.aktivni { background: var(--hlavni); color: #fff; }
+.napoveda-obsah .hledani input { width: 100%; }
+.napoveda-text { max-width: 780px; line-height: 1.6; }
+.napoveda-text h1 { font-size: 1.35rem; margin-top: 0; }
+.napoveda-text .help-table table { margin: .6rem 0; }
+.napoveda-text blockquote { margin: .8rem 0; padding: .5rem .9rem; border-left: 3px solid var(--hlavni); background: var(--pozadi); }
+.napoveda-text .souvisi { margin-top: 1.5rem; padding-top: .8rem; border-top: 1px solid var(--okraj); font-size: .9rem; }
+.napoveda-text .sousedni { margin-top: 1rem; }
+.napoveda-text .vysledek { margin: .8rem 0; }
+@media (max-width: 860px) { .napoveda { grid-template-columns: 1fr; } .napoveda-obsah { position: static; max-height: none; } }

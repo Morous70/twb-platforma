@@ -15,7 +15,6 @@ final class Ui
         'galerie' => 'Galerie',
         'promenne' => 'Proměnné',
         'nastaveni' => 'Nastavení',
-        'protokol' => 'Protokol',
     ];
 
     /** @var list<string> chyby k zobrazení na této stránce (neplatný formulář) */
@@ -155,8 +154,10 @@ final class Ui
     }
 
     /** Celá stránka administrace s menu. */
-    public function stranka(string $titulek, string $aktivni, string $obsah): void
+    /** @param string $kontext stránka administrace pro tlačítko „?“ (kontext nápovědy, viz help/_obsah.json) */
+    public function stranka(string $titulek, string $aktivni, string $obsah, string $kontext = ''): void
     {
+        $pomoc = $kontext !== '' ? ($this->app->napoveda()->obsah()['context'][$kontext] ?? null) : null;
         header('Content-Type: text/html; charset=utf-8');
         header('Cache-Control: no-store');
         header('X-Frame-Options: DENY');
@@ -167,8 +168,10 @@ final class Ui
             . '<header class="lista"><a class="logo" href="index.php"><img src="assets/ikona.svg" alt="" width="24" height="24">' . App::NAZEV . '</a>'
             . '<button type="button" class="menu-prepinac" aria-label="Menu" data-prepni="menu">☰</button>'
             . '<nav id="menu">' . $menu . '</nav>'
+            . '<a class="napoveda-odkaz' . ($aktivni === 'napoveda' ? ' aktivni' : '') . '" href="' . self::h(self::odkaz('napoveda')) . '">Nápověda</a>'
             . '<form method="post" action="index.php?p=odhlasit" class="odhlasit">' . $this->csrf() . '<button type="submit" class="odkaz">Odhlásit</button></form></header>'
-            . '<main' . ($limit > 0 ? ' data-necinnost="' . $limit . '"' : '') . '><h1>' . self::h($titulek) . '</h1>' . $this->hlasky() . $obsah . '</main>'
+            . '<main' . ($limit > 0 ? ' data-necinnost="' . $limit . '"' : '') . '><h1>' . self::h($titulek)
+            . ($pomoc ? ' <a class="pomoc" href="' . self::h(self::odkaz('napoveda', ['s' => $pomoc])) . '" title="Nápověda k této stránce" aria-label="Nápověda k této stránce">?</a>' : '') . '</h1>' . $this->hlasky() . $obsah . '</main>'
             . '<footer>' . App::NAZEV . ' ' . self::h($this->app->verze) . '</footer></body></html>';
     }
 

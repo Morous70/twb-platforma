@@ -6,7 +6,7 @@ namespace Reklamy;
  * Výběr banneru pro zónu a počítání zobrazení a prokliků.
  *
  * Pravidla výběru:
- *  1. kandidáti = bannery zóny (přímo přiřazené i z přiřazených kampaní, vhodného rozměru),
+ *  1. kandidáti = dvojice banner–kampaň: bannery zóny (přímo přiřazené ve všech svých kampaních, z přiřazených kampaní jen v nich, vhodného rozměru),
  *     aktivní banner v aktivní kampani, v termínu kampaně, s nevyčerpanými limity,
  *     bez bannerů, které už na stránce jsou, splňující cílení kampaně a frekvenci (cookie návštěvníka)
  *     a další filtry (pridejFiltr);
@@ -22,8 +22,8 @@ final class Dorucovani
     private array $filtry = [];
     /** @var callable(int): int */
     private $los;
-    /** @var array<int, array{campaign_id:int, cap:int, hodin:int}> */
-    private array $kampanBanneru = [];
+    /** @var array<int, array{cap:int, hodin:int}> */
+    private array $frekvence = [];
     private ?bool $zobrazeniProKonverze = null;
 
     /** @param ?callable(int): int $los náhodné číslo 0…n-1 (pro testy) */
@@ -58,14 +58,15 @@ final class Dorucovani
     public function kandidati(array $zona, Kontext $k, array $typy = []): array
     {
         $ted = $k->ted();
-        $rows = $this->app->db->q("SELECT b.*, c.name AS campaign_name, c.kind AS campaign_kind, c.priority AS campaign_priority, c.weight AS campaign_weight,
+        // banner může být ve více kampaních: každá dvojice banner–kampaň je samostatný kandidát (campaign_id = kampaň dvojice)
+        $rows = $this->app->db->q("SELECT b.*, cb.campaign_id AS campaign_id, c.name AS campaign_name, c.kind AS campaign_kind, c.priority AS campaign_priority, c.weight AS campaign_weight,
                 c.limit_impressions, c.limit_clicks, c.limit_conversions, c.daily_impressions, c.daily_clicks,
                 c.targeting AS campaign_targeting, c.cap_impressions AS campaign_cap, c.cap_hours AS campaign_cap_hours
-            FROM banners b JOIN campaigns c ON c.id = b.campaign_id
+            FROM banners b JOIN campaign_banners cb ON cb.banner_id = b.id JOIN campaigns c ON c.id = cb.campaign_id
             WHERE b.status = 'active' AND c.status = 'active'
               AND (c.starts_at IS NULL OR c.starts_at <= ?) AND (c.ends_at IS NULL OR c.ends_at > ?)
-              AND (b.id IN (SELECT banner_id FROM zone_banners WHERE zone_id = ?) OR b.campaign_id IN (SELECT campaign_id FROM zone_campaigns WHERE zone_id = ?))
-            ORDER BY b.id", [$ted, $ted, $zona['id'], $zona['id']])->fetchAll();
+              AND (b.id IN (SELECT banner_id FROM zone_banners WHERE zone_id = ?) OR cb.campaign_id IN (SELECT campaign_id FROM zone_campaigns WHERE zone_id = ?))
+            ORDER BY b.id, cb.campaign_id", [$ted, $ted, $zona['id'], $zona['id']])->fetchAll();
         $rows = array_filter($rows, fn($b) => Zony::pasuje($zona, $b) && !isset($k->vynechat[(int)$b['id']]) && (!$typy || in_array($b['type'], $typy, true)));
         $rows = $this->bezVycerpanych(array_values($rows), $ted);
         $cileni = [];
@@ -109,7 +110,7 @@ final class Dorucovani
     public function pocty(int $kampan, ?string $den): array
     {
         $sql = 'SELECT COALESCE(SUM(s.impressions), 0) AS impressions, COALESCE(SUM(s.clicks), 0) AS clicks, COALESCE(SUM(s.conversions), 0) AS conversions
-            FROM stats s WHERE s.banner_id IN (SELECT id FROM banners WHERE campaign_id = ?)';
+            FROM stats s WHERE s.campaign_id = ?';
         $r = $den === null ? $this->app->db->q($sql, [$kampan])->fetch() : $this->app->db->q("$sql AND s.day = ?", [$kampan, $den])->fetch();
         return array_map('intval', $r);
     }
@@ -166,21 +167,38 @@ final class Dorucovani
 
     // ---------- počítání ----------
 
-    private function pricti(int $banner, int $zona, string $sloupec, int $cas, int $kolik = 1, int $hodnota = 0): void
+    private function pricti(int $banner, int $zona, int $kampan, string $sloupec, int $cas, int $kolik = 1, int $hodnota = 0): void
     {
-        $this->app->db->q("INSERT INTO stats (day, hour, banner_id, zone_id, $sloupec, revenue) VALUES (?, ?, ?, ?, ?, ?)
-            ON CONFLICT (day, hour, banner_id, zone_id) DO UPDATE SET $sloupec = $sloupec + excluded.$sloupec, revenue = revenue + excluded.revenue",
-            [date('Y-m-d', $cas), (int)date('G', $cas), $banner, $zona, $kolik, $hodnota]);
+        $this->app->db->q("INSERT INTO stats (day, hour, banner_id, zone_id, campaign_id, $sloupec, revenue) VALUES (?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT (day, hour, banner_id, zone_id, campaign_id) DO UPDATE SET $sloupec = $sloupec + excluded.$sloupec, revenue = revenue + excluded.revenue",
+            [date('Y-m-d', $cas), (int)date('G', $cas), $banner, $zona, $kampan, $kolik, $hodnota]);
     }
 
-    /** Kampaň banneru a její frekvence (z mezipaměti požadavku). @return array{campaign_id:int, cap:int, hodin:int} */
-    private function kampanBanneru(int $banner): array
+    /**
+     * Kampaň, za kterou se banner počítá, když ji odkaz neuvádí (odkazy ze starších verzí): kampaň, pro kterou banner vznikl,
+     * pokud v ní ještě je, jinak první z jeho kampaní; 0 = banner není v žádné kampani.
+     */
+    public function hlavniKampan(int $banner): int
     {
-        if (!isset($this->kampanBanneru[$banner])) {
-            $r = $this->app->db->q('SELECT b.campaign_id, c.cap_impressions, c.cap_hours FROM banners b JOIN campaigns c ON c.id = b.campaign_id WHERE b.id = ?', [$banner])->fetch();
-            $this->kampanBanneru[$banner] = ['campaign_id' => (int)($r['campaign_id'] ?? 0), 'cap' => (int)($r['cap_impressions'] ?? 0), 'hodin' => (int)($r['cap_hours'] ?? 0) ?: 24];
+        $r = $this->app->db->q('SELECT cb.campaign_id FROM campaign_banners cb LEFT JOIN banners b ON b.id = cb.banner_id AND b.campaign_id = cb.campaign_id
+            WHERE cb.banner_id = ? ORDER BY b.id IS NULL, cb.campaign_id LIMIT 1', [$banner])->fetchColumn();
+        return $r === false ? 0 : (int)$r;
+    }
+
+    /** Je banner (ještě) v kampani? */
+    public function vKampani(int $banner, int $kampan): bool
+    {
+        return (bool)$this->app->db->q('SELECT 1 FROM campaign_banners WHERE banner_id = ? AND campaign_id = ?', [$banner, $kampan])->fetchColumn();
+    }
+
+    /** Frekvence kampaně (z mezipaměti požadavku). @return array{cap:int, hodin:int} */
+    private function frekvence(int $kampan): array
+    {
+        if (!isset($this->frekvence[$kampan])) {
+            $r = $this->app->db->q('SELECT cap_impressions, cap_hours FROM campaigns WHERE id = ?', [$kampan])->fetch();
+            $this->frekvence[$kampan] = ['cap' => (int)($r['cap_impressions'] ?? 0), 'hodin' => (int)($r['cap_hours'] ?? 0) ?: 24];
         }
-        return $this->kampanBanneru[$banner];
+        return $this->frekvence[$kampan];
     }
 
     /** Zapisovat zobrazení návštěvníků? Jen když nějaký aktivní tracker přiřazuje konverze i po zobrazení. */
@@ -189,48 +207,50 @@ final class Dorucovani
         return $this->zobrazeniProKonverze ??= (bool)$this->app->db->q("SELECT 1 FROM trackers WHERE status = 'active' AND view_days > 0 LIMIT 1")->fetchColumn();
     }
 
-    /** Zobrazení: statistika, frekvence kampaně (cookie) a záznam pro přiřazení konverzí po zobrazení. */
-    public function zobrazeni(int $banner, int $zona, Kontext $k): void
+    /** Zobrazení banneru v kampani: statistika, frekvence kampaně (cookie) a záznam pro přiřazení konverzí po zobrazení. */
+    public function zobrazeni(int $banner, int $zona, Kontext $k, ?int $kampan = null): void
     {
         if (!$k->zapocitat()) return;
-        $this->pricti($banner, $zona, 'impressions', $k->ted());
+        $kampan ??= $this->hlavniKampan($banner);
+        $this->pricti($banner, $zona, $kampan, 'impressions', $k->ted());
         if (!$k->cookies) return;
-        $c = $this->kampanBanneru($banner);
-        if ($c['cap']) $k->zapisFrekvenci($c['campaign_id'], $c['hodin']);
+        $c = $this->frekvence($kampan);
+        if ($c['cap']) $k->zapisFrekvenci($kampan, $c['hodin']);
         if ($this->zobrazeniProKonverze()) {
-            $this->app->db->q('INSERT INTO views (visitor, banner_id, zone_id, campaign_id, at) VALUES (?, ?, ?, ?, ?)', [$k->navstevnik(), $banner, $zona, $c['campaign_id'], $k->ted()]);
+            $this->app->db->q('INSERT INTO views (visitor, banner_id, zone_id, campaign_id, at) VALUES (?, ?, ?, ?, ?)', [$k->navstevnik(), $banner, $zona, $kampan, $k->ted()]);
         }
     }
 
     /** Proklik: statistika a záznam pro přiřazení konverzí. Vrací ID prokliku (null = nepočítá se). */
-    public function proklik(int $banner, int $zona, Kontext $k): ?int
+    public function proklik(int $banner, int $zona, Kontext $k, ?int $kampan = null): ?int
     {
         if (!$k->zapocitat()) return null;
-        $this->pricti($banner, $zona, 'clicks', $k->ted());
-        $c = $this->kampanBanneru($banner);
+        $kampan ??= $this->hlavniKampan($banner);
+        $this->pricti($banner, $zona, $kampan, 'clicks', $k->ted());
         $this->app->db->q('INSERT INTO clicks (visitor, banner_id, zone_id, campaign_id, at) VALUES (?, ?, ?, ?, ?)',
-            [$k->cookies ? $k->navstevnik() : null, $banner, $zona, $c['campaign_id'], $k->ted()]);
+            [$k->cookies ? $k->navstevnik() : null, $banner, $zona, $kampan, $k->ted()]);
         return $this->app->db->posledniId();
     }
 
     /** Konverze do statistiky (hodnota v haléřích). */
-    public function konverze(int $banner, int $zona, int $cas, int $hodnota = 0): void
+    public function konverze(int $banner, int $zona, int $cas, int $hodnota = 0, ?int $kampan = null): void
     {
-        $this->pricti($banner, $zona, 'conversions', $cas, 1, $hodnota);
+        $this->pricti($banner, $zona, $kampan ?? $this->hlavniKampan($banner), 'conversions', $cas, 1, $hodnota);
     }
 
     // ---------- vložení odkazem (obrázek a proklik se stejným n) ----------
 
-    public function zapamatuj(string $n, int $zona, int $banner, int $cas): void
+    public function zapamatuj(string $n, int $zona, int $banner, int $cas, int $kampan = 0): void
     {
-        $this->app->db->q('INSERT INTO view_map (n, zone_id, banner_id, at) VALUES (?, ?, ?, ?)
-            ON CONFLICT (n, zone_id) DO UPDATE SET banner_id = excluded.banner_id, at = excluded.at', [$n, $zona, $banner, $cas]);
+        $this->app->db->q('INSERT INTO view_map (n, zone_id, banner_id, campaign_id, at) VALUES (?, ?, ?, ?, ?)
+            ON CONFLICT (n, zone_id) DO UPDATE SET banner_id = excluded.banner_id, campaign_id = excluded.campaign_id, at = excluded.at', [$n, $zona, $banner, $kampan, $cas]);
     }
 
-    public function zapamatovany(string $n, int $zona): ?int
+    /** Banner a kampaň zapamatované pod n, nebo null. @return ?array{0:int, 1:int} */
+    public function zapamatovany(string $n, int $zona): ?array
     {
-        $b = $this->app->db->q('SELECT banner_id FROM view_map WHERE n = ? AND zone_id = ?', [$n, $zona])->fetchColumn();
-        return $b === false ? null : (int)$b;
+        $r = $this->app->db->q('SELECT banner_id, campaign_id FROM view_map WHERE n = ? AND zone_id = ?', [$n, $zona])->fetch();
+        return $r ? [(int)$r['banner_id'], (int)$r['campaign_id']] : null;
     }
 
     /** Smaže staré záznamy vložení odkazem (po 30 dnech) a prokliky a zobrazení návštěvníků starší než nejdelší okno trackerů. */

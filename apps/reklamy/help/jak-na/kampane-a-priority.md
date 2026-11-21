@@ -4,7 +4,7 @@ sekce: jak-na
 admin: ne
 kontext: kampan
 souvisi: druhy-banneru, cileni-a-frekvence
-klicova: priorita, váha, limit, exkluzivní, zbytková
+klicova: priorita, váha, limit, exkluzivní, zbytková, více kampaní, sdílený banner
 ---
 # Kampaně a priority
 
@@ -21,4 +21,10 @@ Když se zóna zobrazuje, aplikace vybere banner takto:
 | Zobrazení / prokliky / konverze celkem | po dosažení se kampaň přestane zobrazovat |
 | Zobrazení / prokliky za den | platí do půlnoci |
 
-**Kopie kampaně** vznikne pozastavená i s bannery. Smazáním kampaně se smažou i její bannery; statistiky zůstanou.
+## Jeden banner ve více kampaních
+Banner založíte v kampani a pak ho můžete přiřadit dalším kampaním: v kampani **Přidat existující banner…**, nebo v úpravě banneru zaškrtnutím kampaní.
+V každé kampani se banner řídí jejím termínem, druhem, prioritou, limity a cílením; zobrazení, prokliky i konverze se počítají té kampani, ve které se banner zobrazil.
+Zóna s přiřazenou kampaní zobrazí banner jen za tuto kampaň, banner přiřazený zóně přímo běží ve všech svých kampaních. Na jedné stránce se stejný banner neopakuje.
+**Odebrat** banner z kampaně jde, jen když je ještě v jiné kampani – jinak ho smažte.
+
+**Kopie kampaně** vznikne pozastavená se stejnými bannery (bannery se nekopírují, jen se přiřadí i kopii). Smazáním kampaně se smažou bannery, které nejsou v žádné jiné kampani; sdílené zůstanou. Statistiky zůstanou vždy.

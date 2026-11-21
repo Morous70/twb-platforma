@@ -19,3 +19,5 @@ klicova: banner, obrázek, galerie, makro, clickurl
 Cílová adresa je povinná u všeho kromě HTML, kde odkazy píšete sami pomocí makra `{clickurl}` (např. `<a href="{clickurl}">`). Proklik se počítá a vede na cíl banneru; `{clickurl}https://jina.adresa/` vede jinam, ale jen na doménu cíle nebo adresu uvedenou v HTML.
 
 Obrázek z galerie, který banner nebo slide používá, nejde smazat.
+
+**Náhled**: v seznamu bannerů (i v kampani) otevře tlačítko s okem banner v okně přes stránku. Velký banner se zmenší, aby se vešel; HTML a HTML5 běží izolovaně jako na webu, nic se nezapočítá. Okno zavře Esc, křížek nebo klik vedle.

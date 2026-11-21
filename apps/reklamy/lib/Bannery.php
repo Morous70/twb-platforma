@@ -2,7 +2,10 @@
 declare(strict_types=1);
 namespace Reklamy;
 
-/** Bannery kampaní: obrázek z galerie, obrázek z jiné adresy, HTML, HTML5 (ZIP), slide z editoru. */
+/**
+ * Bannery: obrázek z galerie, obrázek z jiné adresy, HTML, HTML5 (ZIP), slide z editoru.
+ * Banner vzniká v kampani a jde ho přiřadit libovolně mnoha dalším kampaním (tabulka campaign_banners); vždy je aspoň v jedné.
+ */
 final class Bannery
 {
     public const TYPY = [
@@ -28,29 +31,119 @@ final class Bannery
 
     public function __construct(private App $app) {}
 
-    /** @return list<array<string, mixed>> */
+    /**
+     * Bannery kampaně, nebo všechny bannery mimo ty, které jsou jen v archivovaných kampaních.
+     * Každý řádek má `kampane` (seznam [id, name, status]); `campaign_id` a `campaign_name` jsou kampaň ze zadání, jinak první kampaň banneru.
+     * @return list<array<string, mixed>>
+     */
     public function seznam(?int $kampan = null): array
     {
-        $sql = 'SELECT b.*, c.name AS campaign_name, c.status AS campaign_status FROM banners b JOIN campaigns c ON c.id = b.campaign_id';
-        if ($kampan !== null) return $this->app->db->q("$sql WHERE b.campaign_id = ? ORDER BY b.name, b.id", [$kampan])->fetchAll();
-        return $this->app->db->q("$sql WHERE c.status <> 'archived' ORDER BY c.name, b.name, b.id")->fetchAll();
+        $db = $this->app->db;
+        if ($kampan !== null) {
+            $rows = $db->q('SELECT b.* FROM banners b JOIN campaign_banners cb ON cb.banner_id = b.id WHERE cb.campaign_id = ? ORDER BY b.name, b.id', [$kampan])->fetchAll();
+        } else {
+            $rows = $db->q("SELECT b.* FROM banners b WHERE NOT EXISTS (SELECT 1 FROM campaign_banners cb WHERE cb.banner_id = b.id)
+                OR EXISTS (SELECT 1 FROM campaign_banners cb JOIN campaigns c ON c.id = cb.campaign_id WHERE cb.banner_id = b.id AND c.status <> 'archived')
+                ORDER BY b.name, b.id")->fetchAll();
+        }
+        return $this->sKampanemi($rows, $kampan);
     }
 
-    /** @return array<string, mixed> */
+    /**
+     * Doplní řádkům bannerů jejich kampaně.
+     * @param list<array<string, mixed>> $rows
+     * @return list<array<string, mixed>>
+     */
+    public function sKampanemi(array $rows, ?int $kampan = null): array
+    {
+        if (!$rows) return [];
+        $ids = implode(',', array_map(fn($r) => (int)$r['id'], $rows));
+        $po = [];
+        foreach ($this->app->db->q("SELECT cb.banner_id, c.id, c.name, c.status FROM campaign_banners cb JOIN campaigns c ON c.id = cb.campaign_id
+            WHERE cb.banner_id IN ($ids) ORDER BY c.name COLLATE NOCASE, c.id")->fetchAll() as $r) {
+            $po[(int)$r['banner_id']][] = ['id' => (int)$r['id'], 'name' => (string)$r['name'], 'status' => (string)$r['status']];
+        }
+        foreach ($rows as &$r) {
+            $r['kampane'] = $po[(int)$r['id']] ?? [];
+            $hlavni = null;
+            foreach ($r['kampane'] as $k) if ($k['id'] === $kampan || ($kampan === null && $k['id'] === (int)$r['campaign_id'])) $hlavni = $k;
+            $hlavni ??= $r['kampane'][0] ?? null;
+            $r['campaign_id'] = $hlavni['id'] ?? null;
+            $r['campaign_name'] = $hlavni['name'] ?? '';
+        }
+        unset($r);
+        return $rows;
+    }
+
+    /** Banner i s kampaněmi (`kampane`). @return array<string, mixed> */
     public function radek(int $id): array
     {
-        return $this->app->db->q('SELECT b.*, c.name AS campaign_name FROM banners b JOIN campaigns c ON c.id = b.campaign_id WHERE b.id = ?', [$id])->fetch()
-            ?: throw new Chyba('Banner nenalezen.');
+        $r = $this->app->db->q('SELECT * FROM banners WHERE id = ?', [$id])->fetch() ?: throw new Chyba('Banner nenalezen.');
+        return $this->sKampanemi([$r])[0];
+    }
+
+    /** ID kampaní banneru. @return list<int> */
+    public function kampane(int $id): array
+    {
+        return array_map('intval', $this->app->db->q('SELECT campaign_id FROM campaign_banners WHERE banner_id = ? ORDER BY campaign_id', [$id])->fetchAll(\PDO::FETCH_COLUMN));
+    }
+
+    /**
+     * Nastaví kampaně banneru (nahradí dosavadní). Banner musí zůstat aspoň v jedné kampani.
+     * @param list<int|string> $kampane
+     */
+    public function nastavKampane(int $id, array $kampane): void
+    {
+        $b = $this->radek($id);
+        $kampane = array_values(array_unique(array_filter(array_map('intval', $kampane), fn($k) => $k > 0)));
+        if (!$kampane) throw new Chyba('Banner musí být aspoň v jedné kampani. Pokud ho už nechcete, smažte ho.');
+        foreach ($kampane as $k) $this->app->kampane()->radek($k);
+        $db = $this->app->db;
+        $db->transakce(function () use ($db, $id, $kampane) {
+            $db->q('DELETE FROM campaign_banners WHERE banner_id = ? AND campaign_id NOT IN (' . implode(',', $kampane) . ')', [$id]);
+            foreach ($kampane as $k) $db->q('INSERT OR IGNORE INTO campaign_banners (campaign_id, banner_id) VALUES (?, ?)', [$k, $id]);
+        });
+        $pred = array_column($b['kampane'], 'id');
+        sort($pred);
+        $po = $kampane;
+        sort($po);
+        if ($pred !== $po) $this->app->log('info', "Banner {$b['name']}: kampaně " . implode(', ', array_map(fn($k) => '#' . $k, $po)));
+    }
+
+    /** Přidá banner do další kampaně. */
+    public function pridejDoKampane(int $id, int $kampan): void
+    {
+        $this->nastavKampane($id, [...$this->kampane($id), $kampan]);
+    }
+
+    /** Odebere banner z kampaně (banner zůstane v ostatních kampaních). */
+    public function odeberZKampane(int $id, int $kampan): void
+    {
+        $ted = $this->kampane($id);
+        if (!in_array($kampan, $ted, true)) throw new Chyba('Banner v této kampani není.');
+        if (count($ted) === 1) throw new Chyba('Banner je jen v této kampani – odebrat ho nejde, můžete ho smazat.');
+        $this->nastavKampane($id, array_values(array_diff($ted, [$kampan])));
     }
 
     /** Uloží banner (nový, když $id je null). Vrací ID. @param array<string, mixed> $v */
     public function uloz(array $v, ?int $id = null): int
     {
         $stary = $id !== null ? $this->radek($id) : null;
-        $kampan = $this->app->kampane()->radek((int)($v['campaign_id'] ?? $stary['campaign_id'] ?? 0));
+        // nový banner vzniká v kampani (campaign_id); seznam kampaní `kampane` přiřazení nahradí
+        $kampane = array_key_exists('kampane', $v)
+            ? array_values(array_unique(array_filter(array_map(fn($k) => is_array($k) ? (int)($k['id'] ?? 0) : (int)$k, (array)$v['kampane']), fn($k) => $k > 0)))
+            : null;
+        if ($stary === null) {
+            $kampan = $this->app->kampane()->radek((int)($v['campaign_id'] ?? ($kampane[0] ?? 0)));
+            $kampane = array_values(array_unique([(int)$kampan['id'], ...($kampane ?? [])]));
+        } else {
+            $kampan = null;
+            if ($kampane !== null && !$kampane) throw new Chyba('Banner musí být aspoň v jedné kampani. Pokud ho už nechcete, smažte ho.');
+        }
+        foreach ($kampane ?? [] as $k) $this->app->kampane()->radek($k);
         $typ = $stary['type'] ?? Vstup::volba($v, 'type', 'Druh banneru', self::TYPY);
         $d = [
-            'campaign_id' => (int)$kampan['id'],
+            'campaign_id' => $stary !== null ? $stary['campaign_id'] : (int)$kampan['id'],
             'name' => Vstup::text($v, 'name', 'Název'),
             'status' => Vstup::volba($v, 'status', 'Stav', self::STAVY, 'active'),
             'type' => $typ,
@@ -109,10 +202,15 @@ final class Bannery
         $db = $this->app->db;
         if ($stary === null) {
             $d['created_at'] = $d['updated_at'];
-            $db->q('INSERT INTO banners (' . implode(', ', array_keys($d)) . ') VALUES (' . implode(', ', array_fill(0, count($d), '?')) . ')', array_values($d));
-            $id = $db->posledniId();
+            $id = $db->transakce(function () use ($db, $d, $kampane) {
+                $db->q('INSERT INTO banners (' . implode(', ', array_keys($d)) . ') VALUES (' . implode(', ', array_fill(0, count($d), '?')) . ')', array_values($d));
+                $id = $db->posledniId();
+                foreach ($kampane as $k) $db->q('INSERT INTO campaign_banners (campaign_id, banner_id) VALUES (?, ?)', [$k, $id]);
+                return $id;
+            });
             $this->app->log('info', "Nový banner {$d['name']} ({$d['width']}×{$d['height']}) v kampani {$kampan['name']}");
         } else {
+            if ($kampane !== null) $this->nastavKampane($id, $kampane);
             $db->transakce(function () use ($db, $d, $id, $stary) {
                 $db->q('UPDATE banners SET ' . implode(', ', array_map(fn($k) => "$k = ?", array_keys($d))) . ' WHERE id = ?', [...array_values($d), $id]);
                 // změna rozměru: přímá přiřazení do zón s jiným pevným rozměrem už neplatí
@@ -133,14 +231,21 @@ final class Bannery
         $this->app->db->q('UPDATE banners SET status = ?, updated_at = ? WHERE id = ?', [$stav, time(), $id]);
     }
 
+    /** Kopie banneru ve stejných kampaních (bez přiřazení do zón). */
     public function duplikuj(int $id): int
     {
-        $b = $this->radek($id);
-        unset($b['id'], $b['campaign_name']);
+        $b = $this->app->db->q('SELECT * FROM banners WHERE id = ?', [$id])->fetch() ?: throw new Chyba('Banner nenalezen.');
+        $kampane = $this->kampane($id);
+        unset($b['id']);
         $b['name'] = mb_substr($b['name'] . ' (kopie)', 0, 200);
         $b['created_at'] = $b['updated_at'] = time();
-        $this->app->db->q('INSERT INTO banners (' . implode(', ', array_keys($b)) . ') VALUES (' . implode(', ', array_fill(0, count($b), '?')) . ')', array_values($b));
-        return $this->app->db->posledniId();
+        $db = $this->app->db;
+        return $db->transakce(function () use ($db, $b, $kampane) {
+            $db->q('INSERT INTO banners (' . implode(', ', array_keys($b)) . ') VALUES (' . implode(', ', array_fill(0, count($b), '?')) . ')', array_values($b));
+            $nid = $db->posledniId();
+            foreach ($kampane as $k) $db->q('INSERT INTO campaign_banners (campaign_id, banner_id) VALUES (?, ?)', [$k, $nid]);
+            return $nid;
+        });
     }
 
     public function smaz(int $id): void

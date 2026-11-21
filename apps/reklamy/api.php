@@ -126,8 +126,9 @@ try {
                 return ['id' => (int)$r['id'], 'grp' => $r['grp'], 'param' => $r['param'], 'value' => $r['value'], 'date' => $d?->format('Y-m-d'), 'past' => $d ? $d < $dnes : false];
             }, $app->tabulkaDat()->radky(true))]);
 
-        case 'source_tree':   // vzdálené zdroje dat aplikace zatím nemá
-            $json(['sources' => []]);
+        case 'source_tree':   // externí data (stránka Externí data): hodnoty všech zdrojů pro výběr proměnné
+            $json(['sources' => array_map(fn($x) => ['id' => (int)$x['id'], 'name' => $x['name'], 'ok_at' => $x['ok_at'] ? (int)$x['ok_at'] : null, 'error' => $x['error'],
+                'groups' => $x['json'] !== null ? $app->zdroje()->strom($x) : []], $app->zdroje()->vsechny(true))]);
 
         case 'datefmt':   // dialogy Formát data / čísla: jak vypadá proměnná v jednotlivých formátech (dnes)
             $jenPost();

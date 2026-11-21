@@ -8,7 +8,7 @@ $kampane = $app->kampane()->seznam();
 $bezi = array_filter($kampane, fn($k) => Kampane::bezi($k));
 $pocty = [
     'Běžící kampaně' => [count($bezi), 'kampane'],
-    'Aktivní bannery' => [(int)$db->q("SELECT COUNT(*) FROM banners b JOIN campaigns c ON c.id = b.campaign_id WHERE b.status = 'active' AND c.status = 'active'")->fetchColumn(), 'bannery'],
+    'Aktivní bannery' => [(int)$db->q("SELECT COUNT(*) FROM banners b WHERE b.status = 'active' AND EXISTS (SELECT 1 FROM campaign_banners cb JOIN campaigns c ON c.id = cb.campaign_id WHERE cb.banner_id = b.id AND c.status = 'active')")->fetchColumn(), 'bannery'],
     'Weby' => [(int)$db->q('SELECT COUNT(*) FROM sites')->fetchColumn(), 'weby'],
     'Zóny' => [(int)$db->q('SELECT COUNT(*) FROM zones')->fetchColumn(), 'zony'],
 ];
@@ -18,7 +18,7 @@ if ((string)$n->dej('backup_password', '') === '') $upozorneni[] = ['Zálohy nej
 $cron = (int)$n->dej('cron_last_run', 0);
 if ($cron < time() - 2 * 86400) $upozorneni[] = [$cron ? 'Cron neběží od ' . Ui::datum($cron) . '.' : 'Cron zatím nikdy neběžel (denní záloha, kontrola aktualizací).', Ui::odkaz('nastaveni') . '#system'];
 $bezZony = (int)$db->q("SELECT COUNT(*) FROM campaigns c WHERE c.status = 'active' AND NOT EXISTS (SELECT 1 FROM zone_campaigns z WHERE z.campaign_id = c.id)
-    AND NOT EXISTS (SELECT 1 FROM zone_banners zb JOIN banners b ON b.id = zb.banner_id WHERE b.campaign_id = c.id)")->fetchColumn();
+    AND NOT EXISTS (SELECT 1 FROM zone_banners zb JOIN campaign_banners cb ON cb.banner_id = zb.banner_id WHERE cb.campaign_id = c.id)")->fetchColumn();
 if ($bezZony) $upozorneni[] = ["Aktivní kampaně bez zóny: $bezZony (nikde se nezobrazí).", Ui::odkaz('kampane')];
 ?>
 <?php

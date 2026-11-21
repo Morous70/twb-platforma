@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 // Soubory HTML5 banneru: d/h5.php/<md5 balíčku>/<cesta v balíčku>. Relativní odkazy uvnitř balíčku tak fungují beze změny.
-// Hlavní soubor dostane clickTag: s podpisem ?b=ID&z=ZONA&k=PODPIS vede přes počítání prokliků, bez něj (náhled) přímo na cíl.
+// Hlavní soubor dostane clickTag: s podpisem ?b=ID&z=ZONA&c=KAMPAN&k=PODPIS vede přes počítání prokliků, bez něj (náhled) přímo na cíl.
 use Reklamy\{App, Vydej, Vykresleni};
 
 /** @var App $app */
@@ -28,8 +28,9 @@ try {
             header('Content-Type: ' . $typ);
             if (str_starts_with($typ, 'text/html') || str_starts_with($typ, 'image/svg')) header('Content-Security-Policy: ' . Vydej::SANDBOX);
             if ($rel === Vykresleni::balicek($b)['index']) {
-                $z = (string)($_GET['z'] ?? '');
-                $zona = ctype_digit($z) && $app->dorucovani()->overPodpis("html|{$b['id']}|$z", $_GET['k'] ?? null) ? (int)$z : null;
+                $o = (string)($_GET['b'] ?? '') === (string)$b['id'] ? $app->vykresleni()->overOdkaz('html', $_GET) : null;
+                $zona = $o[0] ?? null;
+                if ($o) $b['campaign_id'] = $o[1];
                 Vydej::bezCache();
                 echo $app->vykresleni()->html5Index($b, (string)file_get_contents($soubor), $zona);
                 exit;

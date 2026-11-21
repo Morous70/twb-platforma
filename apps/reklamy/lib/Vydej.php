@@ -65,7 +65,7 @@ final class Vydej
     {
         $b = $this->app->dorucovani()->vyber($zona, $k, $typy);
         if (!$b) return ['banner' => null, 'html' => Vykresleni::nahradni($zona)];
-        $this->app->dorucovani()->zobrazeni((int)$b['id'], (int)$zona['id'], $k);
+        $this->app->dorucovani()->zobrazeni((int)$b['id'], (int)$zona['id'], $k, (int)$b['campaign_id']);
         return ['banner' => $b, 'html' => $this->app->vykresleni()->html($b, (int)$zona['id'])];
     }
 

@@ -11,8 +11,8 @@ echo "Reklamy: statistiky\n";
 /** Řádek statistik přímo do tabulky stats. */
 function zapisStat(App $app, string $den, int $hodina, int $banner, int $zona, int $z, int $k, int $konv = 0, int $hodnota = 0): void
 {
-    $app->db->q('INSERT INTO stats (day, hour, banner_id, zone_id, impressions, clicks, conversions, revenue) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-        [$den, $hodina, $banner, $zona, $z, $k, $konv, $hodnota]);
+    $app->db->q('INSERT INTO stats (day, hour, banner_id, zone_id, campaign_id, impressions, clicks, conversions, revenue) VALUES (?, ?, ?, ?, (SELECT campaign_id FROM banners WHERE id = ?), ?, ?, ?, ?)',
+        [$den, $hodina, $banner, $zona, $banner, $z, $k, $konv, $hodnota]);
 }
 
 $app = novaApp();
@@ -78,10 +78,10 @@ test('CSV pro Excel: BOM, středníky, desetinná čárka, součet, ochrana pře
     $csv = Statistiky::csv($app->statistiky()->prehled('2026-11-01', '2026-12-01', 'kampan'), 'kampan');
     ok(str_starts_with($csv, "\u{FEFF}Kampaně;ID;Zobrazení;Prokliky;CTR %;Konverze;Konverzní poměr %;Hodnota Kč\r\n"), $csv);
     $r = explode("\r\n", trim($csv));
-    eq('Advent;1;120;12;10,00;3;25,00;698,00', $r[1]);
-    eq('smazané bannery;0;50;5;10,00;0;0,00;0,00', $r[2], 'smazaný banner A2 už ke kampani nepatří, ve statistikách zůstane');
-    eq("'=Léto;2;35;1;2,86;0;0,00;0,00", $r[3], 'text začínající = Excel nespustí');
-    eq('Celkem;;205;18;8,78;3;16,67;698,00', $r[4]);
+    // od 0.8 si statistiky pamatují kampaň, takže smazaný banner A2 zůstane započítaný kampani Advent
+    eq('Advent;1;170;17;10,00;3;17,65;698,00', $r[1]);
+    eq("'=Léto;2;35;1;2,86;0;0,00;0,00", $r[2], 'text začínající = Excel nespustí');
+    eq('Celkem;;205;18;8,78;3;16,67;698,00', $r[3]);
     eq('"a;b";1;0;0;;0;;0,00', explode("\r\n", Statistiky::csv([['klic' => '1', 'popis' => 'a;b', 'impressions' => 0, 'clicks' => 0, 'conversions' => 0, 'revenue' => 0]], 'banner'))[1]);
 });
 

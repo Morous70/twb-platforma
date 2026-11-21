@@ -25,7 +25,7 @@ final class Kampane
         $kde = []; $p = [];
         if ($stav !== '') { $kde[] = 'c.status = ?'; $p[] = $stav; }
         else $kde[] = "c.status <> 'archived'";
-        $rows = $this->app->db->q('SELECT c.*, (SELECT COUNT(*) FROM banners b WHERE b.campaign_id = c.id) AS banners,
+        $rows = $this->app->db->q('SELECT c.*, (SELECT COUNT(*) FROM campaign_banners cb WHERE cb.campaign_id = c.id) AS banners,
             (SELECT COUNT(*) FROM zone_campaigns z WHERE z.campaign_id = c.id) AS zones
             FROM campaigns c WHERE ' . implode(' AND ', $kde) . " ORDER BY CASE c.kind WHEN 'exclusive' THEN 0 WHEN 'standard' THEN 1 ELSE 2 END, c.priority DESC, c.name", $p)->fetchAll();
         if ($tag !== '') $rows = array_values(array_filter($rows, fn($r) => in_array(Tagy::klic($tag), array_map([Tagy::class, 'klic'], $this->tagy()->tagyPolozky($r)), true)));
@@ -106,7 +106,7 @@ final class Kampane
         $this->app->log('info', "Kampaň {$k['name']}: " . mb_strtolower(self::STAVY[$stav]));
     }
 
-    /** Kopie kampaně i s bannery (bez přiřazení do zón), pozastavená. */
+    /** Kopie kampaně se stejnými bannery (bannery se nekopírují, jen přiřadí i nové kampani; bez přiřazení do zón), pozastavená. */
     public function duplikuj(int $id): int
     {
         $k = $this->radek($id);
@@ -119,21 +119,29 @@ final class Kampane
             $novy['created_at'] = $novy['updated_at'] = time();
             $db->q('INSERT INTO campaigns (' . implode(', ', array_keys($novy)) . ') VALUES (' . implode(', ', array_fill(0, count($novy), '?')) . ')', array_values($novy));
             $nid = $db->posledniId();
-            foreach ($db->q('SELECT * FROM banners WHERE campaign_id = ?', [$k['id']])->fetchAll() as $b) {
-                unset($b['id']);
-                $b['campaign_id'] = $nid;
-                $b['created_at'] = $b['updated_at'] = time();
-                $db->q('INSERT INTO banners (' . implode(', ', array_keys($b)) . ') VALUES (' . implode(', ', array_fill(0, count($b), '?')) . ')', array_values($b));
-            }
+            $db->q('INSERT INTO campaign_banners (campaign_id, banner_id) SELECT ?, banner_id FROM campaign_banners WHERE campaign_id = ?', [$nid, $k['id']]);
             $this->app->log('info', "Kampaň zkopírována: {$k['name']}");
             return $nid;
         });
     }
 
+    /** Bannery, které jsou jen v této kampani (při smazání kampaně se smažou s ní). @return list<int> */
+    public function jenVlastniBannery(int $id): array
+    {
+        return array_map('intval', $this->app->db->q('SELECT cb.banner_id FROM campaign_banners cb WHERE cb.campaign_id = ?
+            AND NOT EXISTS (SELECT 1 FROM campaign_banners x WHERE x.banner_id = cb.banner_id AND x.campaign_id <> cb.campaign_id) ORDER BY cb.banner_id', [$id])->fetchAll(\PDO::FETCH_COLUMN));
+    }
+
+    /** Smaže kampaň a bannery, které nejsou v žádné jiné kampani. Bannery sdílené s jinými kampaněmi zůstanou. */
     public function smaz(int $id): void
     {
         $k = $this->radek($id);
-        $this->app->db->q('DELETE FROM campaigns WHERE id = ?', [$id]);
+        foreach ($this->jenVlastniBannery($id) as $b) $this->app->bannery()->smaz($b);
+        $db = $this->app->db;
+        $db->transakce(function () use ($db, $id) {
+            $db->q('UPDATE banners SET campaign_id = NULL WHERE campaign_id = ?', [$id]);
+            $db->q('DELETE FROM campaigns WHERE id = ?', [$id]);
+        });
         $this->app->log('info', "Kampaň smazána: {$k['name']}");
     }
 }

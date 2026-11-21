@@ -11,7 +11,7 @@ use TWB\Jadro\{Db, ModulMigrace};
  */
 final class Schema implements ModulMigrace
 {
-    public static function verze(): int { return 4; }
+    public static function verze(): int { return 5; }
 
     /** Tabulky, které musí existovat dřív než cokoli jiného (nastavení a protokol). */
     public static function zakladniTabulky(Db $db): void
@@ -150,14 +150,86 @@ final class Schema implements ModulMigrace
             $db->q('CREATE INDEX IF NOT EXISTS conversions_at ON conversions (at)');
             $db->q('CREATE INDEX IF NOT EXISTS conversions_click ON conversions (tracker_id, click_id)');
         }
+        if ($zVerze < 5) self::bannerVeViceKampanich($db);
+    }
+
+    /**
+     * Verze 5 (0.8): banner může být v libovolně mnoha kampaních (tabulka campaign_banners).
+     * Sloupec banners.campaign_id zůstává jen jako kampaň, pro kterou banner vznikl (bez cizího klíče, smí být NULL);
+     * podle něj se převedou i zálohy ze starších verzí (obnova vloží sloupec campaign_id a pak proběhne tento převod).
+     * Statistiky, vložení odkazem a prokliky si pamatují kampaň, ve které se banner zobrazil.
+     * Převod je opakovatelný. Volá se s vypnutými cizími klíči (App::migruj), jinak by přestavba tabulky banners smazala přiřazení do zón.
+     */
+    private static function bannerVeViceKampanich(Db $db): void
+    {
+        $db->q('CREATE TABLE IF NOT EXISTS campaign_banners (
+            campaign_id INTEGER NOT NULL REFERENCES campaigns(id) ON DELETE CASCADE,
+            banner_id INTEGER NOT NULL REFERENCES banners(id) ON DELETE CASCADE,
+            PRIMARY KEY (campaign_id, banner_id)
+        )');
+        $db->q('CREATE INDEX IF NOT EXISTS campaign_banners_banner ON campaign_banners (banner_id)');
+        $fk = array_filter($db->q('PRAGMA foreign_key_list(banners)')->fetchAll(\PDO::FETCH_ASSOC), fn($r) => $r['from'] === 'campaign_id');
+        if ($fk) {
+            $db->q("CREATE TABLE banners_nova (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                campaign_id INTEGER NULL,                          -- kampaň, pro kterou banner vznikl (jen informace); přiřazení je v campaign_banners
+                name VARCHAR(200) NOT NULL,
+                status VARCHAR(10) NOT NULL DEFAULT 'active',      -- active | paused
+                type VARCHAR(10) NOT NULL,                         -- image | external | html | html5 | slide
+                width INTEGER NOT NULL, height INTEGER NOT NULL,
+                weight INTEGER NOT NULL DEFAULT 1,
+                media_id INTEGER NULL,
+                image_url TEXT NULL,
+                html TEXT NULL,
+                content TEXT NULL,                                 -- JSON pro HTML5 a slidy
+                target_url TEXT NULL, target VARCHAR(10) NOT NULL DEFAULT '_blank',
+                alt VARCHAR(255) NULL, note TEXT NULL,
+                created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL
+            )");
+            $sl = 'id, campaign_id, name, status, type, width, height, weight, media_id, image_url, html, content, target_url, target, alt, note, created_at, updated_at';
+            $db->q("INSERT INTO banners_nova ($sl) SELECT $sl FROM banners");
+            $db->q('DROP TABLE banners');
+            $db->q('ALTER TABLE banners_nova RENAME TO banners');
+            $db->q('CREATE INDEX IF NOT EXISTS banners_campaign ON banners (campaign_id)');
+            $db->q('CREATE INDEX IF NOT EXISTS banners_media ON banners (media_id)');
+        }
+        $db->q('INSERT OR IGNORE INTO campaign_banners (campaign_id, banner_id)
+            SELECT b.campaign_id, b.id FROM banners b WHERE b.campaign_id IN (SELECT id FROM campaigns)');
+        // statistiky po kampaních (stejný banner ve dvou kampaních má dva řádky)
+        if (!self::maSloupec($db, 'stats', 'campaign_id')) {
+            $db->q('CREATE TABLE stats_nova (
+                day CHAR(10) NOT NULL, hour INTEGER NOT NULL,
+                banner_id INTEGER NOT NULL, zone_id INTEGER NOT NULL DEFAULT 0, campaign_id INTEGER NOT NULL DEFAULT 0,
+                impressions INTEGER NOT NULL DEFAULT 0, clicks INTEGER NOT NULL DEFAULT 0,
+                conversions INTEGER NOT NULL DEFAULT 0, revenue INTEGER NOT NULL DEFAULT 0,
+                PRIMARY KEY (day, hour, banner_id, zone_id, campaign_id)
+            )');
+            $db->q('INSERT INTO stats_nova (day, hour, banner_id, zone_id, campaign_id, impressions, clicks, conversions, revenue)
+                SELECT s.day, s.hour, s.banner_id, s.zone_id, COALESCE((SELECT b.campaign_id FROM banners b WHERE b.id = s.banner_id), 0),
+                    s.impressions, s.clicks, s.conversions, s.revenue FROM stats s');
+            $db->q('DROP TABLE stats');
+            $db->q('ALTER TABLE stats_nova RENAME TO stats');
+            $db->q('CREATE INDEX IF NOT EXISTS stats_banner ON stats (banner_id, day)');
+        } else {
+            // obnovená záloha ze starší verze: sloupec je, ale kampaň chybí
+            $db->q('UPDATE stats SET campaign_id = COALESCE((SELECT b.campaign_id FROM banners b WHERE b.id = stats.banner_id), 0) WHERE campaign_id = 0');
+        }
+        $db->q('CREATE INDEX IF NOT EXISTS stats_campaign ON stats (campaign_id, day)');
+        self::pridejSloupec($db, 'view_map', 'campaign_id', 'INTEGER NOT NULL DEFAULT 0');
+        $chyby = $db->q('PRAGMA foreign_key_check')->fetchAll();
+        if ($chyby) throw new \RuntimeException('Převod bannerů do více kampaní: porušené vazby v tabulce ' . $chyby[0]['table'] . '.');
+    }
+
+    private static function maSloupec(Db $db, string $tabulka, string $sloupec): bool
+    {
+        foreach ($db->q('PRAGMA table_info(' . $tabulka . ')')->fetchAll(\PDO::FETCH_ASSOC) as $r) if ($r['name'] === $sloupec) return true;
+        return false;
     }
 
     /** ALTER TABLE … ADD COLUMN, jen když sloupec ještě není. */
     private static function pridejSloupec(Db $db, string $tabulka, string $sloupec, string $definice): void
     {
-        foreach ($db->q('PRAGMA table_info(' . $tabulka . ')')->fetchAll(\PDO::FETCH_ASSOC) as $r) {
-            if ($r['name'] === $sloupec) return;
-        }
+        if (self::maSloupec($db, $tabulka, $sloupec)) return;
         $db->q("ALTER TABLE {$tabulka} ADD COLUMN {$sloupec} {$definice}");
     }
 }

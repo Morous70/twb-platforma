@@ -54,7 +54,7 @@ foreach (Bannery::ROZMERY as $r => $n) $rozmery[$r] = str_replace('x', '×', $r)
       <div class="seznam-voleb">
         <?php foreach ($bannery as $b): $pasuje = Zony::pasuje($z, $b); ?>
         <label class="<?= $pasuje ? '' : 'nepasuje' ?>"><input type="checkbox" name="bannery[]" value="<?= (int)$b['id'] ?>"<?= in_array((int)$b['id'], $prirazeni['bannery'], true) ? ' checked' : '' ?><?= $pasuje ? '' : ' disabled' ?>>
-          <?= Ui::h($b['campaign_name'] . ' / ' . $b['name']) ?> <span class="slabe mala"><?= (int)$b['width'] ?>×<?= (int)$b['height'] ?></span></label>
+          <?= Ui::h($b['name']) ?> <span class="slabe mala"><?= (int)$b['width'] ?>×<?= (int)$b['height'] ?> · <?= Ui::h(implode(', ', array_column($b['kampane'], 'name'))) ?></span></label>
         <?php endforeach; ?>
       </div>
       <?php endif; ?>
@@ -65,11 +65,11 @@ foreach (Bannery::ROZMERY as $r => $n) $rozmery[$r] = str_replace('x', '×', $r)
   <h2>Bannery v zóně (<?= count($efektivni) ?>)</h2>
   <?php if (!$efektivni): ?><div class="prazdne">Zóna zatím nemá co zobrazit<?= $z['fallback'] ? ' – zobrazí se náhradní HTML' : '' ?>.</div><?php else: ?>
   <div class="tabulka-obal"><table>
-    <tr><th>Banner</th><th>Kampaň</th><th>Rozměr</th><th>Stav</th></tr>
+    <tr><th>Banner</th><th>Kampaně</th><th>Rozměr</th><th>Stav</th></tr>
     <?php foreach ($efektivni as $b): ?>
     <tr>
       <td><a href="<?= Ui::h(Ui::odkaz('banner', ['id' => $b['id']])) ?>"><?= Ui::h($b['name']) ?></a></td>
-      <td><a href="<?= Ui::h(Ui::odkaz('kampan', ['id' => $b['campaign_id']])) ?>"><?= Ui::h($b['campaign_name']) ?></a></td>
+      <td><?= Ui::kampaneBanneru($b) ?></td>
       <td><?= (int)$b['width'] ?>×<?= (int)$b['height'] ?></td>
       <td><?= Ui::stav($b['status'], Bannery::STAVY[$b['status']]) ?></td>
     </tr>

@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 // Obsah banneru: ?b=ID&v=VERZE – obrázek z galerie nebo vykreslený slide (dlouhá mezipaměť),
-// ?b=ID&z=ZONA&k=PODPIS – HTML dokument banneru pro iframe (izolovaný: vlastní původ díky CSP sandbox).
+// ?b=ID&z=ZONA&c=KAMPAN&k=PODPIS – HTML dokument banneru pro iframe (izolovaný: vlastní původ díky CSP sandbox).
 use Reklamy\{App, Vydej};
 
 /** @var App $app */
@@ -34,12 +34,12 @@ try {
         readfile($cesta);
         exit;
     }
-    $z = (string)($_GET['z'] ?? '');
-    if ($b && $b['type'] === 'html' && ctype_digit($z) && $app->dorucovani()->overPodpis("html|$id|$z", $_GET['k'] ?? null)) {
+    if ($b && $b['type'] === 'html' && ($o = $app->vykresleni()->overOdkaz('html', $_GET))) {
         Vydej::bezCache();
         header('Content-Type: text/html; charset=utf-8');
         header('Content-Security-Policy: ' . Vydej::SANDBOX);
-        echo $app->vykresleni()->dokumentHtml($b, (int)$z);
+        $b['campaign_id'] = $o[1];   // proklik z dokumentu se započítá kampani, ve které se banner zobrazil
+        echo $app->vykresleni()->dokumentHtml($b, $o[0]);
         exit;
     }
 } catch (Throwable $e) {

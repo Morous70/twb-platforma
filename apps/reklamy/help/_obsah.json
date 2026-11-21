@@ -20,7 +20,8 @@
             "druhy-banneru",
             "editor-slidu",
             "html5-bannery",
-            "promenne"
+            "promenne",
+            "externi-data"
           ]
         },
         {
@@ -73,6 +74,7 @@
     "statistiky": "statistiky",
     "galerie": "druhy-banneru",
     "promenne": "promenne",
+    "zdroje": "externi-data",
     "nastaveni": "zalohy",
     "protokol": "banner-se-nezobrazuje",
     "slide": "editor-slidu"

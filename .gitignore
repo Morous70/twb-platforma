@@ -6,3 +6,4 @@ data/media/*
 data/tmp/*
 uploads/*
 !uploads/.gitkeep
+dist/

@@ -81,3 +81,21 @@ php tests/run.php tagy       # jeden modul
 - Počasí: `tests/data/original/weather-sp-1.9.2.php` je zmrazený originál; test porovnává hodnoty, tabulku `weather`, protokol i volané adresy OpenWeather (chyby 401/404/429/500, výpadek, obnova, mazání nepoužitých míst). API klíč, výchozí místo a seznam míst použitých v textech dodává aplikace funkcemi (`mistaVTextu()` je najde v textu, v zápisu `{{…}}` i `{…}`). Při výpadku je text v protokolu neutrální.
 - Správa řádků a zdrojů v originále leží přímo v `api.php` aplikací, proto je kryta samostatnými testy (`tests/data/sprava_test.php`), ne porovnáním. Zápis do `data_rows` předpokládá sloupce `id, grp, param, value, updated_at` (UNIX čas), tj. tabulku Social Planneru nebo `Migrace`; Plánovač médií má jiné časové sloupce (`created_at`, `updated_at` jako DATETIME), proto bude při přechodu potřeba doplnit mapování.
 - Prvek „Počasí“: `PocasiPrvek` implementuje `TWB\Slidy\Prvek` (vyžaduje modul `slidy`); výsledný obrázek je shodný s originálem bajt po bajtu (test spouští zmrazený `slide.php` s jednoduchými náhradami funkcí počasí). Serverová část, která počítá rozvržení (`rozvrh`), je zároveň zdrojem pro editor v prohlížeči.
+
+
+## Sestavení balíčků (`tools/sestavit.php`)
+
+```
+php tools/sestavit.php <aplikace>              # dist/twb-<app>-<verze>-full.zip a -update.zip
+php tools/sestavit.php <aplikace> --kontrola   # jen ověří modules.lock a vypíše počty souborů
+php tools/sestavit.php <aplikace> --zamek      # přepíše modules.lock podle verzí z module.json
+php tools/sestavit.php <aplikace> --bez-lintu --cil=složka
+```
+
+- **`apps/<app>/modules.lock`**: `{"app": "…", "moduly": {"jadro": "0.1.0", …}}`. Verze musí přesně odpovídat `module.json`, jinak sestavení skončí chybou (změna modulu se musí do aplikace převzít vědomě, `--zamek`). Závislosti (`requires`: `>=1.2.3`, `^1.2.3` nebo přesná verze) musí být splněné uvnitř zámku. Aplikace bez `modules.lock` se sestaví beze změny (stávající aplikace).
+- **Obsah balíčku**: jedna kořenová složka (výchozí `<app>/`), soubory aplikace, `modules/<modul>/…` jen z modulů v zámku (bez testů), `BUILD.json` (verze, moduly, SHA-256 všech souborů). Nikdy `config.php` v kořeni, `*.sqlite`, logy, obsah `data/media|tmp|update|backups|weather-icons`.
+- **FULL** = vše (první instalace přes FTP). **UPDATE** = bez `install.php`, `config.sample.php` a složky `data/`. Seznam „jen FULL“, složku v ZIPu a povinné soubory lze změnit v `apps/<app>/build.json` (`jen_full`, `koren`, `povinne`).
+- ZIP je opakovatelný: soubory seřazené, pevné přístupová práva, čas souborů = čas sestavení. Po sestavení se vypíše SHA-256 a velikost (údaje, které potřebuje manifest Update Serveru). Nahrání na Update Server nástroj zatím neumí; balíčky se nahrávají jako dosud.
+- Před sestavením se každý `.php` v balíčku zkontroluje `php -l` (jde vypnout). Symbolické odkazy sestavení zastaví (stejně je odmítne `Balicek::rozbal`).
+- Aplikace s moduly načítá `modules/jadro/boot.php` z vlastní složky `modules/` (v balíčku), při vývoji z `../../modules`.
+- Testy: `tests/nastroje/sestavit_test.php`; jeden test sestaví skutečný Plánovač médií a ověří, že jeho soubory jsou beze změny.

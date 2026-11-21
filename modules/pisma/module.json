@@ -1,0 +1,7 @@
+{
+  "name": "pisma",
+  "version": "0.1.0",
+  "php": ">=8.1",
+  "popis": "Písma pro slidy a bannery: vestavěná sada (OFL) a vlastní TTF/OTF včetně kontroly českých znaků.",
+  "requires": { "jadro": ">=0.1.0" }
+}

@@ -10,4 +10,4 @@ tests/     testy modulů
 docs/      dokumentace (Update Server a další)
 ```
 
-Stav: krok 1 – importované aplikace beze změny. Moduly se vyčleňují postupně, starší aplikace se nechávají být.
+Stav: aplikace jsou importované beze změny. Moduly (`jadro`, `tagy`, `pisma`) jsou hotové a otestované, aplikace je zatím nepoužívají. Pravidla a stav modulů: [docs/moduly.md](docs/moduly.md). Testy: `php tests/run.php`.

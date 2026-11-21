@@ -1,0 +1,7 @@
+{
+  "name": "jadro",
+  "version": "0.1.0",
+  "php": ">=8.1",
+  "popis": "Základ platformy: zavaděč tříd, databáze, nastavení, protokol, registr API akcí a haků, migrace modulů.",
+  "requires": {}
+}

@@ -1,0 +1,7 @@
+{
+  "name": "tagy",
+  "version": "0.1.0",
+  "php": ">=8.1",
+  "popis": "Tagy položek (médií, souborů): čištění a limity, hromadné změny, přejmenování se sloučením, mazání.",
+  "requires": { "jadro": ">=0.1.0" }
+}

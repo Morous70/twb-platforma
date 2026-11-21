@@ -13,6 +13,7 @@ Aplikace je složená z modulů platformy (`modules/`), vlastní kód je v `lib/
 | 0.4 | Konverze a trackery (pixel, JS, proměnné jako hodnota objednávky), přiřazení po prokliku (a volitelně po zobrazení), omezení doručení (čas, den, zařízení, jazyk, stránka) a frekvence | hotovo |
 | 0.5 | Statistiky (dny, měsíce, kampaně, bannery, zóny, weby; CTR, konverze, hodnota), grafy, export CSV, nápověda, obnova zálohy a aktualizace v rozhraní, balíček pro Update Server | hotovo |
 | 0.6 | Nový vzhled administrace podle šablony AdminKit: tmavé postranní menu se skupinami a ikonami (skrytí na počítači, vysunutí na mobilu), horní lišta, karty a dlaždice se stínem, barvy a typografie; funkce beze změny | hotovo |
+| 0.7 | Zóna jen se šířkou nebo jen s výškou (druhý rozměr libovolný): přiřazení a výběr bannerů, formulář, kódy pro vložení a náhled | hotovo |
 
 ## Struktura
 ```
@@ -108,7 +109,7 @@ a když kód jmenuje písmo z modulu pisma (`font-family: 'Montserrat'`), vlož�
 ## Datový model (SQLite, `lib/Schema.php`)
 - `campaigns` – druh (`exclusive` přednost, `standard`, `remnant` jen když není nic jiného), priorita 1–10, váha, termín (unix čas), limity celkem a za den, tagy (modul tagy).
 - `banners` – patří kampani; druh `image` (galerie, `media_id`), `external` (`image_url`), `html` (`html`), `html5` a `slide` (JSON ve sloupci `content`: balíček, resp. šablona). Rozměr, cíl prokliku, váha.
-- `sites` a `zones` – zóna má volitelný pevný rozměr (bere jen bannery stejného rozměru) a náhradní HTML.
+- `sites` a `zones` – zóna má volitelnou pevnou šířku a výšku, každou zvlášť (`NULL` = libovolná; bere jen bannery, které v zadaných rozměrech sedí) a náhradní HTML. Rám a popup bez pevného rozměru dostanou v kódu největší rozměr bannerů zóny (jinak 300×250, popup 800×600).
 - `zone_campaigns` (celá kampaň, platí i pro později přidané bannery) a `zone_banners` (jednotlivé bannery).
 - `trackers`, `tracker_campaigns` – trackery konverzí a kampaně, které sledují. `conversions` – konverze (tracker, kampaň, banner, zóna, proklik, `via` = `click` / `view` / prázdné, hodnota v haléřích, `ref` = číslo objednávky, unikátní v trackeru).
 - `clicks` a `views` – prokliky a zobrazení návštěvníků pro přiřazení (zobrazení jen když nějaký tracker má okno po zobrazení); cron maže starší než nejdelší okno.

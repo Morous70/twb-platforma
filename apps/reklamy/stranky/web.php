@@ -54,7 +54,7 @@ $jeNova = ($_POST['akce'] ?? '') === 'nova-zona';
       <?= Ui::pole('Výška (px)', 'height', '', ['type' => 'number', 'min' => 1, 'max' => Bannery::MAX_ROZMER]) ?>
       <label class="pole"><span>&nbsp;</span><select data-rozmery aria-label="Běžné rozměry"><?php foreach ($rozmery as $k => $t): ?><option value="<?= Ui::h($k) ?>"><?= Ui::h($t) ?></option><?php endforeach; ?></select></label>
     </div>
-    <small class="slabe">Bez rozměru zóna přijme banner libovolné velikosti.</small>
+    <small class="slabe">Prázdný rozměr je libovolný: bez šířky i výšky zóna přijme banner jakékoli velikosti, se zadanou jen šířkou (nebo jen výškou) přijme bannery s touto šířkou (výškou) a libovolným druhým rozměrem.</small>
     <div><button type="submit" class="hlavni">Přidat zónu</button></div>
   </form>
 </section>

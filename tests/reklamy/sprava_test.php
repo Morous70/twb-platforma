@@ -134,7 +134,6 @@ test('zóny: rozměr, přiřazení kampaní a bannerů, změna rozměru', functi
     $ids = function (array $rows): array { $a = array_map(fn($b) => (int)$b['id'], $rows); sort($a); return $a; };
     $web = $app->weby()->uloz(['name' => 'kazbo.eu', 'url' => 'https://kazbo.eu']);
     throws(fn() => $app->weby()->uloz(['name' => 'X', 'url' => 'kazbo.eu']), 'http');
-    throws(fn() => $app->zony()->uloz(['site_id' => $web, 'name' => 'Z', 'width' => 300]), 'šířku i výšku');
     throws(fn() => $app->zony()->uloz(['site_id' => 999, 'name' => 'Z']), 'Web nenalezen');
     $zPevna = $app->zony()->uloz(['site_id' => $web, 'name' => 'Ctverec', 'width' => 300, 'height' => 250, 'fallback' => '<p>Reklama</p>']);
     $zVolna = $app->zony()->uloz(['site_id' => $web, 'name' => 'Cokoli']);
@@ -164,6 +163,33 @@ test('zóny: rozměr, přiřazení kampaní a bannerů, změna rozměru', functi
     $app->zony()->uloz(['name' => 'Cokoli', 'width' => 728, 'height' => 90], $zVolna);
     eq([], $app->zony()->prirazeni($zVolna)['bannery']);
     eq([$b728], array_map(fn($b) => (int)$b['id'], $app->zony()->bannery($zVolna)));
+    // zóna jen se šířkou / jen s výškou: druhý rozměr libovolný
+    $zSirka = $app->zony()->uloz(['site_id' => $web, 'name' => 'Pruh', 'width' => 1200]);
+    $zVyska = $app->zony()->uloz(['site_id' => $web, 'name' => 'Nizky', 'height' => 90]);
+    eq('1200 × libovolná výška', Zony::rozmer($app->zony()->radek($zSirka)));
+    eq('libovolná šířka × 90', Zony::rozmer($app->zony()->radek($zVyska)));
+    $p100 = htmlBanner($app, $kid, 1200, 100);
+    $p300 = htmlBanner($app, $kid, 1200, 300);
+    $u90 = htmlBanner($app, $jina, 970, 90);
+    throws(fn() => $app->zony()->prirad($zSirka, [], [$b300]), 'nemá rozměr zóny 1200 × libovolná výška');
+    $app->zony()->prirad($zSirka, [$kid], [$p100]);
+    eq([$p100, $p300], $ids($app->zony()->bannery($zSirka)), 'z kampaně jen šířka 1200, výška libovolná');
+    $app->zony()->prirad($zVyska, [$kid], [$u90]);
+    eq([$b728, $u90], $ids($app->zony()->bannery($zVyska)), 'jen výška 90, šířka libovolná');
+    eq([1200, 300], $app->zony()->rozmerVlozeni($app->zony()->radek($zSirka)), 'chybějící výška = největší banner');
+    eq([970, 90], $app->zony()->rozmerVlozeni($app->zony()->radek($zVyska)));
+    eq([300, 250], $app->zony()->rozmerVlozeni(['id' => 0, 'width' => null, 'height' => null]));
+    // změna výšky banneru nevadí zóně jen se šířkou, změna šířky ano
+    $app->bannery()->uloz(['name' => 'P', 'width' => 1200, 'height' => 150, 'html' => 'x'], $p100);
+    eq([$p100], $app->zony()->prirazeni($zSirka)['bannery']);
+    $app->bannery()->uloz(['name' => 'P', 'width' => 1000, 'height' => 150, 'html' => 'x'], $p100);
+    eq([], $app->zony()->prirazeni($zSirka)['bannery']);
+    // změna zóny na jen výšku odebere přímé bannery jiné výšky
+    $app->zony()->prirad($zSirka, [], [$p300]);
+    $app->zony()->uloz(['name' => 'Pruh', 'height' => 300], $zSirka);
+    eq([$p300], $app->zony()->prirazeni($zSirka)['bannery']);
+    $app->zony()->uloz(['name' => 'Pruh', 'height' => 100], $zSirka);
+    eq([], $app->zony()->prirazeni($zSirka)['bannery']);
     // smazání webu smaže zóny i přiřazení
     $app->weby()->smaz($web);
     eq(0, (int)$app->db->q('SELECT COUNT(*) FROM zones')->fetchColumn());

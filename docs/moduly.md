@@ -26,10 +26,17 @@ php tests/run.php tagy       # jeden modul
 | pisma | 0.1.0 | hotovo; vestavěná písma ve složce `fonty/` |
 | obrazky | 0.1.0 | hotovo; komprese, EXIF, průhlednost, animované GIFy (opravena detekce GIFu se dvěma snímky) |
 | napoveda | 0.1.0 | hotovo (PHP); klient `assets/help.js` je zatím převzatý z Plánovače beze změny |
-| prihlaseni, zalohy, aktualizace | – | další v pořadí; přihlášení a zálohy se v aplikacích výrazně liší |
+| prihlaseni | 0.1.0 | hotovo: Tokeny, Zamek, Heslo, Obnova, Google, Passkey, Relace (+CSRF), Posta; vlastní tabulky `auth_tokens`, `passkeys` |
+| zalohy, aktualizace | – | další v pořadí; zálohy se v aplikacích výrazně liší |
 | galerie, slidy, html, data | – | po jednoduchých modulech |
 
 ## Známé chyby nalezené při vyčleňování
 - `Napoveda::zkontroluj()` a původní `help_check()` v Plánovači: ve zprávách typu `„$k“` bere PHP uvozovku jako součást jména proměnné. V modulu opraveno, v Plánovači zmizí po přepnutí na modul.
 - Původní `img_is_animated_gif()` nepoznala GIF se dvěma snímky, takže by se zmenšil a přišel o animaci. V modulu opraveno.
 - `imagedestroy()` je od PHP 8.5 zastaralé, moduly ho nepoužívají.
+
+## Poznámky k přihlášení
+- Moduly nesahají na `$_SESSION` ani `$_SERVER`: `Relace` dostane pole (u aplikace `$_SESSION`), `Google` dostane HTTP klienta, `Obnova` dostane odesílání e-mailu a adresu. Díky tomu jdou testovat bez webového serveru.
+- Rozdíly mezi aplikacemi řeší parametry: tvar odkazu obnovy (`{zaklad}/?reset={token}` v Plánovači, `{zaklad}/login.php?reset={token}` v Social Planneru), formát času u Passkey (datum a čas, nebo číslo), záložní otisk hesla z konfigurace.
+- Zkušební (mock) přihlášení přes Google zůstává věcí aplikace – modul ho nezná.
+- Testy ověřují i to, že odstranění kontroly podpisu nebo počítadla Passkey test shodí.

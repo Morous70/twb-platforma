@@ -1,0 +1,7 @@
+{
+  "name": "prihlaseni",
+  "version": "0.1.0",
+  "php": ">=8.1",
+  "popis": "Přihlášení jednoho uživatele: heslo, zámek pokusů, obnova e-mailem, Google (OpenID Connect), Passkey (WebAuthn), relace s odhlášením po nečinnosti a CSRF.",
+  "requires": { "jadro": ">=0.1.0" }
+}

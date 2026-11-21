@@ -1,0 +1,7 @@
+{
+  "name": "zalohy",
+  "version": "0.1.0",
+  "php": ">=8.1",
+  "popis": "Zálohy: šifrovaný ZIP (AES-256) s databází a soubory, automatická denní záloha, obnova s pojistnou zálohou; snímek SQLite.",
+  "requires": { "jadro": ">=0.1.0" }
+}

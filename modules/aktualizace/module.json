@@ -1,0 +1,7 @@
+{
+  "name": "aktualizace",
+  "version": "0.1.0",
+  "php": ">=8.1",
+  "popis": "Aktualizace z TWB Update Serveru: podepsaný manifest (Ed25519), SHA-256, bezpečné rozbalení, záloha, kontrola zdraví a návrat k předchozí verzi.",
+  "requires": { "jadro": ">=0.1.0", "zalohy": ">=0.1.0" }
+}

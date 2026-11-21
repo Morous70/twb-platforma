@@ -27,7 +27,8 @@ php tests/run.php tagy       # jeden modul
 | obrazky | 0.1.0 | hotovo; komprese, EXIF, průhlednost, animované GIFy (opravena detekce GIFu se dvěma snímky) |
 | napoveda | 0.1.0 | hotovo (PHP); klient `assets/help.js` je zatím převzatý z Plánovače beze změny |
 | prihlaseni | 0.1.0 | hotovo: Tokeny, Zamek, Heslo, Obnova, Google, Passkey, Relace (+CSRF), Posta; vlastní tabulky `auth_tokens`, `passkeys` |
-| zalohy, aktualizace | – | další v pořadí; zálohy se v aplikacích výrazně liší |
+| zalohy | 0.1.0 | hotovo: `Zalohy` (šifrovaný ZIP AES-256, denní záloha, obnova s pojistnou zálohou, kontrola kontrolních součtů souborů), `Skupina` (galerie, písma …), `Snimek` (SQLite VACUUM INTO – způsob Social Planneru) |
+| aktualizace | 0.1.0 | hotovo: `Aktualizace`, `Manifest` (Ed25519), `Balicek` (bezpečné rozbalení), `Curl`; vyžaduje modul `zalohy` |
 | galerie, slidy, html, data | – | po jednoduchých modulech |
 
 ## Známé chyby nalezené při vyčleňování
@@ -40,3 +41,11 @@ php tests/run.php tagy       # jeden modul
 - Rozdíly mezi aplikacemi řeší parametry: tvar odkazu obnovy (`{zaklad}/?reset={token}` v Plánovači, `{zaklad}/login.php?reset={token}` v Social Planneru), formát času u Passkey (datum a čas, nebo číslo), záložní otisk hesla z konfigurace.
 - Zkušební (mock) přihlášení přes Google zůstává věcí aplikace – modul ho nezná.
 - Testy ověřují i to, že odstranění kontroly podpisu nebo počítadla Passkey test shodí.
+
+## Poznámky k zálohám a aktualizaci
+- `Zalohy` nezná tabulky ani složky konkrétní aplikace: dostane pořadí tabulek, povinné tabulky, místní nastavení (nepřepisují se obnovou) a `Skupina` souborů. Plánovač: skupina `media` (galerie, jen při změně, s úklidem po obnovení) a `fonts` (vždy). Formát `database.json` a názvy složek v ZIPu zůstaly shodné s Plánovačem, takže jde obnovit i jeho dosavadní zálohy.
+- Převod databáze po obnovení starší zálohy je zavěšený jako callable `poObnoveni` (v Plánovači `run_migrations`).
+- Social Planner nahradí vlastní zálohu stejným modulem; jeho dosavadní snímek SQLite (`Snimek::automaticky`) zůstává k dispozici jako lehčí varianta.
+- `Aktualizace` nikdy nesahá na `config.php` a `data/` (parametr `zachovat`), maže jen soubory, které předchozí aktualizace sama nainstalovala (evidence v `installed-files.json`), a při selhání kontroly zdraví vrátí soubory; databázi vrací ze zálohy před aktualizací jen tehdy, když ji nová verze převedla na vyšší verzi dat.
+- Server a kontrola zdraví jsou vyměnitelné (callable), takže testy běží bez sítě. Testy ověřují: podpis, SHA-256, Zip Slip, symbolické odkazy, zachované cesty, návrat souborů i databáze; odstranění kterékoli z těchto kontrol aspoň jeden test shodí.
+- Úrovně protokolu: modul zapisuje `info`, `warn`, `error` (původní úroveň `success` se zapisuje jako `info`).

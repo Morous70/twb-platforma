@@ -25,7 +25,7 @@ php tests/run.php tagy       # jeden modul
 | tagy | 0.1.0 | hotovo, sloučeno z obou aplikací |
 | pisma | 0.1.0 | hotovo; vestavěná písma ve složce `fonty/` |
 | obrazky | 0.1.0 | hotovo; komprese, EXIF, průhlednost, animované GIFy (opravena detekce GIFu se dvěma snímky) |
-| napoveda | 0.1.0 | hotovo (PHP); klient `assets/help.js` je zatím převzatý z Plánovače beze změny |
+| napoveda | 0.2.0 | hotovo (PHP); klient `assets/help.js` je zatím převzatý z Plánovače beze změny; od 0.2.0 i vykreslení na serveru (`Markdown`, shodné HTML s klientem – test porovnává všechny stránky Plánovače) a `Napoveda::hledej()` (TWB Reklamy) |
 | prihlaseni | 0.1.0 | hotovo: Tokeny, Zamek, Heslo, Obnova, Google, Passkey, Relace (+CSRF), Posta; vlastní tabulky `auth_tokens`, `passkeys` |
 | zalohy | 0.1.0 | hotovo: `Zalohy` (šifrovaný ZIP AES-256, denní záloha, obnova s pojistnou zálohou, kontrola kontrolních součtů souborů), `Skupina` (galerie, písma …), `Snimek` (SQLite VACUUM INTO – způsob Social Planneru) |
 | aktualizace | 0.1.0 | hotovo: `Aktualizace`, `Manifest` (Ed25519), `Balicek` (bezpečné rozbalení), `Curl`; vyžaduje modul `zalohy` |

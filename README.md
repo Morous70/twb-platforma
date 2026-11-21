@@ -10,4 +10,4 @@ tests/     testy modulů
 docs/      dokumentace (Update Server a další)
 ```
 
-Stav: aplikace jsou importované beze změny. Moduly (`jadro`, `tagy`, `pisma`, `obrazky`, `napoveda`, `prihlaseni`, `zalohy`, `aktualizace`) jsou hotové a otestované, aplikace je zatím nepoužívají. Pravidla a stav modulů: [docs/moduly.md](docs/moduly.md). Testy: `php tests/run.php`.
+Stav: aplikace jsou importované beze změny. Moduly (`jadro`, `tagy`, `pisma`, `obrazky`, `napoveda`, `prihlaseni`, `zalohy`, `aktualizace`, `galerie`) jsou hotové a otestované, aplikace je zatím nepoužívají. Pravidla a stav modulů: [docs/moduly.md](docs/moduly.md). Testy: `php tests/run.php`.

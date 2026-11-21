@@ -29,7 +29,8 @@ php tests/run.php tagy       # jeden modul
 | prihlaseni | 0.1.0 | hotovo: Tokeny, Zamek, Heslo, Obnova, Google, Passkey, Relace (+CSRF), Posta; vlastní tabulky `auth_tokens`, `passkeys` |
 | zalohy | 0.1.0 | hotovo: `Zalohy` (šifrovaný ZIP AES-256, denní záloha, obnova s pojistnou zálohou, kontrola kontrolních součtů souborů), `Skupina` (galerie, písma …), `Snimek` (SQLite VACUUM INTO – způsob Social Planneru) |
 | aktualizace | 0.1.0 | hotovo: `Aktualizace`, `Manifest` (Ed25519), `Balicek` (bezpečné rozbalení), `Curl`; vyžaduje modul `zalohy` |
-| galerie, slidy, html, data | – | po jednoduchých modulech |
+| galerie | 0.1.0 | hotovo: `Galerie` (nahrání s kontrolou typu i obsahu, nahrazení souboru, komprese s uchováním originálu, archiv, tagy, mazání s vazbami aplikace), `Nahravani` (soubor po částech), `Sloupce` (přiřazení ke sloupcům tabulky), `Migrace` (výchozí tabulka `media`) |
+| slidy, html, data | – | další v pořadí |
 
 ## Známé chyby nalezené při vyčleňování
 - `Napoveda::zkontroluj()` a původní `help_check()` v Plánovači: ve zprávách typu `„$k“` bere PHP uvozovku jako součást jména proměnné. V modulu opraveno, v Plánovači zmizí po přepnutí na modul.
@@ -49,3 +50,10 @@ php tests/run.php tagy       # jeden modul
 - `Aktualizace` nikdy nesahá na `config.php` a `data/` (parametr `zachovat`), maže jen soubory, které předchozí aktualizace sama nainstalovala (evidence v `installed-files.json`), a při selhání kontroly zdraví vrátí soubory; databázi vrací ze zálohy před aktualizací jen tehdy, když ji nová verze převedla na vyšší verzi dat.
 - Server a kontrola zdraví jsou vyměnitelné (callable), takže testy běží bez sítě. Testy ověřují: podpis, SHA-256, Zip Slip, symbolické odkazy, zachované cesty, návrat souborů i databáze; odstranění kterékoli z těchto kontrol aspoň jeden test shodí.
 - Úrovně protokolu: modul zapisuje `info`, `warn`, `error` (původní úroveň `success` se zapisuje jako `info`).
+
+## Poznámky ke galerii
+- Tabulka aplikace se popisuje objektem `Sloupce` (výchozí = `media` z Plánovače). Social Planner: `library`, sloupce `file`, `name`, `type`, `w`, `h`, bez `mime`, `md5` a bez sloupců pro originál; čas se tam ukládá jako unix (`casFormat: 'unix'`). Bez sloupců pro originál se nekomprimuje, bez sloupce pro tagy nebo archiv příslušné funkce hlásí srozumitelnou chybu.
+- Co je specifické pro aplikaci, řeší funkce předané konstruktoru: `priSmazani` (smazat vazby média, běží v transakci spolu s řádkem) a `pouziti` (kde se médium používá). Virtuální položky Plánovače (slide, HTML, náhodný a datovaný výběr) zůstávají v jeho tabulce `media` a spravují je jeho moduly/kód; galerie pracuje s obrázky, videi a PDF.
+- Zdroj nahraného souboru se přesune a po chybě smaže. Názvy souborů na disku jsou náhodné; originál po kompresi se uchovává a komprese vždy vychází z něj.
+- Zvláštní chování oproti Plánovači: nahrávání po částech vyžaduje souvislé pořadí částí a hlídá celkovou velikost (výchozí 512 MB).
+- Sloupec `Galerie::soubory()` se použije jako zdroj pro `Skupina` v modulu `zalohy`.

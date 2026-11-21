@@ -20,6 +20,8 @@ final class App
 {
     public const NAZEV = 'TWB Reklamy';
     public const SLUG = 'reklamy';
+    /** Slug aplikace na TWB Update Serveru (liší se od interního SLUG, který jmenuje migrace). */
+    public const UPDATE_SLUG = 'twb-reklamy';
     public const UPDATE_SERVER = 'https://updates.trafikabr.cz';
     /** Veřejný klíč Ed25519 TWB Update Serveru (veřejný, smí být v kódu). */
     public const UPDATE_KLIC = 'JTvTWDW+eSP/GtT9zG3t+3UraawTk82vKteb2Dci8Cg=';
@@ -178,7 +180,7 @@ final class App
 
     public function aktualizace(): Aktualizace
     {
-        return $this->sluzba('aktualizace', fn() => new Aktualizace($this->host, $this->zalohy(), self::SLUG, self::NAZEV, $this->verze, $this->adresar,
+        return $this->sluzba('aktualizace', fn() => new Aktualizace($this->host, $this->zalohy(), self::UPDATE_SLUG, self::NAZEV, $this->verze, $this->adresar,
             (string)$this->cfg('update_public_key', self::UPDATE_KLIC), 'reklamy/', $this->url(), (string)$this->cfg('update_token', ''),
             server: (string)$this->cfg('update_server', self::UPDATE_SERVER), zachovat: ['config.php', 'data'],
             povinne: ['index.php', 'health.php', 'lib/bootstrap.php'], predponaZip: 'twb-reklamy-'));

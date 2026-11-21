@@ -1,7 +1,7 @@
 # TWB Reklamy
 
 Osobní reklamní server místo Revive Adserveru: jen vlastní kampaně, jeden uživatel, česky.
-Adresa nasazení `https://ads.kazbo.eu`, slug na TWB Update Serveru `reklamy`.
+Adresa nasazení `https://ads.kazbo.eu`, slug na TWB Update Serveru `twb-reklamy` (interní slug aplikace a migrací je `reklamy`). Publikace: `-update.zip` a `.publish.json` do složky „TrafikaBR Update Server – Inbox“ na Google Disku.
 Aplikace je složená z modulů platformy (`modules/`), vlastní kód je v `lib/` a `stranky/`.
 
 ## Etapy

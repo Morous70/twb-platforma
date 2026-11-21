@@ -24,6 +24,6 @@ return [
     // Odesílatel e-mailů aplikace (adresa na vaší doméně)
     'mail_from' => 'reklamy@kazbo.eu',
 
-    // Aktualizace z TWB Update Serveru: token upd_… (administrace Update Serveru → aplikace reklamy)
+    // Aktualizace z TWB Update Serveru: token upd_… (administrace Update Serveru → aplikace twb-reklamy)
     'update_token' => '',
 ];

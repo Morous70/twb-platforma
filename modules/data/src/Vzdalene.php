@@ -70,6 +70,45 @@ final class Vzdalene implements Zdroje
         return preg_replace('/([?&](?:key|apikey|api_key|appid|token|access_token|secret)=)[^&#]+/i', '$1…', $url);
     }
 
+    /**
+     * Založí nebo upraví zdroj (id 0 / null = nový) a hned ho stáhne, ať je vidět, jestli funguje.
+     * @return array{ok: bool, id: int, error: ?string} výsledek stažení
+     * @throws \InvalidArgumentException s českým textem chyby
+     */
+    public function uloz(?int $id, string $nazev, string $url, int $intervalMin = 15, string $format = 'json', bool $csvZahlavi = true): array
+    {
+        $nazev = trim($nazev);
+        $url = trim($url);
+        $interval = max(5, min(1440, $intervalMin));
+        $format = $format === 'csv' ? 'csv' : 'json';
+        if ($nazev === '' || mb_strlen($nazev) > 60) throw new \InvalidArgumentException('Zadejte název zdroje (nejvýš 60 znaků).');
+        if (preg_match('/[{}|:.]/u', $nazev)) throw new \InvalidArgumentException('Název zdroje nesmí obsahovat znaky { } | : a tečku.');
+        if (in_array(Format::klic($nazev), Tabulka::VYHRAZENE, true)) throw new \InvalidArgumentException('Tento název je vyhrazený pro proměnnou kalendáře.');
+        foreach ($this->vsechny(true) as $x) if ((int)$x['id'] !== (int)$id && Format::klic($x['name']) === Format::klic($nazev)) throw new \InvalidArgumentException('Zdroj s tímto názvem už existuje.');
+        if (!preg_match('~^https?://~i', $url)) throw new \InvalidArgumentException('Adresa musí začínat http:// nebo https://.');
+        $hlavicka = $csvZahlavi ? 1 : 0;
+        if ($id) {
+            $stary = $this->db->q("SELECT url, format, csv_header FROM {$this->t} WHERE id = ?", [$id])->fetch();
+            $this->db->q("UPDATE {$this->t} SET name = ?, url = ?, interval_min = ?, format = ?, csv_header = ? WHERE id = ?", [$nazev, $url, $interval, $format, $hlavicka, $id]);
+            if (!$stary || $stary['url'] !== $url || $stary['format'] !== $format || (int)$stary['csv_header'] !== $hlavicka) {
+                $this->db->q("UPDATE {$this->t} SET fetched_at = NULL, hash = NULL, error = NULL WHERE id = ?", [$id]);
+            }
+        } else {
+            $this->db->q("INSERT INTO {$this->t} (name, url, interval_min, format, csv_header, created_at) VALUES (?,?,?,?,?,?)", [$nazev, $url, $interval, $format, $hlavicka, ($this->cas)()]);
+            $id = $this->db->posledniId();
+        }
+        $zdroj = null;
+        foreach ($this->vsechny(true) as $x) if ((int)$x['id'] === $id) $zdroj = $x;
+        $r = $this->stahni($zdroj);
+        return ['ok' => $r['ok'], 'id' => $id, 'error' => $r['error']];
+    }
+
+    public function smaz(int $id): void
+    {
+        $this->db->q("DELETE FROM {$this->t} WHERE id = ?", [$id]);
+        $this->cache = null;
+    }
+
     /** Stáhne zdroj a uloží data. @return array{ok: bool, changed: bool, error: ?string} */
     public function stahni(array $s): array
     {

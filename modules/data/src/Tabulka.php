@@ -15,10 +15,14 @@ final class Tabulka
     /** @var list<array{id: int|string, grp: string, param: string, value: string}>|null */
     private ?array $cache = null;
     private string $t;
+    /** @var callable(): int */
+    private $cas;
 
-    public function __construct(private Db $db, string $tabulka = 'data_rows')
+    /** Zápis předpokládá sloupce `id, grp, param, value, updated_at` (UNIX čas) – tabulka z `Migrace` nebo Social Planneru. */
+    public function __construct(private Db $db, string $tabulka = 'data_rows', ?callable $cas = null)
     {
         $this->t = Db::identifikator($tabulka);
+        $this->cas = $cas ?? 'time';
     }
 
     /** @return list<array{id: int|string, grp: string, param: string, value: string}> */
@@ -101,5 +105,77 @@ final class Tabulka
             $v = rtrim(rtrim(number_format($n, 4, '.', ''), '0'), '.');
         }
         return [$g, $p, mb_substr($v, 0, 2000)];
+    }
+
+    // ---------- správa řádků ----------
+    /** Uloží jeden řádek (id 0 / null = nový). Vrací id. @throws InvalidArgumentException */
+    public function uloz(?int $id, mixed $g, mixed $p, mixed $v): int
+    {
+        [$g, $p, $v] = self::uklidRadek($g, $p, $v);
+        if ($id) {
+            $this->db->q("UPDATE {$this->t} SET grp = ?, param = ?, value = ?, updated_at = ? WHERE id = ?", [$g, $p, $v, ($this->cas)(), $id]);
+        } else {
+            $this->db->q("INSERT INTO {$this->t} (grp, param, value, updated_at) VALUES (?,?,?,?)", [$g, $p, $v, ($this->cas)()]);
+            $id = $this->db->posledniId();
+        }
+        $this->cache = null;
+        return $id;
+    }
+
+    /** @param list<int|string> $ids */
+    public function smaz(array $ids): int
+    {
+        foreach ($ids as $id) $this->db->q("DELETE FROM {$this->t} WHERE id = ?", [(int)$id]);
+        $this->cache = null;
+        return count($ids);
+    }
+
+    /** Smaže řádky, jejichž parametr je datum před dnešním dnem. Vrací počet. */
+    public function smazMinule(DateTimeImmutable $dnes): int
+    {
+        $dnes = new DateTimeImmutable($dnes->format('Y-m-d'));
+        $ids = [];
+        foreach ($this->radky(true) as $r) { $d = Format::datumZTextu($r['param']); if ($d && $d < $dnes) $ids[] = (int)$r['id']; }
+        return $this->smaz($ids);
+    }
+
+    /**
+     * Rozebere vložený text z Excelu (řádky Skupina⇥Parametr⇥Hodnota, oddělovač tabulátor, ; nebo |; první řádek může být záhlaví).
+     * @return array{0: list<array{0: string, 1: string, 2: string}>, 1: list<string>} [řádky, chyby po řádcích]
+     */
+    public static function rozborImportu(string $text): array
+    {
+        $rows = []; $chyby = [];
+        foreach (preg_split('/\r?\n/', $text) as $i => $line) {
+            if (trim($line) === '') continue;
+            $sep = str_contains($line, "\t") ? "\t" : (str_contains($line, ';') ? ';' : (str_contains($line, '|') ? '|' : null));
+            $cols = $sep ? array_map('trim', explode($sep, $line)) : [];
+            if (count($cols) < 3) { $chyby[] = 'řádek ' . ($i + 1) . ': očekávám 3 sloupce (Skupina, Parametr, Hodnota)'; continue; }
+            if ($i === 0 && Format::klic($cols[0]) === 'skupina') continue;
+            try { $rows[] = self::uklidRadek($cols[0], $cols[1], implode(' ', array_slice($cols, 2))); }
+            catch (\Throwable $e) { $chyby[] = 'řádek ' . ($i + 1) . ': ' . $e->getMessage(); }
+        }
+        return [$rows, $chyby];
+    }
+
+    /**
+     * Vloží řádky z textu; $nahradit = nejdřív smaže všechny řádky skupin, které import obsahuje.
+     * @return array{imported: int, errors: list<string>}
+     * @throws InvalidArgumentException když není co vložit
+     */
+    public function importuj(string $text, bool $nahradit = false): array
+    {
+        [$rows, $chyby] = self::rozborImportu($text);
+        if (!$rows) throw new InvalidArgumentException($chyby ? 'Nic k vložení – ' . implode('; ', array_slice($chyby, 0, 3)) : 'Vložte řádky z Excelu (Skupina, Parametr, Hodnota).');
+        $this->db->transakce(function () use ($rows, $nahradit) {
+            if ($nahradit) {
+                foreach (array_unique(array_map(fn($r) => Format::klic($r[0]), $rows)) as $gk) {
+                    foreach ($this->radky(true) as $old) if (Format::klic($old['grp']) === $gk) $this->db->q("DELETE FROM {$this->t} WHERE id = ?", [(int)$old['id']]);
+                }
+            }
+            foreach ($rows as [$g, $p, $v]) $this->db->q("INSERT INTO {$this->t} (grp, param, value, updated_at) VALUES (?,?,?,?)", [$g, $p, $v, ($this->cas)()]);
+        });
+        $this->cache = null;
+        return ['imported' => count($rows), 'errors' => $chyby];
     }
 }

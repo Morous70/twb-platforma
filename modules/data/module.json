@@ -1,0 +1,7 @@
+{
+  "name": "data",
+  "version": "0.1.0",
+  "php": ">=8.1",
+  "popis": "Proměnné v textech: kalendář a svátky, tabulka dat Skupina|Parametr|Hodnota, vlastní proměnné, filtry (čísla, data), podmínky. Vzdálené zdroje a počasí se připojují přes rozhraní.",
+  "requires": { "jadro": ">=0.1.0" }
+}

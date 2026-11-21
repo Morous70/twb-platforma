@@ -32,7 +32,7 @@ php tests/run.php tagy       # jeden modul
 | galerie | 0.1.0 | hotovo: `Galerie` (nahrání s kontrolou typu i obsahu, nahrazení souboru, komprese s uchováním originálu, archiv, tagy, mazání s vazbami aplikace), `Nahravani` (soubor po částech), `Sloupce` (přiřazení ke sloupcům tabulky), `Migrace` (výchozí tabulka `media`) |
 | slidy | 0.1.0 | serverová část hotova: `Navrh` (očištění šablony, formáty dodá aplikace, volitelný vlastní rozměr 16–4096 px pro bannery), `Vykresleni` (JPEG + klíč obsahu), `Text`, `Fx`, `Kulicky`, `Gd`; rozšíření přes rozhraní `Zdroje`, `Promenne`, `Prvek`. Editor v prohlížeči: `web/` (kopie ze Social Planneru + `HOST.md` s tím, co dodává aplikace) |
 | html | 0.1.0 | hotovo: `Dokument` (kontrola zdroje do 5 MB, dosazení proměnných mimo skripty/styly/komentáře s HTML escapem, vložení písem z `pisma` do dokumentu, seznam externích adres, klíč obsahu), rozhraní `Promenne`; ukládání řeší aplikace |
-| data | – | další v pořadí |
+| data | 0.1.0 | část 1 hotova: `Format` (čísla, data, filtry), `Tabulka` (Skupina\|Parametr\|Hodnota), `Promenne` (kalendář, svátky, vlastní proměnné, podmínky), rozhraní `Zdroje` a `Pocasi`, napojení `ProSlidy` a `ProHtml`, `Migrace` (`data_rows`). Zbývá: stahování vzdálených zdrojů JSON/CSV, počasí, správa řádků (uložení, import) |
 
 ## Známé chyby nalezené při vyčleňování
 - `Napoveda::zkontroluj()` a původní `help_check()` v Plánovači: ve zprávách typu `„$k“` bere PHP uvozovku jako součást jména proměnné. V modulu opraveno, v Plánovači zmizí po přepnutí na modul.
@@ -71,3 +71,9 @@ php tests/run.php tagy       # jeden modul
 
 - Chování je shodné s `lib/html.php` z Plánovače médií; test spouští zmrazenou kopii (`tests/html/original/`) a porovnává kontrolu, dosazení, písma, sestavení i externí adresy. Výchozí dokument má volitelný rozměr (pro bannery), bez zadání je 1920×1080 jako dosud.
 - Modul nic neukládá a nezná databázi: zdroj, hotový soubor a pravidelné přegenerování (`regenerate_html` v Plánovači) patří aplikaci, která si hlídá změnu přes `klic()`.
+
+## Data
+
+- Základem je `data.php` ze Social Planneru 1.9.2 (zná zápis `{x}` i `{{x}}`); test spouští zmrazenou kopii (`tests/data/original/`) a porovnává přes 900 vstupů: formáty čísel a dat, filtry, proměnné kalendáře i svátků, vlastní proměnné, tabulku dat, podmínky.
+- Vlastní proměnné dodává aplikace funkcí (v Social Planneru tabulka `variables`); vzdálené zdroje a počasí se připojí přes `Zdroje` a `Pocasi`. Bez nich jsou jejich proměnné „neznámé“ a zůstanou v textu.
+- Svátky jsou v `modules/data/data/svatky.php` (kopie ze Social Planneru, shodná s Plánovačem).

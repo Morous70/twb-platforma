@@ -125,7 +125,7 @@ test('HTML5: balíček s ad.size, hlavní soubor i ve složce, rozbalení a vyd�
     $id2 = $app->bannery()->uloz(['campaign_id' => $k, 'type' => 'html5', 'name' => 'H5b', 'width' => 300, 'height' => 600, 'balicek' => ['tmp' => $zip2, 'name' => 'b.zip']]);
     eq('banner_300x600/index.html', json_decode($app->bannery()->radek($id2)['content'], true)['index']);
     $u = $app->vykresleni()->dokument($app->bannery()->radek($id2), 7);
-    ok(str_contains($u, '/d/h5.php/' . md5_file($zip2) . '/banner_300x600/index.html?b=' . $id2 . '&z=7&k='));
+    ok(str_contains($u, '/d/h5.php/' . md5_file($zip2) . '/banner_300x600/index.html?b=' . $id2 . '&z=7&c=' . $k . '&k='));
     ok(str_starts_with($app->vykresleni()->html($app->bannery()->radek($id2), 7), '<iframe src="'));
     // úprava bez nového balíčku balíček zachová
     $app->bannery()->uloz(['name' => 'H5 nový název', 'target_url' => 'https://kazbo.eu/h5'] + $b, $id);
@@ -193,7 +193,7 @@ test('HTML banner s proměnnými: kalendář, vlastní proměnné, tabulka dat; 
     $b = $app->bannery()->radek($id);
     $html = $app->vykresleni()->dokumentHtml($b, 3, new DateTimeImmutable('2026-11-21 12:00'));
     ok(str_contains($html, '<p>21. 11. 2026 Sobota – Albert. Kód SLEVA20, sleva 20 %. {neznama} <a href="'), $html);
-    ok(str_contains($html, '/d/klik.php?b=' . $id . '&z=3&k='), 'makro {clickurl}');
+    ok(str_contains($html, '/d/klik.php?b=' . $id . '&z=3&c=' . $k . '&k='), 'makro {clickurl}');
     ok(str_contains($html, "</a> $id</p>"), 'makro {bannerid}');
     ok(str_contains($html, '<script>var o = {datum: 1};</script>'), 'uvnitř skriptu se nic nedosazuje');
     ok(!str_contains($html, '@font-face'), 'bez písma se nic nevkládá');

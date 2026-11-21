@@ -22,11 +22,34 @@ final class Vykresleni
         return $this->app->url('d/' . $soubor) . ($parametry ? '?' . http_build_query($parametry) : '');
     }
 
-    /** Adresa prokliku (podepsaná dvojice banner–zóna). Cíl se bere z banneru, ne z adresy. */
+    /**
+     * Adresa prokliku (podepsaná trojice banner–zóna–kampaň). Cíl se bere z banneru, ne z adresy.
+     * Kampaň (`campaign_id` řádku z doručování) určuje, které kampani se proklik započítá.
+     */
     public function klik(array $banner, int $zona): string
     {
         $b = (int)$banner['id'];
-        return $this->adresa('klik.php', ['b' => $b, 'z' => $zona, 'k' => $this->dorucovani->podpis("klik|$b|$zona")]);
+        $c = (int)($banner['campaign_id'] ?? 0);
+        return $this->adresa('klik.php', ['b' => $b, 'z' => $zona, 'c' => $c, 'k' => $this->dorucovani->podpis("klik|$b|$zona|$c")]);
+    }
+
+    /**
+     * Ověří podepsaný odkaz doručování (druh klik nebo html) z parametrů b, z, c, k. Odkazy ze starších verzí (bez c) platí dál
+     * a počítají se kampani, pro kterou banner vznikl. Vrací [zóna, kampaň] nebo null.
+     * @param array<string, mixed> $get
+     * @return ?array{0:int, 1:int}
+     */
+    public function overOdkaz(string $druh, array $get): ?array
+    {
+        $b = (string)($get['b'] ?? '');
+        $z = (string)($get['z'] ?? '');
+        $c = $get['c'] ?? null;
+        if (!ctype_digit($b) || !ctype_digit($z)) return null;
+        if (is_string($c) && ctype_digit($c)) {
+            return $this->dorucovani->overPodpis("$druh|$b|$z|$c", $get['k'] ?? null) ? [(int)$z, (int)$c] : null;
+        }
+        if ($c !== null || !$this->dorucovani->overPodpis("$druh|$b|$z", $get['k'] ?? null)) return null;
+        return [(int)$z, $this->dorucovani->hlavniKampan((int)$b)];
     }
 
     /** Adresa obrázku banneru (galerie a slidy přes d/b.php, jinak vlastní adresa). */
@@ -50,7 +73,8 @@ final class Vykresleni
     public function dokument(array $banner, int $zona): string
     {
         $b = (int)$banner['id'];
-        $p = ['b' => $b, 'z' => $zona, 'k' => $this->dorucovani->podpis("html|$b|$zona"), 'cb' => random_int(1, PHP_INT_MAX)];
+        $c = (int)($banner['campaign_id'] ?? 0);
+        $p = ['b' => $b, 'z' => $zona, 'c' => $c, 'k' => $this->dorucovani->podpis("html|$b|$zona|$c"), 'cb' => random_int(1, PHP_INT_MAX)];
         if ($banner['type'] === 'html5') {
             $c = self::balicek($banner);
             return $this->adresa('h5.php/' . $c['zip'] . '/' . implode('/', array_map('rawurlencode', explode('/', $c['index']))), $p);

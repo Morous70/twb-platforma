@@ -14,13 +14,14 @@ final class Ui
         'statistiky' => 'Statistiky',
         'galerie' => 'Galerie',
         'promenne' => 'Proměnné',
+        'zdroje' => 'Externí data',
         'nastaveni' => 'Nastavení',
     ];
 
     /** Skupiny postranního menu (nadpis => stránky). Nápověda je v menu navíc, nemá vlastní titulek v MENU. */
     public const SKUPINY = [
         'Reklama' => ['prehled', 'kampane', 'bannery', 'weby', 'konverze', 'statistiky'],
-        'Obsah' => ['galerie', 'promenne'],
+        'Obsah' => ['galerie', 'promenne', 'zdroje'],
         'Správa' => ['nastaveni', 'napoveda'],
     ];
 
@@ -37,6 +38,8 @@ final class Ui
         'nastaveni' => '<line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/>',
         'napoveda' => '<circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/>',
         'odhlasit' => '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>',
+        'zdroje' => '<ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/>',
+        'zavrit' => '<line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>',
         'zobrazeni' => '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>',
         'prokliky' => '<path d="M3 3l7.07 16.97 2.51-7.39 7.39-2.51L3 3z"/><path d="M13 13l6 6"/>',
         'ctr' => '<line x1="19" y1="5" x2="5" y2="19"/><circle cx="6.5" cy="6.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/>',
@@ -51,6 +54,35 @@ final class Ui
         if ($obsah === '') return '';
         return '<svg class="ikona" width="' . $velikost . '" height="' . $velikost . '" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"'
             . ' stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">' . $obsah . '</svg>';
+    }
+
+    /**
+     * Tlačítko s okem: náhled banneru v modálním okně (assets/app.js). Obrázky (galerie, slide, adresa) okno zobrazí přímo,
+     * HTML a HTML5 v izolovaném rámu z nahled.php.
+     */
+    public static function nahledTlacitko(array $b): string
+    {
+        $id = (int)$b['id'];
+        [$druh, $src] = match ($b['type']) {
+            'image' => ['obrazek', 'media.php?id=' . (int)$b['media_id']],
+            'slide' => ['obrazek', 'media.php?slide=' . $id . '&v=' . (int)$b['updated_at'] . '-' . date('YmdH')],
+            'external' => ['obrazek', (string)$b['image_url']],
+            default => ['ram', 'nahled.php?id=' . $id],
+        };
+        $popis = 'Náhled banneru ' . $b['name'];
+        return '<button type="button" class="maly ikona-tlacitko" data-nahled="' . $druh . '" data-src="' . self::h($src) . '" data-w="' . (int)$b['width'] . '" data-h="' . (int)$b['height']
+            . '" data-nazev="' . self::h($b['name']) . '" title="' . self::h($popis) . '" aria-label="' . self::h($popis) . '">' . self::ikona('zobrazeni', 16) . '</button>';
+    }
+
+    /** Odkazy na kampaně banneru (řádek s `kampane` z Bannery::sKampanemi), oddělené čárkou. $bez = kampaň, kterou vynechat. */
+    public static function kampaneBanneru(array $banner, ?int $bez = null): string
+    {
+        $out = [];
+        foreach ($banner['kampane'] ?? [] as $k) {
+            if ($k['id'] === $bez) continue;
+            $out[] = '<a href="' . self::h(self::odkaz('kampan', ['id' => $k['id']])) . '"' . ($k['status'] !== 'active' ? ' class="slabe"' : '') . '>' . self::h($k['name']) . '</a>';
+        }
+        return $out ? implode(', ', $out) : ($bez === null ? '<span class="slabe">bez kampaně</span>' : '');
     }
 
     /** Dlaždice s číslem (přehled, statistiky). $popis je HTML. */

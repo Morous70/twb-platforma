@@ -140,7 +140,7 @@ test('podpisy odkazů a vložení odkazem (n → banner)', function () {
     $d->zapamatuj('abc', 1, 5, time());
     $d->zapamatuj('abc', 1, 6, time());
     $d->zapamatuj('abc', 2, 9, time() - 40 * 86400);
-    eq(6, $d->zapamatovany('abc', 1));
+    eq([6, 0], $d->zapamatovany('abc', 1));
     eq(1, $d->uklid());
     eq(null, $d->zapamatovany('abc', 2));
 });
@@ -153,7 +153,7 @@ test('vykreslení: obrázek s odkazem, bez cíle bez odkazu, HTML v rámu, makra
     $v = $app->vykresleni();
     $b = $app->bannery()->radek($bid);
     $html = $v->html($b, 4);
-    ok(str_contains($html, 'href="https://ads.kazbo.eu/d/klik.php?b=' . $bid . '&amp;z=4&amp;k='), $html);
+    ok(str_contains($html, 'href="https://ads.kazbo.eu/d/klik.php?b=' . $bid . '&amp;z=4&amp;c=' . $kid . '&amp;k='), $html);
     ok(str_contains($html, 'src="https://ads.kazbo.eu/d/b.php?b=' . $bid . '&amp;v='), $html);
     ok(str_contains($html, 'alt="Sleva &quot;50 %&quot;"') && str_contains($html, 'width="300" height="250"'));
     ok(str_contains($html, 'rel="sponsored noopener"'));
@@ -161,10 +161,10 @@ test('vykreslení: obrázek s odkazem, bez cíle bez odkazu, HTML v rámu, makra
     ok(!str_contains($v->html($app->bannery()->radek($bid), 4), '<a '), 'bez cílové adresy není odkaz');
     $hid = htmlBanner($app, $kid, 728, 90, ['html' => '<a href="{clickurl}">A</a><a href="{clickurl}https://kazbo.eu/x">B</a> {random} {bannerid} {zoneid} {width}x{height} {targeturl}', 'target_url' => 'https://kazbo.eu/']);
     $h = $app->bannery()->radek($hid);
-    ok(str_contains($v->html($h, 4), '<iframe src="https://ads.kazbo.eu/d/b.php?b=' . $hid . '&amp;z=4&amp;k='), 'HTML banner v rámu');
+    ok(str_contains($v->html($h, 4), '<iframe src="https://ads.kazbo.eu/d/b.php?b=' . $hid . '&amp;z=4&amp;c=' . $kid . '&amp;k='), 'HTML banner v rámu');
     $dok = $v->dokumentHtml($h, 4);
     ok(str_starts_with($dok, '<!doctype html>') && str_contains($dok, '<base target="_blank">'));
-    ok(preg_match('~href="https://ads\.kazbo\.eu/d/klik\.php\?b=' . $hid . '&z=4&k=[0-9a-f]{16}&cil=">A</a>~', $dok) === 1, $dok);
+    ok(preg_match('~href="https://ads\.kazbo\.eu/d/klik\.php\?b=' . $hid . '&z=4&c=\d+&k=[0-9a-f]{16}&cil=">A</a>~', $dok) === 1, $dok);
     ok(str_contains($dok, '&cil=https://kazbo.eu/x">B</a>'));
     ok(preg_match('~</a> \d{9} ' . $hid . ' 4 728x90 https://kazbo\.eu/~', $dok) === 1, $dok);
     $plny = htmlBanner($app, $kid, 1, 1, ['html' => '<html><body>{zoneid}</body></html>']);

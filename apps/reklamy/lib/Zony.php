@@ -139,19 +139,20 @@ final class Zony
     public function bannery(int $id): array
     {
         $z = $this->radek($id);
-        $rows = $this->app->db->q('SELECT DISTINCT b.*, c.name AS campaign_name FROM banners b JOIN campaigns c ON c.id = b.campaign_id
+        $rows = $this->app->db->q('SELECT b.* FROM banners b
             WHERE b.id IN (SELECT banner_id FROM zone_banners WHERE zone_id = ?)
-               OR b.campaign_id IN (SELECT campaign_id FROM zone_campaigns WHERE zone_id = ?)
-            ORDER BY c.name, b.name', [$id, $id])->fetchAll();
-        return array_values(array_filter($rows, fn($b) => self::pasuje($z, $b)));
+               OR b.id IN (SELECT cb.banner_id FROM campaign_banners cb JOIN zone_campaigns zc ON zc.campaign_id = cb.campaign_id WHERE zc.zone_id = ?)
+            ORDER BY b.name, b.id', [$id, $id])->fetchAll();
+        return $this->app->bannery()->sKampanemi(array_values(array_filter($rows, fn($b) => self::pasuje($z, $b))));
     }
 
     /** Zóny, ve kterých se kampaň nebo banner může zobrazit. @return list<array<string, mixed>> */
     public function zonyBanneru(array $banner): array
     {
         $rows = $this->app->db->q('SELECT z.*, s.name AS site_name FROM zones z JOIN sites s ON s.id = z.site_id
-            WHERE z.id IN (SELECT zone_id FROM zone_banners WHERE banner_id = ?) OR z.id IN (SELECT zone_id FROM zone_campaigns WHERE campaign_id = ?)
-            ORDER BY s.name, z.name', [$banner['id'], $banner['campaign_id']])->fetchAll();
+            WHERE z.id IN (SELECT zone_id FROM zone_banners WHERE banner_id = ?)
+               OR z.id IN (SELECT zc.zone_id FROM zone_campaigns zc JOIN campaign_banners cb ON cb.campaign_id = zc.campaign_id WHERE cb.banner_id = ?)
+            ORDER BY s.name, z.name', [$banner['id'], $banner['id']])->fetchAll();
         return array_values(array_filter($rows, fn($z) => self::pasuje($z, $banner)));
     }
 

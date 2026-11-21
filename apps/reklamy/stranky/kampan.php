@@ -21,12 +21,19 @@ if ($post) {
                 $ui->zprava('ok', 'Kampaň smazána.');
                 $ui->presmeruj(Ui::odkaz('kampane'));
             case 'banner-stav':
-                if ((int)$app->bannery()->radek($bid)['campaign_id'] !== $id) throw new Chyba('Banner patří jiné kampani.');
+                if (!in_array((int)$id, $app->bannery()->kampane($bid), true)) throw new Chyba('Banner v této kampani není.');
                 $app->bannery()->nastavStav($bid, (string)($_POST['stav'] ?? ''));
                 break;
             case 'banner-kopie':
-                if ((int)$app->bannery()->radek($bid)['campaign_id'] !== $id) throw new Chyba('Banner patří jiné kampani.');
+                if (!in_array((int)$id, $app->bannery()->kampane($bid), true)) throw new Chyba('Banner v této kampani není.');
                 $app->bannery()->duplikuj($bid);
+                break;
+            case 'banner-pridat':   // existující banner i do této kampaně
+                if ($bid <= 0) throw new Chyba('Vyberte banner.');
+                $app->bannery()->pridejDoKampane($bid, (int)$id);
+                break;
+            case 'banner-odebrat':
+                $app->bannery()->odeberZKampane($bid, (int)$id);
                 break;
             default:
                 throw new Chyba('Neznámá akce.');
@@ -44,6 +51,8 @@ $tagy = implode(', ', $kampane->tagy()->tagyPolozky($z));
 $cil = ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['akce'] ?? '') === 'ulozit') ? $_POST + ['cil_dny' => [], 'cil_zarizeni' => []] : Cileni::doFormulare($z['targeting'] ?? null);
 $zaskrtnuto = fn(string $pole, string|int $h) => in_array((string)$h, array_map('strval', (array)($cil[$pole] ?? [])), true) ? ' checked' : '';
 $bannery = $k ? $app->bannery()->seznam((int)$k['id']) : [];
+$jine = $k ? array_values(array_filter($app->bannery()->seznam(), fn($b) => !in_array((int)$k['id'], array_column($b['kampane'], 'id'), true))) : [];
+$smazouSe = $k ? count($kampane->jenVlastniBannery((int)$k['id'])) : 0;
 $stB = $k ? $app->statistiky()->poBannerech(null, null, (int)$k['id']) : [];
 $stK = $k ? $app->statistiky()->souhrn(null, null, (int)$k['id']) : null;
 $stDnes = $k ? $app->statistiky()->souhrn(date('Y-m-d'), date('Y-m-d'), (int)$k['id']) : null;
@@ -106,7 +115,8 @@ seznam.cz"]) ?>
   </div>
 </form>
 <?php if ($k): ?>
-  <?= $ui->tlacitko('Smazat kampaň', 'smazat', [], 'maly nebezpecne', 'Smazat kampaň „' . $k['name'] . '“ i se všemi bannery?') ?>
+  <?= $ui->tlacitko('Smazat kampaň', 'smazat', [], 'maly nebezpecne', 'Smazat kampaň „' . $k['name'] . '“'
+      . ($smazouSe ? " i s bannery, které nejsou v jiné kampani ({$smazouSe})?" : '?') . (count($bannery) > $smazouSe ? ' Bannery sdílené s jinými kampaněmi zůstanou.' : '')) ?>
 <?php endif; ?>
 </section>
 
@@ -126,6 +136,17 @@ seznam.cz"]) ?>
       <a class="tlacitko maly" href="<?= Ui::h(Ui::odkaz('banner', ['kampan' => $k['id'], 'typ' => $typ])) ?>">+ <?= Ui::h($popis) ?></a>
     <?php endforeach; ?>
   </div>
+  <?php if ($jine): ?>
+  <form method="post" class="tlacitka" style="margin-bottom:.8rem">
+    <?= $ui->csrf() ?>
+    <input type="hidden" name="akce" value="banner-pridat">
+    <select name="banner" aria-label="Existující banner" required>
+      <option value="">Přidat existující banner…</option>
+      <?php foreach ($jine as $jb): ?><option value="<?= (int)$jb['id'] ?>"><?= Ui::h($jb['name']) ?> (<?= (int)$jb['width'] ?>×<?= (int)$jb['height'] ?>, <?= Ui::h(implode(', ', array_column($jb['kampane'], 'name')) ?: 'bez kampaně') ?>)</option><?php endforeach; ?>
+    </select>
+    <button type="submit" class="maly">Přidat do kampaně</button>
+  </form>
+  <?php endif; ?>
   <?php if (!$bannery): ?>
     <div class="prazdne">Kampaň zatím nemá bannery.</div>
   <?php else: ?>
@@ -134,12 +155,15 @@ seznam.cz"]) ?>
     <tr>
       <td><?php if ($b['type'] === 'image'): ?><img class="miniatura" src="media.php?id=<?= (int)$b['media_id'] ?>" alt=""><?php endif; ?></td>
       <td><a href="<?= Ui::h(Ui::odkaz('banner', ['id' => $b['id']])) ?>"><?= Ui::h($b['name']) ?></a><br>
-        <span class="slabe mala"><?= Ui::h(Bannery::TYPY[$b['type']] ?? $b['type']) ?>, <?= (int)$b['width'] ?>×<?= (int)$b['height'] ?></span></td>
+        <span class="slabe mala"><?= Ui::h(Bannery::TYPY[$b['type']] ?? $b['type']) ?>, <?= (int)$b['width'] ?>×<?= (int)$b['height'] ?></span>
+        <?php if (count($b['kampane']) > 1): ?><br><span class="mala">Také v: <?= Ui::kampaneBanneru($b, (int)$k['id']) ?></span><?php endif; ?></td>
       <td><?= Ui::stav($b['status'], Bannery::STAVY[$b['status']]) ?></td>
       <td class="cisla mala"><?= Ui::cislo($stB[$b['id']]['impressions'] ?? 0) ?> / <?= Ui::cislo($stB[$b['id']]['clicks'] ?? 0) ?><?= !empty($stB[$b['id']]['conversions']) ? ' / ' . Ui::cislo($stB[$b['id']]['conversions']) . ' konv.' : '' ?></td>
       <td><div class="akce">
+        <?= Ui::nahledTlacitko($b) ?>
         <?= $b['status'] === 'active' ? $ui->tlacitko('Pozastavit', 'banner-stav', ['banner' => $b['id'], 'stav' => 'paused']) : $ui->tlacitko('Spustit', 'banner-stav', ['banner' => $b['id'], 'stav' => 'active']) ?>
         <?= $ui->tlacitko('Kopie', 'banner-kopie', ['banner' => $b['id']]) ?>
+        <?php if (count($b['kampane']) > 1): ?><?= $ui->tlacitko('Odebrat', 'banner-odebrat', ['banner' => $b['id']], 'maly', 'Odebrat banner „' . $b['name'] . '“ z této kampaně? V ostatních kampaních zůstane.') ?><?php endif; ?>
       </div></td>
     </tr>
     <?php endforeach; ?>

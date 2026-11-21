@@ -14,6 +14,7 @@ Aplikace je složená z modulů platformy (`modules/`), vlastní kód je v `lib/
 | 0.5 | Statistiky (dny, měsíce, kampaně, bannery, zóny, weby; CTR, konverze, hodnota), grafy, export CSV, nápověda, obnova zálohy a aktualizace v rozhraní, balíček pro Update Server | hotovo |
 | 0.6 | Nový vzhled administrace podle šablony AdminKit: tmavé postranní menu se skupinami a ikonami (skrytí na počítači, vysunutí na mobilu), horní lišta, karty a dlaždice se stínem, barvy a typografie; funkce beze změny | hotovo |
 | 0.7 | Zóna jen se šířkou nebo jen s výškou (druhý rozměr libovolný): přiřazení a výběr bannerů, formulář, kódy pro vložení a náhled | hotovo |
+| 0.8 | Banner ve více kampaních (vazba M:N, doručování, limity a statistiky po kampaních), náhled banneru v modálním okně (oko v seznamu), externí data (vzdálené zdroje JSON/CSV z modulu data) | hotovo |
 
 ## Struktura
 ```
@@ -22,10 +23,11 @@ install.php      první spuštění: config.php (když chybí), databáze, heslo
 google.php       přihlášení / propojení Google účtu (OpenID Connect)
 passkey.php      JSON rozhraní Passkey (WebAuthn) pro assets/app.js
 media.php        náhled obrázku z galerie nebo vykresleného slidu (jen přihlášený)
+nahled.php       náhled HTML / HTML5 banneru pro modální okno (jen přihlášený, izolovaný)
 slide.php        editor slidu (modul slidy) – ?kampan=K&w=&h= nový, ?id=N úprava banneru
 api.php          JSON rozhraní editoru slidů (formáty, náhled, uložení, písma, data) – jen přihlášený, POST s X-CSRF
 asset.php        soubory editoru z modulu slidy (slide-editor.js / .css), jen vyjmenované
-cron.php         denní záloha, kontrola aktualizací, úklid protokolu (?key=cron_key)
+cron.php         denní záloha, kontrola aktualizací, stažení externích dat, úklid protokolu (?key=cron_key)
 health.php       kontrola po aktualizaci (modul aktualizace)
 d/               veřejné doručování reklam (viz níže)
 lib/             třídy Reklamy\… (App, Schema, Kampane, Bannery, Weby, Zony, Dorucovani, Vykresleni, Vydej, Kody, XmlRpc, Ui, Vstup …)
@@ -44,7 +46,7 @@ data/            databáze reklamy.sqlite, galerie (media/), zálohy (backups/),
 | `js.php` | klasický JavaScript (`document.write`) |
 | `ram.php` | rám (iframe); HTML banner je přímo obsahem rámu; používá ho i vyskakovací okno |
 | `obr.php` + `klik.php?zona=&n=` | vložení odkazem (e-maily): obrázek a proklik se stejným `n` vedou na stejný banner (tabulka `view_map`, i bez cookies) |
-| `klik.php?b=&z=&k=` | proklik z vloženého banneru; podpis HMAC dvojice banner–zóna, cíl se bere z banneru. `&cil=` jen u HTML bannerů a jen na doménu cíle nebo adresu uvedenou v HTML (ochrana proti otevřenému přesměrování) |
+| `klik.php?b=&z=&c=&k=` | proklik z vloženého banneru; podpis HMAC trojice banner–zóna–kampaň (starší odkazy bez `c` platí dál), cíl se bere z banneru. `&cil=` jen u HTML bannerů a jen na doménu cíle nebo adresu uvedenou v HTML (ochrana proti otevřenému přesměrování) |
 | `b.php` | obrázek banneru z galerie (`?b=&v=md5`) nebo vykreslený slide (`?b=&v=klíč obsahu`), mezipaměť rok; HTML dokument banneru (`?b=&z=&k=`) |
 | `h5.php/<md5>/<cesta>` | soubory HTML5 balíčku (relativní odkazy uvnitř balíčku fungují beze změny); hlavní soubor dostane `clickTag` – s podpisem `?b=&z=&k=` vede přes počítání prokliků |
 | `okno.php` | vyskakovací okno (při prvním kliknutí na stránce, `kdy=ihned`, `pod=1`, `jednou=1`) |
@@ -62,6 +64,21 @@ takže nemají přístup k cookies ani stránkám administrace na stejné domén
 Makra v HTML bannerech: `{clickurl}` (proklik na cíl banneru, `{clickurl}https://…` na jinou povolenou adresu), `{clickurl_enc}`, `{targeturl}`, `{random}`, `{cachebuster}`, `{timestamp}`, `{bannerid}`, `{zoneid}`, `{campaignid}`, `{width}`, `{height}`.
 Před makry se dosadí proměnné modulu data (`{datum}`, `{svatek}`, `{odpocet:24. 12. 2026}`, `{Skupina:parametr}`, vlastní proměnné; ne uvnitř `<script>` a `<style>`)
 a když kód jmenuje písmo z modulu pisma (`font-family: 'Montserrat'`), vloží se do dokumentu jako `@font-face`.
+
+## Banner ve více kampaních, náhled, externí data (0.8)
+- **Více kampaní**: tabulka `campaign_banners` (M:N). Banner vzniká v kampani (`banners.campaign_id` = kampaň, pro kterou vznikl – jen informace a převod starších záloh, bez cizího klíče) a jde přidat dalším:
+  v kampani „Přidat existující banner…“ / „Odebrat“, v úpravě banneru zaškrtávací seznam kampaní. Banner je vždy aspoň v jedné kampani (`Bannery::nastavKampane`).
+- **Doručování**: kandidát je dvojice banner–kampaň (`campaign_id` řádku = kampaň dvojice). Zóna s kampaní bere banner jen za tuto kampaň, banner přiřazený zóně přímo běží ve všech svých kampaních;
+  termín, druh, priorita, váha, limity, cílení a frekvence se berou z kampaně dvojice. Banner se na stránce neopakuje (ani za jinou kampaň).
+- **Statistiky** mají sloupec `campaign_id` (součást klíče), limity kampaně (`Dorucovani::pocty`) i statistiky po kampaních se počítají z něj, takže zůstanou správné i po odebrání nebo smazání banneru.
+  Prokliky (`clicks`), zobrazení (`views`), konverze a vložení odkazem (`view_map.campaign_id`) si kampaň pamatují.
+- **Odkazy**: proklik a HTML dokument mají podepsanou trojici `klik|b|z|c` / `html|b|z|c` (`Vykresleni::overOdkaz`). Odkazy ze starších verzí (bez `c`) platí dál a počítají se kampani, pro kterou banner vznikl (`Dorucovani::hlavniKampan`), nebo první kampani banneru.
+- **Kampaň**: kopie sdílí stejné bannery (nekopírují se); smazání kampaně smaže jen bannery, které nejsou v jiné kampani (`Kampane::jenVlastniBannery`).
+- **Převod databáze** (schéma 5): přestavba tabulek `banners` (bez cizího klíče na kampaň) a `stats` (s kampaní) s vypnutými cizími klíči (`App::migruj`), vazby podle `banners.campaign_id`; opakovatelný, takže obnova zálohy ze 0.7 se po obnovení doplní. Test proti zmrazenému schématu 0.7 (`tests/reklamy/original/Schema-0.7.php`).
+- **Náhled** (`Ui::nahledTlacitko`, `assets/app.js`): oko v seznamu bannerů a v kampani otevře `<dialog>`; obrázky (galerie, slide, adresa) přímo, HTML z `nahled.php` (jen přihlášený, CSP sandbox), HTML5 přesměrováním na balíček bez podpisu (clickTag vede rovnou na cíl). Velký banner se zmenší (`transform: scale`), Esc / křížek / klik vedle okno zavře a banner zastaví.
+- **Externí data** (Obsah → Externí data, `stranky/zdroje.php`): modul data `Vzdalene` (tabulka `sources`, je v zálohách) – zdroje JSON nebo CSV (i tabulka Google), interval stahování, hned první stažení, stav a chyba, strom hodnot se zápisem `{Zdroj:cesta}`, upozornění na bannery, které zdroj používají.
+  Proměnné (`App::promenne`) zdroje znají, takže fungují v HTML bannerech i slidech; editor slidů je dostane přes `api.php?a=source_tree`. Cron stahuje podle intervalu (`stahniPo`), při výpadku zůstávají poslední data (jedno varování v protokolu, pak zpráva o obnovení).
+- Testy: `tests/reklamy/kampane_banneru_test.php` (převod, správa, doručování, statistiky, odkazy, zdroje) a `kampane_banneru_web_test.php` (formuláře, `nahled.php`, okno v Chromiu, stránka Externí data proti druhému vestavěnému serveru).
 
 ## Vzhled administrace (0.6)
 - Inspirace šablonou **AdminKit** 3.5.0 (MIT): barvy (`#3b7ddd`, pozadí `#f5f7fb`, menu `#222e3c`), postranní menu 260 px, lišta se stínem, karty bez rámečku, písmo 14 px (`Inter`, pokud ho systém má, jinak systémové).
@@ -108,15 +125,16 @@ a když kód jmenuje písmo z modulu pisma (`font-family: 'Montserrat'`), vlož�
 
 ## Datový model (SQLite, `lib/Schema.php`)
 - `campaigns` – druh (`exclusive` přednost, `standard`, `remnant` jen když není nic jiného), priorita 1–10, váha, termín (unix čas), limity celkem a za den, tagy (modul tagy).
-- `banners` – patří kampani; druh `image` (galerie, `media_id`), `external` (`image_url`), `html` (`html`), `html5` a `slide` (JSON ve sloupci `content`: balíček, resp. šablona). Rozměr, cíl prokliku, váha.
+- `banners` – druh `image` (galerie, `media_id`), `external` (`image_url`), `html` (`html`), `html5` a `slide` (JSON ve sloupci `content`: balíček, resp. šablona). Rozměr, cíl prokliku, váha.
 - `sites` a `zones` – zóna má volitelnou pevnou šířku a výšku, každou zvlášť (`NULL` = libovolná; bere jen bannery, které v zadaných rozměrech sedí) a náhradní HTML. Rám a popup bez pevného rozměru dostanou v kódu největší rozměr bannerů zóny (jinak 300×250, popup 800×600).
+- `campaign_banners` – banner v kampaních (M:N, aspoň jedna); `banners.campaign_id` = kampaň, pro kterou banner vznikl.
 - `zone_campaigns` (celá kampaň, platí i pro později přidané bannery) a `zone_banners` (jednotlivé bannery).
 - `trackers`, `tracker_campaigns` – trackery konverzí a kampaně, které sledují. `conversions` – konverze (tracker, kampaň, banner, zóna, proklik, `via` = `click` / `view` / prázdné, hodnota v haléřích, `ref` = číslo objednávky, unikátní v trackeru).
 - `clicks` a `views` – prokliky a zobrazení návštěvníků pro přiřazení (zobrazení jen když nějaký tracker má okno po zobrazení); cron maže starší než nejdelší okno.
 - `campaigns.targeting`, `cap_impressions`, `cap_hours` – cílení a frekvence.
-- `stats` – po hodinách (`day`, `hour`, `banner_id`, `zone_id`): zobrazení, prokliky, konverze, hodnota v haléřích. `view_map` – vazba obrázek/proklik u vložení odkazem (úklid po 30 dnech v cronu).
-- Moduly: `settings`, `log`, `module_versions`, `media` (galerie), `passkeys`, `auth_tokens` (přihlášení), `data_rows`, `sources`, `weather` (modul data; Reklamy používají jen `data_rows`).
-- Verze schématu: 1 = 0.1, 2 = 0.2 (`stats`, `view_map`), 3 = 0.3 (tabulky modulu data), 4 = 0.4 (konverze, cílení, frekvence; převod jde bezpečně zopakovat).
+- `stats` – po hodinách (`day`, `hour`, `banner_id`, `zone_id`, `campaign_id`): zobrazení, prokliky, konverze, hodnota v haléřích. `view_map` – vazba obrázek/proklik u vložení odkazem (úklid po 30 dnech v cronu).
+- Moduly: `settings`, `log`, `module_versions`, `media` (galerie), `passkeys`, `auth_tokens` (přihlášení), `data_rows`, `sources`, `weather` (modul data; Reklamy používají `data_rows` a od 0.8 `sources` – externí data).
+- Verze schématu: 1 = 0.1, 2 = 0.2 (`stats`, `view_map`), 3 = 0.3 (tabulky modulu data), 4 = 0.4 (konverze, cílení, frekvence; převod jde bezpečně zopakovat), 5 = 0.8 (banner ve více kampaních, kampaň ve statistikách).
 - `schema_version` v nastavení = verze schématu aplikace; zvýšit i při změně schématu modulu, aby zálohy a návrat aktualizace poznaly starší data.
 
 ## Instalace (Wedos NoLimit)

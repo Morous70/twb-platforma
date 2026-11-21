@@ -205,6 +205,17 @@ body.samostatna { min-height: 100vh; display: flex; align-items: center; justify
 .nahled { background: repeating-conic-gradient(var(--kod) 0 25%, var(--plocha) 0 50%) 0 0 / 16px 16px; border: 1px dashed var(--okraj); border-radius: var(--polomer);
   padding: .8rem; overflow: auto; max-height: 70vh; }
 .nahled img, .nahled iframe { display: block; max-width: none; border: 0; }
+.jen-ctecka { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+/* náhled banneru v modálním okně (seznam bannerů, kampaň) */
+.ikona-tlacitko { display: inline-flex; align-items: center; justify-content: center; min-width: 2rem; padding-left: .4rem; padding-right: .4rem; line-height: 1; }
+.nahled-okno { border: 0; border-radius: var(--polomer); padding: 0; max-width: calc(100vw - 2rem); max-height: calc(100vh - 2rem); background: var(--plocha); color: inherit;
+  box-shadow: 0 .5rem 2rem rgba(0, 0, 0, .35); }
+.nahled-okno::backdrop { background: rgba(15, 23, 42, .6); }
+.nahled-okno-hlava { display: flex; align-items: center; gap: .75rem; padding: .75rem 1rem; border-bottom: 1px solid var(--okraj); }
+.nahled-okno-hlava h2 { margin: 0; font-size: 1rem; flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nahled-okno-plocha { margin: 1rem; display: flex; justify-content: center; }
+.nahled-okno-obsah { position: relative; overflow: hidden; }
+.nahled-okno-obsah img, .nahled-okno-obsah iframe { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
 .miniatura { width: 72px; height: 48px; object-fit: contain; background: var(--kod); border-radius: var(--polomer); display: block; }
 .galerie { display: grid; gap: 1.5rem; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); }
 .galerie figure { margin: 0; background: var(--plocha); border-radius: var(--polomer); overflow: hidden; box-shadow: var(--stin); }

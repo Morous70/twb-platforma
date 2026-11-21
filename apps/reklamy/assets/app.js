@@ -1,4 +1,4 @@
-// TWB Reklamy – drobnosti administrace: potvrzení akcí, menu, Passkey, formulář banneru, odhlášení po nečinnosti.
+// TWB Reklamy – drobnosti administrace: potvrzení akcí, menu, náhled banneru, Passkey, formulář banneru, odhlášení po nečinnosti.
 (function () {
   'use strict';
 
@@ -34,6 +34,56 @@
     (navigator.clipboard ? navigator.clipboard.writeText(text) : Promise.reject()).then(function () {
       var p = b.textContent; b.textContent = 'Zkopírováno'; setTimeout(function () { b.textContent = p; }, 1500);
     }, function () { if (el.select) el.select(); });
+  });
+
+  // Náhled banneru v modálním okně (tlačítko s okem v seznamech bannerů): obrázek přímo, HTML a HTML5 v izolovaném rámu
+  var okno = null;
+  function zavriNahled() {
+    if (!okno) return;
+    okno.querySelector('.nahled-okno-obsah').innerHTML = '';   // zastaví animace a skripty banneru
+    if (okno.open) okno.close();
+  }
+  document.addEventListener('click', function (e) {
+    var b = e.target.closest('[data-nahled]');
+    if (!b) return;
+    e.preventDefault();
+    if (!okno) {
+      okno = document.createElement('dialog');
+      okno.className = 'nahled-okno';
+      okno.setAttribute('aria-labelledby', 'nahled-okno-nazev');
+      okno.innerHTML = '<div class="nahled-okno-hlava"><h2 id="nahled-okno-nazev"></h2><span class="slabe mala nahled-okno-rozmer"></span>'
+        + '<button type="button" class="maly ikona-tlacitko" data-zavrit-nahled aria-label="Zavřít" title="Zavřít (Esc)">×</button></div>'
+        + '<div class="nahled nahled-okno-plocha"><div class="nahled-okno-obsah"></div></div>';
+      document.body.appendChild(okno);
+      okno.addEventListener('click', function (ev) { if (ev.target === okno || ev.target.closest('[data-zavrit-nahled]')) zavriNahled(); });
+      okno.addEventListener('close', function () { okno.querySelector('.nahled-okno-obsah').innerHTML = ''; });
+    }
+    var w = parseInt(b.dataset.w, 10) || 300, h = parseInt(b.dataset.h, 10) || 250;
+    okno.querySelector('h2').textContent = b.dataset.nazev || 'Náhled';
+    okno.querySelector('.nahled-okno-rozmer').textContent = w + '×' + h + ' px';
+    var obsah = okno.querySelector('.nahled-okno-obsah');
+    var el;
+    if (b.dataset.nahled === 'obrazek') {
+      el = document.createElement('img');
+      el.alt = '';
+      el.referrerPolicy = 'no-referrer';
+    } else {
+      el = document.createElement('iframe');
+      el.setAttribute('sandbox', 'allow-scripts allow-popups');
+      el.setAttribute('scrolling', 'no');
+      el.title = 'Náhled banneru';
+    }
+    el.width = w; el.height = h;
+    el.src = b.dataset.src;
+    obsah.innerHTML = '';
+    obsah.appendChild(el);
+    // velký banner se zmenší, aby se vešel do okna (rám i obrázek mají dál svůj skutečný rozměr)
+    var meritko = Math.min(1, (window.innerWidth - 80) / w, (window.innerHeight - 180) / h);
+    obsah.style.width = Math.round(w * meritko) + 'px';
+    obsah.style.height = Math.round(h * meritko) + 'px';
+    el.style.transform = meritko < 1 ? 'scale(' + meritko + ')' : '';
+    okno.querySelector('.nahled-okno-rozmer').textContent += meritko < 1 ? ' · zmenšeno na ' + Math.round(meritko * 100) + ' %' : '';
+    if (typeof okno.showModal === 'function') okno.showModal(); else okno.setAttribute('open', '');
   });
 
   // Rozměr z nabídky běžných rozměrů

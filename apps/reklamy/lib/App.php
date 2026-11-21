@@ -9,7 +9,7 @@ use TWB\Zalohy\{Zalohy, Skupina};
 use TWB\Aktualizace\Aktualizace;
 use TWB\Pisma\Pisma;
 use TWB\Slidy\{Navrh, Text};
-use TWB\Data\{Tabulka, Promenne, ProSlidy, ProHtml};
+use TWB\Data\{Tabulka, Promenne, ProSlidy, ProHtml, Vzdalene};
 use TWB\Html\Dokument;
 
 /**
@@ -26,7 +26,7 @@ final class App
     /** Veřejný klíč Ed25519 TWB Update Serveru (veřejný, smí být v kódu). */
     public const UPDATE_KLIC = 'JTvTWDW+eSP/GtT9zG3t+3UraawTk82vKteb2Dci8Cg=';
     /** Tabulky v pořadí pro obnovu ze zálohy (nejdřív ty, na které ostatní odkazují). */
-    public const TABULKY = ['module_versions', 'settings', 'log', 'media', 'passkeys', 'campaigns', 'banners', 'sites', 'zones', 'zone_campaigns', 'zone_banners', 'stats', 'data_rows', 'trackers', 'tracker_campaigns', 'clicks', 'views', 'conversions'];
+    public const TABULKY = ['module_versions', 'settings', 'log', 'media', 'passkeys', 'campaigns', 'banners', 'campaign_banners', 'sites', 'zones', 'zone_campaigns', 'zone_banners', 'stats', 'data_rows', 'sources', 'trackers', 'tracker_campaigns', 'clicks', 'views', 'conversions'];
     /** Nastavení, která patří k instalaci a obnova zálohy je nepřepíše. */
     public const MISTNI = ['login_fails', 'login_last_fail', 'update_result', 'update_checked_at', 'update_available', 'update_health_key'];
 
@@ -96,7 +96,15 @@ final class App
         $zmena = $m->spust('galerie', \TWB\Galerie\Migrace::class) || $zmena;
         $zmena = $m->spust('data', \TWB\Data\Migrace::class) || $zmena;
         $prvni = $m->verze(self::SLUG) === 0;
-        $zmena = $m->spust(self::SLUG, Schema::class) || $zmena;
+        // převod 5 přestavuje tabulku banners: s cizími klíči by DROP TABLE smazal přiřazení do zón a kampaní
+        $pdo = $this->db->pdo();
+        $vypnout = $m->verze(self::SLUG) < Schema::verze() && !$pdo->inTransaction();
+        if ($vypnout) $pdo->exec('PRAGMA foreign_keys = OFF');
+        try {
+            $zmena = $m->spust(self::SLUG, Schema::class) || $zmena;
+        } finally {
+            if ($vypnout) $pdo->exec('PRAGMA foreign_keys = ON');
+        }
         if ($prvni) {
             // banner musí mít přesné rozměry – galerie obrázky sama nezmenšuje
             $this->nastaveni()->uloz('img_auto', '0');
@@ -220,9 +228,20 @@ final class App
         return is_array($v) ? $v : [];
     }
 
+    /**
+     * Externí data: vzdálené zdroje JSON / CSV (modul data, tabulka sources). Cron je stahuje podle intervalu,
+     * v textech banerů se čtou jako {Zdroj:cesta}. Konfigurace `zdroje_http` (callable) nahradí stahování – jen pro testy.
+     */
+    public function zdroje(): Vzdalene
+    {
+        return $this->sluzba('zdroje', fn() => new Vzdalene($this->db, $this->host->protokol, self::NAZEV . ' ' . $this->verze,
+            is_callable($this->cfg['zdroje_http'] ?? null) ? $this->cfg['zdroje_http'] : null,
+            is_callable($this->cfg['zdroje_cas'] ?? null) ? $this->cfg['zdroje_cas'] : null));
+    }
+
     public function promenne(): Promenne
     {
-        return $this->sluzba('promenne', fn() => new Promenne($this->tabulkaDat(), fn() => $this->vlastniPromenne()));
+        return $this->sluzba('promenne', fn() => new Promenne($this->tabulkaDat(), fn() => $this->vlastniPromenne(), $this->zdroje()));
     }
 
     public function navrh(): Navrh

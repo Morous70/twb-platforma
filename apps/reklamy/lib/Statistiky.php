@@ -72,7 +72,7 @@ final class Statistiky
             return array_map(fn($k) => ['klic' => $k[0], 'popis' => $k[1], 'odkaz' => null] + ($data[$k[0]] ?? $nula), $klice);
         }
         [$sloupec, $nazev, $stranka] = match ($podle) {
-            'kampan' => ['b.campaign_id', 'SELECT name FROM campaigns WHERE id = x.k', 'kampan'],
+            'kampan' => ['s.campaign_id', 'SELECT name FROM campaigns WHERE id = x.k', 'kampan'],
             'banner' => ['s.banner_id', 'SELECT name FROM banners WHERE id = x.k', 'banner'],
             'zona' => ['s.zone_id', 'SELECT name FROM zones WHERE id = x.k', 'zona'],
             'web' => ['z.site_id', 'SELECT name FROM sites WHERE id = x.k', 'web'],
@@ -82,7 +82,7 @@ final class Statistiky
             ORDER BY x.impressions DESC, x.clicks DESC, x.k", $p)->fetchAll();
         return array_map(function ($r) use ($cisla, $podle, $stranka) {
             $id = (int)$r['k'];
-            $popis = $r['nazev'] ?? ($id === 0 ? ($podle === 'kampan' ? 'smazané bannery' : 'bez zóny (vložení ze serveru)') : "#$id (smazáno)");
+            $popis = $r['nazev'] ?? ($id === 0 ? ($podle === 'kampan' ? 'neznámá kampaň (starší data smazaných bannerů)' : 'bez zóny (vložení ze serveru)') : "#$id (smazáno)");
             return ['klic' => (string)$id, 'popis' => (string)$popis, 'odkaz' => $r['nazev'] !== null ? [$stranka, ['id' => $id]] : null] + $cisla($r);
         }, $rows);
     }
@@ -145,7 +145,7 @@ final class Statistiky
         if ($web !== null) { $k[] = 's.zone_id IN (SELECT id FROM zones WHERE site_id = ?)'; $p[] = $web; }
         if ($od !== null) { $k[] = 's.day >= ?'; $p[] = $od; }
         if ($do !== null) { $k[] = 's.day <= ?'; $p[] = $do; }
-        if ($kampan !== null) { $k[] = 's.banner_id IN (SELECT id FROM banners WHERE campaign_id = ?)'; $p[] = $kampan; }
+        if ($kampan !== null) { $k[] = 's.campaign_id = ?'; $p[] = $kampan; }
         if ($banner !== null) { $k[] = 's.banner_id = ?'; $p[] = $banner; }
         if ($zona !== null) { $k[] = 's.zone_id = ?'; $p[] = $zona; }
         return [$k ? ' WHERE ' . implode(' AND ', $k) : '', $p];

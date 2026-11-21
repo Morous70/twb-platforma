@@ -1,12 +1,20 @@
 <?php
 declare(strict_types=1);
 // Nový banner nebo úprava banneru. Proměnné: $app, $ui, $post.
-use Reklamy\{Ui, Bannery, Zony, Chyba};
+use Reklamy\{Ui, Bannery, Zony, Chyba, Kampane};
 
 $bannery = $app->bannery();
 $id = isset($_GET['id']) ? (int)$_GET['id'] : null;
 $b = $id !== null ? $bannery->radek($id) : null;
-$kampan = $app->kampane()->radek((int)($b['campaign_id'] ?? $_GET['kampan'] ?? 0));
+// kampaň, ze které uživatel přišel (?kampan=), jinak první kampaň banneru; banner může být ve více kampaních
+$zKampane = (int)($_GET['kampan'] ?? 0);
+if ($b && !in_array($zKampane, array_column($b['kampane'], 'id'), true)) $zKampane = (int)($b['campaign_id'] ?? 0);
+$kampan = $zKampane > 0 ? $app->kampane()->radek($zKampane) : null;
+if (!$b && !$kampan) throw new Chyba('Nový banner se zakládá v kampani.');
+$zpet = $kampan ? Ui::odkaz('kampan', ['id' => $kampan['id']]) : Ui::odkaz('bannery');
+$vsechnyKampane = $app->kampane()->seznam();
+if ($b) foreach ($b['kampane'] as $bk) if (!in_array($bk['id'], array_map('intval', array_column($vsechnyKampane, 'id')), true)) $vsechnyKampane[] = $app->kampane()->radek($bk['id']);
+$vybraneKampane = $post && isset($_POST['kampane']) ? array_map('intval', (array)$_POST['kampane']) : ($b ? array_column($b['kampane'], 'id') : [(int)$kampan['id']]);
 $typ = $b['type'] ?? (string)($_GET['typ'] ?? 'image');
 if (!isset(Bannery::TYPY[$typ])) throw new Chyba('Neznámý druh banneru.');
 $titulek = $b ? $b['name'] : 'Nový banner – ' . mb_strtolower(Bannery::TYPY[$typ]);
@@ -16,10 +24,14 @@ if ($post) {
     if ($akce === 'smazat' && $b) {
         if ($ui->zpracuj(fn() => $bannery->smaz((int)$id))) {
             $ui->zprava('ok', 'Banner smazán.');
-            $ui->presmeruj(Ui::odkaz('kampan', ['id' => $kampan['id']]));
+            $ui->presmeruj($zpet);
         }
-    } elseif ($ui->zpracuj(function () use ($bannery, &$id, $kampan, $typ) {
-        $v = ['campaign_id' => $kampan['id'], 'type' => $typ] + $_POST;
+    } elseif ($ui->zpracuj(function () use ($bannery, &$id, $kampan, $typ, $vybraneKampane) {
+        $vybrane = array_values(array_filter($vybraneKampane, fn($x) => $x > 0));
+        if (!$vybrane) throw new Chyba('Vyberte aspoň jednu kampaň. Pokud banner už nechcete, smažte ho.');
+        $v = ['type' => $typ] + $_POST;
+        $v['kampane'] = $vybrane;
+        if ($kampan) $v['campaign_id'] = in_array((int)$kampan['id'], $vybrane, true) ? (int)$kampan['id'] : $vybrane[0];
         unset($v['design']);
         $f = $_FILES['balicek'] ?? null;
         if ($typ === 'html5' && is_array($f) && ($f['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE) {
@@ -30,7 +42,7 @@ if ($post) {
         $id = $bannery->uloz($v, $id);
     })) {
         $ui->zprava('ok', 'Banner uložen.');
-        $ui->presmeruj(Ui::odkaz('banner', ['id' => $id]));
+        $ui->presmeruj(Ui::odkaz('banner', ['id' => $id, 'kampan' => $kampan && (int)$kampan['id'] !== (int)$bannery->radek((int)$id)['campaign_id'] && in_array((int)$kampan['id'], $vybraneKampane, true) ? $kampan['id'] : null]));
     }
 }
 $z = $b ?? ['name' => '', 'status' => 'active', 'width' => null, 'height' => null, 'weight' => 1, 'media_id' => null, 'image_url' => '', 'html' => '',
@@ -58,7 +70,7 @@ if ($typ === 'slide' && !$b):
 <?php return; endif;
 $balicek = $typ === 'html5' && $b ? (json_decode((string)$b['content'], true) ?: null) : null;
 ?>
-<p class="slabe">Kampaň: <a href="<?= Ui::h(Ui::odkaz('kampan', ['id' => $kampan['id']])) ?>"><?= Ui::h($kampan['name']) ?></a> · <?= Ui::h(Bannery::TYPY[$typ]) ?></p>
+<p class="slabe"><?= $b ? 'Kampaně: ' . Ui::kampaneBanneru($b) : 'Kampaň: <a href="' . Ui::h($zpet) . '">' . Ui::h($kampan['name']) . '</a>' ?> · <?= Ui::h(Bannery::TYPY[$typ]) ?></p>
 <div class="dva-sloupce">
 <section>
 <form method="post" class="formular karta"<?= $typ === 'html5' ? ' enctype="multipart/form-data"' : '' ?>>
@@ -112,10 +124,20 @@ $balicek = $typ === 'html5' && $b ? (json_decode((string)$b['content'], true) ?:
   <?php if (in_array($typ, Bannery::OBRAZKOVE, true)): ?>
     <?= Ui::pole('Popis obrázku (alt)', 'alt', $z['alt'], ['maxlength' => 255]) ?>
   <?php endif; ?>
+  <fieldset><legend>Kampaně</legend>
+    <p class="slabe mala" style="margin-top:0">Stejný banner může běžet ve více kampaních; v každé se řídí jejím termínem, prioritou, limity a cílením a statistiky se počítají zvlášť.</p>
+    <input type="hidden" name="kampane[]" value="0">
+    <div class="seznam-voleb">
+      <?php foreach ($vsechnyKampane as $vk): ?>
+      <label><input type="checkbox" name="kampane[]" value="<?= (int)$vk['id'] ?>"<?= in_array((int)$vk['id'], $vybraneKampane, true) ? ' checked' : '' ?>>
+        <?= Ui::h($vk['name']) ?> <?= Ui::stav($vk['status'], Kampane::STAVY[$vk['status']]) ?></label>
+      <?php endforeach; ?>
+    </div>
+  </fieldset>
   <?= Ui::oblast('Poznámka', 'note', $z['note'], ['rows' => 2]) ?>
   <div class="tlacitka">
     <button type="submit" class="hlavni"><?= $b ? 'Uložit' : 'Vytvořit banner' ?></button>
-    <a href="<?= Ui::h(Ui::odkaz('kampan', ['id' => $kampan['id']])) ?>">Zpět na kampaň</a>
+    <a href="<?= Ui::h($zpet) ?>"><?= $kampan ? 'Zpět na kampaň' : 'Zpět na bannery' ?></a>
   </div>
 </form>
 <?php if ($b): ?>

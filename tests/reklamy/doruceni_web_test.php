@@ -46,13 +46,13 @@ test('JSON pro víc zón: různé bannery, náhradní HTML, CORS, zobrazení se 
     eq(3, $stat('impressions'));
 });
 
-test('JavaScript (document.write), rám a náhled', function () use ($b, $s, $app, $zPruh, $zCtverec, $html, $stat) {
+test('JavaScript (document.write), rám a náhled', function () use ($b, $s, $app, $kid, $zPruh, $zCtverec, $html, $stat) {
     $pred = $stat('impressions');
     $r = $b->jdi("d/js.php?zona=$zPruh");
     eq('application/javascript', $r['type']);
     ok(preg_match('/^document\.write\(".*\\\\u003Ciframe/', $r['body']) === 1, 'HTML zakódované, aby nezavřelo <script>');
     $r = $b->jdi("d/ram.php?zona=$zPruh");
-    ok(str_contains($r['body'], '<a id="a" href="' . $s->url . '/d/klik.php?b=' . $html . '&z=' . $zPruh . '&k='), 'HTML banner je přímo obsahem rámu s makry');
+    ok(str_contains($r['body'], '<a id="a" href="' . $s->url . '/d/klik.php?b=' . $html . '&z=' . $zPruh . '&c=' . $kid . '&k='), 'HTML banner je přímo obsahem rámu s makry');
     ok(str_contains($r['body'], '<script>document.title = "banner ' . $html . '";</script>'));
     $r = $b->jdi("d/ram.php?zona=$zCtverec");
     ok(str_contains($r['body'], '<base target="_blank">') && str_contains($r['body'], '<img src='));

@@ -16,7 +16,7 @@ try {
         $k = $v->kontext($_GET, (int)$z['id']);
         $b = $app->dorucovani()->vyber($z, $k);
         if ($b) {
-            $app->dorucovani()->zobrazeni((int)$b['id'], (int)$z['id'], $k);
+            $app->dorucovani()->zobrazeni((int)$b['id'], (int)$z['id'], $k, (int)$b['campaign_id']);
             Vydej::ulozCookies($k);
             $cil = $b['target'] === '_self' ? '_self' : ($b['target'] ?: '_blank');
             // HTML banner je přímo obsahem rámu (bez dalšího vnořeného rámu)

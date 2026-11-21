@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 // Pravidelné úlohy: <base_url>/cron.php?key=<cron_key> (nebo z příkazové řádky: php cron.php).
-// Denní záloha, kontrola aktualizací, úklid protokolu.
+// Denní záloha, kontrola aktualizací, stažení externích dat (podle intervalu zdroje), úklid protokolu.
 use Reklamy\{App, ProtokolDb};
 
 /** @var App $app */
@@ -34,6 +34,12 @@ try {
     $app->aktualizace()->kontrolaDojde();
 } catch (Throwable $e) {
     $vystup[] = 'Kontrola aktualizací selhala: ' . $e->getMessage();
+}
+try {
+    // externí data: zdroje, kterým uplynul interval (při výpadku zůstávají poslední stažená data)
+    if ($app->zdroje()->vsechny()) $vystup[] = 'Externí data: ' . ($app->zdroje()->stahniPo() ? 'změněna' : 'beze změny');
+} catch (Throwable $e) {
+    $vystup[] = 'Stažení externích dat selhalo: ' . $e->getMessage();
 }
 try {
     $app->dorucovani()->uklid();

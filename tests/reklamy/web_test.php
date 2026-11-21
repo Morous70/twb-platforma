@@ -68,13 +68,15 @@ test('kampaň, banner, web, zóna a přiřazení přes formuláře', function ()
     ok(str_contains($r['body'], 'Advent &lt;b&gt;'));
     $r = $b->odesli('index.php?p=banner&kampan=1&typ=html', ['name' => 'Čtverec', 'width' => '300', 'height' => '250', 'html' => '<p onclick="x()">Ahoj</p>', 'target_url' => 'https://kazbo.eu']);
     eq('index.php?p=banner&id=1', $r['presmerovano']);
-    ok(str_contains($r['body'], 'srcdoc="&lt;p onclick=&quot;x()&quot;&gt;Ahoj&lt;/p&gt;"'), 'náhled HTML v izolovaném rámci');
+    ok(preg_match('~sandbox="allow-scripts allow-popups" srcdoc="&lt;!doctype html&gt;[^"]*&lt;p onclick=&quot;x\(\)&quot;&gt;Ahoj&lt;/p&gt;~', $r['body']) === 1, 'náhled HTML v izolovaném rámci');
     $r = $b->odesli('index.php?p=weby', ['akce' => 'novy-web', 'name' => 'Kazbo', 'url' => 'https://kazbo.eu']);
     eq('index.php?p=web&id=1', $r['presmerovano']);
     $r = $b->odesli('index.php?p=web&id=1', ['akce' => 'nova-zona', 'name' => 'Vpravo', 'kind' => 'banner', 'width' => '300', 'height' => '250']);
     eq('index.php?p=zona&id=1', $r['presmerovano']);
     $r = $b->odesli('index.php?p=zona&id=1', ['akce' => 'priradit', 'kampane' => ['1']]);
     ok(str_contains($r['body'], 'Bannery v zóně (1)'));
+    ok(str_contains($r['body'], '&lt;ins data-twbr-zona=&quot;1&quot;'), 'kód pro vložení');
+    ok(preg_match('~<iframe src="[^"]*/d/ram\.php\?zona=1&amp;nahled=[0-9a-f]{16}~', $r['body']) === 1, 'náhled zóny');
     eq(1, (int)$s->db()->query('SELECT COUNT(*) FROM zone_campaigns')->fetchColumn());
     $r = $b->jdi('index.php?p=web&id=1', ['akce' => 'nova-zona', 'name' => '', 'width' => '300']);
     ok(str_contains($r['body'], 'Vyplňte pole'));

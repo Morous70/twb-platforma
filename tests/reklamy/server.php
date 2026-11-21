@@ -56,6 +56,10 @@ final class Prohlizec
 {
     private string $jar;
     public string $csrf = '';
+    public string $ua = 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36';
+    /** @var list<string> další hlavičky dalšího požadavku */
+    public array $hlavicky = [];
+    public string $posledniHlavicky = '';
 
     public function __construct(private TestServer $s) { $this->jar = $s->data . '/cookies-' . bin2hex(random_bytes(3)); }
 
@@ -63,17 +67,25 @@ final class Prohlizec
      * @param array<string, mixed>|null $post
      * @return array{code:int, body:string, location:?string, type:string}
      */
-    public function jdi(string $cesta, ?array $post = null, bool $csrf = true, ?string $json = null): array
+    public function jdi(string $cesta, ?array $post = null, bool $csrf = true, ?string $json = null, ?string $telo = null): array
     {
-        $ch = curl_init($this->s->url . '/' . ltrim($cesta, '/'));
-        curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER => true, CURLOPT_HEADER => true, CURLOPT_COOKIEJAR => $this->jar, CURLOPT_COOKIEFILE => $this->jar, CURLOPT_TIMEOUT => 20]);
+        $ch = curl_init(str_starts_with($cesta, 'http') ? $cesta : $this->s->url . '/' . ltrim($cesta, '/'));
+        curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER => true, CURLOPT_HEADER => true, CURLOPT_COOKIEJAR => $this->jar, CURLOPT_COOKIEFILE => $this->jar, CURLOPT_TIMEOUT => 20,
+            CURLOPT_USERAGENT => $this->ua]);
+        $hl = $this->hlavicky;
+        $this->hlavicky = [];
         if ($json !== null) {
-            curl_setopt_array($ch, [CURLOPT_POST => true, CURLOPT_POSTFIELDS => $json, CURLOPT_HTTPHEADER => ['Content-Type: application/json']]);
+            curl_setopt_array($ch, [CURLOPT_POST => true, CURLOPT_POSTFIELDS => $json]);
+            $hl[] = 'Content-Type: application/json';
+        } elseif ($telo !== null) {
+            curl_setopt_array($ch, [CURLOPT_POST => true, CURLOPT_POSTFIELDS => $telo]);
+            $hl[] = 'Content-Type: text/xml';
         } elseif ($post !== null) {
             if ($csrf && !isset($post['csrf'])) $post['csrf'] = $this->csrf;
             $multipart = (bool)array_filter($post, fn($v) => $v instanceof CURLFile);
             curl_setopt_array($ch, [CURLOPT_POST => true, CURLOPT_POSTFIELDS => $multipart ? $post : http_build_query($post)]);
         }
+        if ($hl) curl_setopt($ch, CURLOPT_HTTPHEADER, $hl);
         $r = curl_exec($ch);
         if ($r === false) throw new RuntimeException('Požadavek selhal: ' . curl_error($ch));
         $hs = curl_getinfo($ch, CURLINFO_HEADER_SIZE);
@@ -82,6 +94,7 @@ final class Prohlizec
         $code = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
         $loc = preg_match('/^Location:\s*(\S+)/mi', $hlavicky, $m) ? $m[1] : null;
         $type = preg_match('/^Content-Type:\s*([^\r\n;]+)/mi', $hlavicky, $m) ? $m[1] : '';
+        $this->posledniHlavicky = $hlavicky;
         if (preg_match('/name="csrf" value="([0-9a-f]+)"/', $body, $m)) $this->csrf = $m[1];
         foreach (['Fatal error', 'Warning:', 'Deprecated:', 'Notice:', 'Uncaught', 'ErrorException'] as $spatne) {
             if (str_contains($body, $spatne)) throw new RuntimeException("Stránka $cesta obsahuje chybu PHP: " . mb_substr(strip_tags($body), 0, 600));

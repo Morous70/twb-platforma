@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 // Zóna: nastavení, přiřazení kampaní a bannerů. Proměnné: $app, $ui, $post.
-use Reklamy\{Ui, Zony, Bannery, Kampane};
+use Reklamy\{Ui, Zony, Bannery, Kampane, Kody, Vydej};
 
 $id = (int)($_GET['id'] ?? 0);
 $z = $app->zony()->radek($id);
@@ -76,9 +76,26 @@ foreach (Bannery::ROZMERY as $r => $n) $rozmery[$r] = str_replace('x', '×', $r)
     <?php endforeach; ?>
   </table></div>
   <?php endif; ?>
-  <p class="slabe mala">Kódy pro vložení zóny na web (JavaScript, iframe, odkaz, XML-RPC …) přibudou s doručováním reklam.</p>
+
+  <h2 id="kod">Kód pro vložení na web</h2>
+  <?php $kody = new Kody($app); $prvni = true;
+  foreach (Kody::ZPUSOBY as $zp => [$nazev, $popis]): ?>
+  <details class="kod-vlozeni"<?= $prvni ? ' open' : '' ?>>
+    <summary><?= Ui::h($nazev) ?></summary>
+    <p class="slabe mala"><?= Ui::h($popis) ?></p>
+    <textarea id="kod-<?= $zp ?>" class="kod" readonly rows="<?= in_array($zp, ['php', 'xmlrpc', 'json'], true) ? 12 : 4 ?>"><?= Ui::h($kody->kod($z, $zp)) ?></textarea>
+    <div class="tlacitka" style="margin-top:.4rem"><button type="button" class="maly" data-kopirovat="kod-<?= $zp ?>">Kopírovat</button></div>
+  </details>
+  <?php $prvni = false; endforeach; ?>
 </section>
 <section>
+  <h2 style="margin-top:0">Náhled</h2>
+  <?php $vydej = new Vydej($app); $nw = (int)($z['width'] ?? 0) ?: 300; $nh = (int)($z['height'] ?? 0) ?: 250; ?>
+  <div class="nahled" style="margin-bottom:1rem">
+    <iframe src="<?= Ui::h($app->url('d/ram.php') . '?' . http_build_query(['zona' => $id, 'nahled' => $vydej->podpisNahledu($id), 'cb' => random_int(1, 1_000_000)])) ?>"
+      width="<?= $nw ?>" height="<?= $nh ?>" title="Náhled zóny" style="background:transparent"></iframe>
+  </div>
+  <p class="slabe mala" style="margin-top:-.5rem">Náhled vybere banner stejně jako na webu (obnovením stránky se střídají), ale nepočítá se do statistik.</p>
   <?php Ui::$zPostu = $akce === 'ulozit'; ?>
   <form method="post" class="formular karta">
     <h2 style="margin:0">Nastavení zóny</h2>

@@ -20,7 +20,7 @@ final class App
     /** Veřejný klíč Ed25519 TWB Update Serveru (veřejný, smí být v kódu). */
     public const UPDATE_KLIC = 'JTvTWDW+eSP/GtT9zG3t+3UraawTk82vKteb2Dci8Cg=';
     /** Tabulky v pořadí pro obnovu ze zálohy (nejdřív ty, na které ostatní odkazují). */
-    public const TABULKY = ['module_versions', 'settings', 'log', 'media', 'passkeys', 'campaigns', 'banners', 'sites', 'zones', 'zone_campaigns', 'zone_banners'];
+    public const TABULKY = ['module_versions', 'settings', 'log', 'media', 'passkeys', 'campaigns', 'banners', 'sites', 'zones', 'zone_campaigns', 'zone_banners', 'stats'];
     /** Nastavení, která patří k instalaci a obnova zálohy je nepřepíše. */
     public const MISTNI = ['login_fails', 'login_last_fail', 'update_result', 'update_checked_at', 'update_available', 'update_health_key'];
 
@@ -170,6 +170,17 @@ final class App
             povinne: ['index.php', 'health.php', 'lib/bootstrap.php'], predponaZip: 'twb-reklamy-'));
     }
 
+    public function dorucovani(): Dorucovani { return $this->sluzba('dorucovani', fn() => new Dorucovani($this)); }
+    public function vykresleni(): Vykresleni { return $this->sluzba('vykresleni', fn() => new Vykresleni($this, $this->dorucovani())); }
+
+    /** Pro soubory doručování: převod databáze jen tehdy, když nesedí verze (bez zbytečné práce u každého zobrazení). */
+    public function pripravDoruceni(): bool
+    {
+        if ((int)$this->nastaveni()->dej('schema_version', 0) !== Schema::verze()) $this->migruj();
+        return (new Migrace($this->db))->verze(self::SLUG) > 0;
+    }
+
+    public function statistiky(): Statistiky { return $this->sluzba('statistiky', fn() => new Statistiky($this)); }
     public function kampane(): Kampane { return $this->sluzba('kampane', fn() => new Kampane($this)); }
     public function bannery(): Bannery { return $this->sluzba('bannery', fn() => new Bannery($this)); }
     public function weby(): Weby { return $this->sluzba('weby', fn() => new Weby($this)); }

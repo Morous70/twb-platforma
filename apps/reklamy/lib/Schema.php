@@ -11,7 +11,7 @@ use TWB\Jadro\{Db, ModulMigrace};
  */
 final class Schema implements ModulMigrace
 {
-    public static function verze(): int { return 1; }
+    public static function verze(): int { return 2; }
 
     /** Tabulky, které musí existovat dřív než cokoli jiného (nastavení a protokol). */
     public static function zakladniTabulky(Db $db): void
@@ -81,6 +81,23 @@ final class Schema implements ModulMigrace
                 banner_id INTEGER NOT NULL REFERENCES banners(id) ON DELETE CASCADE,
                 PRIMARY KEY (zone_id, banner_id)
             )');
+        }
+        if ($zVerze < 2) {
+            // statistiky po hodinách: zobrazení, prokliky, konverze, hodnota (v haléřích); zone_id 0 = bez zóny
+            $db->q('CREATE TABLE stats (
+                day CHAR(10) NOT NULL, hour INTEGER NOT NULL,
+                banner_id INTEGER NOT NULL, zone_id INTEGER NOT NULL DEFAULT 0,
+                impressions INTEGER NOT NULL DEFAULT 0, clicks INTEGER NOT NULL DEFAULT 0,
+                conversions INTEGER NOT NULL DEFAULT 0, revenue INTEGER NOT NULL DEFAULT 0,
+                PRIMARY KEY (day, hour, banner_id, zone_id)
+            )');
+            $db->q('CREATE INDEX stats_banner ON stats (banner_id, day)');
+            // vazba obrázku a prokliku u vložení odkazem (obr.php a klik.php se stejným n), i bez cookies
+            $db->q('CREATE TABLE view_map (
+                n VARCHAR(64) NOT NULL, zone_id INTEGER NOT NULL, banner_id INTEGER NOT NULL, at INTEGER NOT NULL,
+                PRIMARY KEY (n, zone_id)
+            )');
+            $db->q('CREATE INDEX view_map_at ON view_map (at)');
         }
     }
 }

@@ -55,7 +55,7 @@ foreach (Bannery::ROZMERY as $r => $n) $rozmery[$r] = str_replace('x', '×', $r)
     <?= Ui::pole('Adresa obrázku', 'image_url', $z['image_url'], ['type' => 'url', 'required' => true, 'placeholder' => 'https://…']) ?>
   <?php elseif ($typ === 'html'): ?>
     <?= Ui::oblast('HTML kód', 'html', $z['html'], ['class' => 'kod', 'rows' => 14, 'spellcheck' => 'false', 'required' => true],
-        'Kód se zobrazí v izolovaném rámci (iframe) o rozměru banneru. Proměnné pro adresu prokliku apod. přibudou s doručováním.') ?>
+        'Kód se zobrazí v izolovaném rámci (iframe) o rozměru banneru. Odkazy: <code>{clickurl}</code> (proklik na cílovou adresu) nebo <code>{clickurl}https://…</code> (proklik na jinou adresu stejné domény nebo uvedenou v kódu). Dále <code>{random}</code>, <code>{timestamp}</code>, <code>{bannerid}</code>, <code>{zoneid}</code>, <code>{width}</code>, <code>{height}</code>, <code>{targeturl}</code>.') ?>
   <?php endif; ?>
   <div class="radek">
     <?= Ui::pole('Šířka (px)', 'width', $z['width'], ['type' => 'number', 'min' => 1, 'max' => Bannery::MAX_ROZMER, 'required' => $typ !== 'image']) ?>
@@ -89,7 +89,7 @@ foreach (Bannery::ROZMERY as $r => $n) $rozmery[$r] = str_replace('x', '×', $r)
   <?php elseif ($typ === 'external' && $b): ?>
     <img src="<?= Ui::h($b['image_url']) ?>" alt="" width="<?= (int)$b['width'] ?>" height="<?= (int)$b['height'] ?>" referrerpolicy="no-referrer">
   <?php elseif ($typ === 'html' && $b): ?>
-    <iframe sandbox="allow-scripts allow-popups" srcdoc="<?= Ui::h($b['html']) ?>" width="<?= (int)$b['width'] ?>" height="<?= (int)$b['height'] ?>" title="Náhled banneru"></iframe>
+    <iframe sandbox="allow-scripts allow-popups" srcdoc="<?= Ui::h($app->vykresleni()->dokumentHtml($b, 0)) ?>" width="<?= (int)$b['width'] ?>" height="<?= (int)$b['height'] ?>" title="Náhled banneru"></iframe>
   <?php else: ?>
     <p class="slabe">Náhled se zobrazí po uložení.</p>
   <?php endif; ?>

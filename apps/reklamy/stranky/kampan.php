@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 // Nová kampaň nebo úprava kampaně, její bannery a zóny. Proměnné: $app, $ui, $post.
-use Reklamy\{Ui, Kampane, Bannery, Vstup, Zony, Chyba};
+use Reklamy\{Ui, Kampane, Bannery, Vstup, Zony, Chyba, Statistiky};
 
 $kampane = $app->kampane();
 $id = isset($_GET['id']) ? (int)$_GET['id'] : null;
@@ -41,6 +41,9 @@ $z = $k ?? ['name' => '', 'status' => 'active', 'kind' => 'standard', 'priority'
     'limit_impressions' => null, 'limit_clicks' => null, 'limit_conversions' => null, 'daily_impressions' => null, 'daily_clicks' => null, 'note' => '', 'tags' => null];
 $tagy = implode(', ', $kampane->tagy()->tagyPolozky($z));
 $bannery = $k ? $app->bannery()->seznam((int)$k['id']) : [];
+$stB = $k ? $app->statistiky()->poBannerech(null, null, (int)$k['id']) : [];
+$stK = $k ? $app->statistiky()->souhrn(null, null, (int)$k['id']) : null;
+$stDnes = $k ? $app->statistiky()->souhrn(date('Y-m-d'), date('Y-m-d'), (int)$k['id']) : null;
 ?>
 <div class="dva-sloupce">
 <section>
@@ -85,6 +88,11 @@ $bannery = $k ? $app->bannery()->seznam((int)$k['id']) : [];
 
 <?php if ($k): ?>
 <section>
+  <div class="mrizka" style="grid-template-columns:repeat(3,1fr);margin-bottom:1rem">
+    <div class="dlazdice"><div class="cislo"><?= Ui::cislo($stK['impressions']) ?></div><div class="popis">Zobrazení (dnes <?= Ui::cislo($stDnes['impressions']) ?>)</div></div>
+    <div class="dlazdice"><div class="cislo"><?= Ui::cislo($stK['clicks']) ?></div><div class="popis">Prokliky (dnes <?= Ui::cislo($stDnes['clicks']) ?>)</div></div>
+    <div class="dlazdice"><div class="cislo"><?= Statistiky::ctr($stK['impressions'], $stK['clicks']) ?></div><div class="popis">CTR</div></div>
+  </div>
   <h2 style="margin-top:0">Bannery</h2>
   <div class="tlacitka" style="margin-bottom:.8rem">
     <?php foreach (Bannery::TYPY as $typ => $popis): ?>
@@ -101,6 +109,7 @@ $bannery = $k ? $app->bannery()->seznam((int)$k['id']) : [];
       <td><a href="<?= Ui::h(Ui::odkaz('banner', ['id' => $b['id']])) ?>"><?= Ui::h($b['name']) ?></a><br>
         <span class="slabe mala"><?= Ui::h(Bannery::TYPY[$b['type']] ?? $b['type']) ?>, <?= (int)$b['width'] ?>×<?= (int)$b['height'] ?></span></td>
       <td><?= Ui::stav($b['status'], Bannery::STAVY[$b['status']]) ?></td>
+      <td class="cisla mala"><?= Ui::cislo($stB[$b['id']]['impressions'] ?? 0) ?> / <?= Ui::cislo($stB[$b['id']]['clicks'] ?? 0) ?></td>
       <td><div class="akce">
         <?= $b['status'] === 'active' ? $ui->tlacitko('Pozastavit', 'banner-stav', ['banner' => $b['id'], 'stav' => 'paused']) : $ui->tlacitko('Spustit', 'banner-stav', ['banner' => $b['id'], 'stav' => 'active']) ?>
         <?= $ui->tlacitko('Kopie', 'banner-kopie', ['banner' => $b['id']]) ?>

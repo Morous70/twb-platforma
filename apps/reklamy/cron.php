@@ -35,6 +35,11 @@ try {
 } catch (Throwable $e) {
     $vystup[] = 'Kontrola aktualizací selhala: ' . $e->getMessage();
 }
+try {
+    $app->dorucovani()->uklid();
+} catch (Throwable $e) {
+    $vystup[] = 'Úklid doručování selhal: ' . $e->getMessage();
+}
 $host = $app->host->protokol;
 if ($host instanceof ProtokolDb) $host->uklid();
 echo "OK\n" . implode("\n", $vystup) . "\n";

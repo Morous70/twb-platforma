@@ -118,3 +118,6 @@ dl.udaje dd { margin: 0; }
 .seznam-voleb { display: grid; gap: .3rem; max-height: 22rem; overflow: auto; padding: .3rem; border: 1px solid var(--okraj); border-radius: 6px; background: var(--plocha); }
 .seznam-voleb label { display: flex; gap: .5rem; align-items: center; }
 .seznam-voleb .nepasuje { opacity: .55; }
+details.kod-vlozeni { background: var(--plocha); border: 1px solid var(--okraj); border-radius: var(--polomer); padding: .5rem .8rem; margin-bottom: .5rem; }
+details.kod-vlozeni summary { cursor: pointer; font-weight: 600; }
+details.kod-vlozeni textarea { min-height: 0; background: var(--kod); }

@@ -256,3 +256,21 @@ test('neplatné nastavení formátů a prvků se odmítne; kuličky čísla z te
     eq(100, count(Kulicky::cisla(implode(' ', range(1, 150)))));
     eq(null, Fx::vycisti(['style' => 'neexistuje']));
 });
+
+test('editor v prohlížeči: kopie je shodná se Social Plannerem, je syntakticky v pořádku a popis zná všechny dodávané funkce', function () {
+    $web = KOREN . '/modules/slidy/web';
+    $sp = KOREN . '/apps/social-planner/assets';
+    eq(md5_file("$sp/js/slide-editor.js"), md5_file("$web/slide-editor.js"));
+    eq(md5_file("$sp/css/slide-editor.css"), md5_file("$web/slide-editor.css"));
+    $shim = (string)file_get_contents("$sp/js/slide-shim.js");
+    $js = (string)file_get_contents("$web/slide-editor.js");
+    $popis = (string)file_get_contents("$web/HOST.md");
+    preg_match_all('/^(?:async function|function|const|let) ([A-Za-z_$]+)/m', $shim, $m);
+    $pouzite = array_filter(array_unique($m[1]), fn($n) => preg_match('/(?<![\w$])' . preg_quote($n, '/') . '(?![\w$])/', $js));
+    ok(count($pouzite) > 20, 'nalezeny dodávané symboly');
+    foreach ($pouzite as $n) ok(str_contains($popis, '`' . $n . '`'), "HOST.md nezmiňuje $n");
+    if (trim((string)shell_exec('command -v node'))) {
+        exec('node --check ' . escapeshellarg("$web/slide-editor.js") . ' 2>&1', $out, $rc);
+        eq(0, $rc, implode("\n", $out));
+    }
+});

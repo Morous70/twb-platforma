@@ -4,7 +4,8 @@ namespace Reklamy;
 
 /**
  * Zóny = místa pro reklamu na webu. Do zóny se přiřazují celé kampaně (platí i pro bannery přidané později)
- * nebo jednotlivé bannery. Zóna s pevným rozměrem bere jen bannery stejného rozměru.
+ * nebo jednotlivé bannery. Zóna může mít pevnou šířku, pevnou výšku, obojí, nebo nic: bere jen bannery,
+ * které v zadaných rozměrech sedí (nezadaný rozměr je libovolný).
  */
 final class Zony
 {
@@ -30,15 +31,28 @@ final class Zony
             ?: throw new Chyba('Zóna nenalezena.');
     }
 
+    /** Popis rozměru zóny: „300×250“, „1200 × libovolná výška“, „libovolná šířka × 100“ nebo „libovolný“. */
     public static function rozmer(array $z): string
     {
-        return $z['width'] !== null ? "{$z['width']}×{$z['height']}" : 'libovolný';
+        $w = $z['width'] ?? null;
+        $h = $z['height'] ?? null;
+        if ($w !== null && $h !== null) return "{$w}×{$h}";
+        if ($w !== null) return "{$w} × libovolná výška";
+        if ($h !== null) return "libovolná šířka × {$h}";
+        return 'libovolný';
     }
 
-    /** Vejde se banner do zóny? */
+    /** Má zóna aspoň jeden pevný rozměr? */
+    public static function maRozmer(array $z): bool
+    {
+        return ($z['width'] ?? null) !== null || ($z['height'] ?? null) !== null;
+    }
+
+    /** Vejde se banner do zóny? Nezadaný rozměr zóny je libovolný. */
     public static function pasuje(array $zona, array $banner): bool
     {
-        return $zona['width'] === null || ((int)$zona['width'] === (int)$banner['width'] && (int)$zona['height'] === (int)$banner['height']);
+        return (($zona['width'] ?? null) === null || (int)$zona['width'] === (int)$banner['width'])
+            && (($zona['height'] ?? null) === null || (int)$zona['height'] === (int)$banner['height']);
     }
 
     /** @param array<string, mixed> $v */
@@ -56,7 +70,6 @@ final class Zony
             'note' => Vstup::text($v, 'note', 'Poznámka', 5000, false),
             'updated_at' => time(),
         ];
-        if (($d['width'] === null) !== ($d['height'] === null)) throw new Chyba('Vyplňte šířku i výšku zóny, nebo obojí nechte prázdné (libovolný rozměr).');
         $fb = (string)($v['fallback'] ?? '');
         if (strlen($fb) > Bannery::MAX_HTML) throw new Chyba('Náhradní HTML může mít nejvýš 512 kB.');
         $d['fallback'] = trim($fb) !== '' ? $fb : null;
@@ -70,8 +83,9 @@ final class Zony
         }
         $db->transakce(function () use ($db, $d, $id) {
             $db->q('UPDATE zones SET ' . implode(', ', array_map(fn($k) => "$k = ?", array_keys($d))) . ' WHERE id = ?', [...array_values($d), $id]);
-            if ($d['width'] !== null) {
-                $db->q('DELETE FROM zone_banners WHERE zone_id = ? AND banner_id IN (SELECT id FROM banners WHERE width <> ? OR height <> ?)', [$id, $d['width'], $d['height']]);
+            if ($d['width'] !== null || $d['height'] !== null) {
+                $db->q('DELETE FROM zone_banners WHERE zone_id = ? AND banner_id IN (SELECT id FROM banners WHERE (? IS NOT NULL AND width <> ?) OR (? IS NOT NULL AND height <> ?))',
+                    [$id, $d['width'], $d['width'], $d['height'], $d['height']]);
             }
         });
         return $id;
@@ -139,5 +153,22 @@ final class Zony
             WHERE z.id IN (SELECT zone_id FROM zone_banners WHERE banner_id = ?) OR z.id IN (SELECT zone_id FROM zone_campaigns WHERE campaign_id = ?)
             ORDER BY s.name, z.name', [$banner['id'], $banner['campaign_id']])->fetchAll();
         return array_values(array_filter($rows, fn($z) => self::pasuje($z, $banner)));
+    }
+
+    /**
+     * Rozměr pro rám, náhled a vyskakovací okno. Nezadaný rozměr zóny se vezme jako největší z bannerů,
+     * které zóna může zobrazit (aby se vešel každý), bez bannerů výchozí hodnota.
+     * @return array{0:int, 1:int}
+     */
+    public function rozmerVlozeni(array $zona, int $vychoziW = 300, int $vychoziH = 250): array
+    {
+        $w = ($zona['width'] ?? null) !== null ? (int)$zona['width'] : 0;
+        $h = ($zona['height'] ?? null) !== null ? (int)$zona['height'] : 0;
+        if ((!$w || !$h) && isset($zona['id'])) {
+            try { $bannery = $this->bannery((int)$zona['id']); } catch (Chyba) { $bannery = []; }
+            if (!$w && $bannery) $w = max(array_map(fn($b) => (int)$b['width'], $bannery));
+            if (!$h && $bannery) $h = max(array_map(fn($b) => (int)$b['height'], $bannery));
+        }
+        return [$w ?: $vychoziW, $h ?: $vychoziH];
     }
 }

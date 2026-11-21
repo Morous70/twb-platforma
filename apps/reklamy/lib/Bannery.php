@@ -117,7 +117,7 @@ final class Bannery
                 $db->q('UPDATE banners SET ' . implode(', ', array_map(fn($k) => "$k = ?", array_keys($d))) . ' WHERE id = ?', [...array_values($d), $id]);
                 // změna rozměru: přímá přiřazení do zón s jiným pevným rozměrem už neplatí
                 if ((int)$stary['width'] !== $d['width'] || (int)$stary['height'] !== $d['height']) {
-                    $db->q('DELETE FROM zone_banners WHERE banner_id = ? AND zone_id IN (SELECT id FROM zones WHERE width IS NOT NULL AND (width <> ? OR height <> ?))',
+                    $db->q('DELETE FROM zone_banners WHERE banner_id = ? AND zone_id IN (SELECT id FROM zones WHERE (width IS NOT NULL AND width <> ?) OR (height IS NOT NULL AND height <> ?))',
                         [$id, $d['width'], $d['height']]);
                 }
             });

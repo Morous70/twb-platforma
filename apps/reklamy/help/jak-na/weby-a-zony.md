@@ -10,7 +10,12 @@ klicova: zóna, web, rozměr, náhradní
 
 **Web** je jen skupina zón (a údaj pro statistiky po webech). **Zóna** je jedno místo pro reklamu.
 
-- **Rozměr zóny**: zóna s rozměrem bere jen bannery stejného rozměru; bez rozměru bere všechny.
+- **Rozměr zóny**: prázdný rozměr je libovolný.
+  - šířka i výška (např. 300×250) – jen bannery přesně tohoto rozměru;
+  - jen šířka (např. 1200) – bannery široké 1200 px s libovolnou výškou (1200×100, 1200×300 …);
+  - jen výška (např. 100) – bannery vysoké 100 px s libovolnou šířkou;
+  - bez rozměru – bannery jakékoli velikosti.
+  Rám (iframe) a vyskakovací okno potřebují oba rozměry: chybějící se v kódu doplní podle největšího banneru zóny.
 - **Náhradní HTML**: zobrazí se, když není co ukázat (např. „Tady může být vaše reklama“).
 - **Přiřazení**: celá kampaň (platí i pro bannery přidané později), nebo jednotlivé bannery.
 

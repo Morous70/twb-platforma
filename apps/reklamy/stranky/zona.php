@@ -39,7 +39,7 @@ foreach (Bannery::ROZMERY as $r => $n) $rozmery[$r] = str_replace('x', '×', $r)
     <?= $ui->csrf() ?>
     <input type="hidden" name="akce" value="priradit">
     <fieldset><legend>Celé kampaně</legend>
-      <p class="slabe mala" style="margin-top:0">Platí i pro bannery, které do kampaně přidáte později<?= $z['width'] !== null ? ' (jen rozměr ' . Ui::h(Zony::rozmer($z)) . ')' : '' ?>.</p>
+      <p class="slabe mala" style="margin-top:0">Platí i pro bannery, které do kampaně přidáte později<?= Zony::maRozmer($z) ? ' (jen rozměr ' . Ui::h(Zony::rozmer($z)) . ')' : '' ?>.</p>
       <?php if (!$kampane): ?><p class="slabe">Žádné kampaně.</p><?php else: ?>
       <div class="seznam-voleb">
         <?php foreach ($kampane as $k): ?>
@@ -78,6 +78,11 @@ foreach (Bannery::ROZMERY as $r => $n) $rozmery[$r] = str_replace('x', '×', $r)
   <?php endif; ?>
 
   <h2 id="kod">Kód pro vložení na web</h2>
+  <?php if ($z['width'] === null || $z['height'] === null): [$kw, $kh] = $app->zony()->rozmerVlozeni($z);
+    $chybi = $z['width'] === null && $z['height'] === null ? 'pevný rozměr' : ($z['width'] === null ? 'pevnou šířku' : 'pevnou výšku'); ?>
+  <p class="slabe mala">Zóna nemá <?= $chybi ?>. Rám (iframe) a vyskakovací okno potřebují oba rozměry, proto mají v kódu <?= $kw ?>×<?= $kh ?> px
+    (chybějící rozměr podle největšího banneru zóny<?= $efektivni ? '' : ', zatím výchozí' ?>). Asynchronní a JavaScriptové vložení se přizpůsobí samo.</p>
+  <?php endif; ?>
   <?php $kody = new Kody($app); $prvni = true;
   foreach (Kody::ZPUSOBY as $zp => [$nazev, $popis]): ?>
   <details class="kod-vlozeni"<?= $prvni ? ' open' : '' ?>>
@@ -90,7 +95,7 @@ foreach (Bannery::ROZMERY as $r => $n) $rozmery[$r] = str_replace('x', '×', $r)
 </section>
 <section>
   <h2 style="margin-top:0">Náhled</h2>
-  <?php $vydej = new Vydej($app); $nw = (int)($z['width'] ?? 0) ?: 300; $nh = (int)($z['height'] ?? 0) ?: 250; ?>
+  <?php $vydej = new Vydej($app); [$nw, $nh] = $app->zony()->rozmerVlozeni($z); ?>
   <div class="nahled" style="margin-bottom:1rem">
     <iframe src="<?= Ui::h($app->url('d/ram.php') . '?' . http_build_query(['zona' => $id, 'nahled' => $vydej->podpisNahledu($id), 'cb' => random_int(1, 1_000_000)])) ?>"
       width="<?= $nw ?>" height="<?= $nh ?>" title="Náhled zóny" style="background:transparent"></iframe>
@@ -108,7 +113,7 @@ foreach (Bannery::ROZMERY as $r => $n) $rozmery[$r] = str_replace('x', '×', $r)
       <?= Ui::pole('Výška (px)', 'height', $z['height'], ['type' => 'number', 'min' => 1, 'max' => Bannery::MAX_ROZMER]) ?>
     </div>
     <label class="pole"><span>Běžné rozměry</span><select data-rozmery><?php foreach ($rozmery as $k => $t): ?><option value="<?= Ui::h($k) ?>"><?= Ui::h($t) ?></option><?php endforeach; ?></select>
-      <small>Bez rozměru zóna přijme banner libovolné velikosti. Přímo přiřazené bannery jiného rozměru se po změně odeberou.</small></label>
+      <small>Prázdný rozměr je libovolný: bez šířky i výšky zóna přijme banner jakékoli velikosti, jen se šířkou (nebo jen s výškou) bannery s touto šířkou (výškou) a libovolným druhým rozměrem. Přímo přiřazené bannery, které po změně nesedí, se odeberou.</small></label>
     <?= Ui::oblast('Náhradní HTML', 'fallback', $z['fallback'], ['class' => 'kod', 'rows' => 4, 'spellcheck' => 'false'], 'Zobrazí se, když zóna nemá žádný banner k dispozici. Prázdné = nic.') ?>
     <?= Ui::oblast('Poznámka', 'note', $z['note'], ['rows' => 2]) ?>
     <div><button type="submit" class="hlavni">Uložit</button></div>

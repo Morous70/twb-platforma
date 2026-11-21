@@ -81,6 +81,13 @@ test('kampaň, banner, web, zóna a přiřazení přes formuláře', function ()
     $r = $b->jdi('index.php?p=web&id=1', ['akce' => 'nova-zona', 'name' => '', 'width' => '300']);
     ok(str_contains($r['body'], 'Vyplňte pole'));
     ok(str_contains($r['body'], 'value="Kazbo"'), 'formulář webu nepřevzal hodnoty formuláře zóny');
+    $b->jdi('index.php?p=web&id=1');
+    $r = $b->odesli('index.php?p=web&id=1', ['akce' => 'nova-zona', 'name' => 'Pruh', 'kind' => 'banner', 'width' => '1200', 'height' => '']);
+    eq('index.php?p=zona&id=2', $r['presmerovano'], 'zóna jen se šířkou');
+    $r = $b->jdi('index.php?p=zona&id=2');
+    ok(str_contains($r['body'], 'rozměr 1200 × libovolná výška') && str_contains($r['body'], 'Zóna nemá pevnou výšku'));
+    ok(str_contains($r['body'], 'style=&quot;display:inline-block;width:1200px&quot;&gt;&lt;/ins&gt;'));
+    ok(str_contains($b->jdi('index.php?p=web&id=1')['body'], '1200 × libovolná výška'), 'rozměr v seznamu zón');
     foreach (['kampane', 'bannery', 'weby', 'prehled', 'kampan&id=1', 'banner&id=1', 'web&id=1', 'zona&id=1'] as $p) eq(200, $b->jdi("index.php?p=$p")['code'], $p);
     // pozastavení a smazání
     $b->jdi('index.php?p=kampane');

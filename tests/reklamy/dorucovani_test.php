@@ -39,6 +39,20 @@ test('kandidáti: jen aktivní bannery aktivních kampaní v termínu, vhodného
     eq([], $app->dorucovani()->kandidati($z, kontext(), ['image', 'external']), 'filtr druhu banneru');
 });
 
+test('kandidáti: zóna jen se šířkou nebo jen s výškou bere libovolný druhý rozměr', function () {
+    $app = novaApp();
+    $kid = kampan($app);
+    $a = htmlBanner($app, $kid, 1200, 100);
+    $b = htmlBanner($app, $kid, 1200, 300);
+    $c = htmlBanner($app, $kid, 728, 100);
+    $zs = zona($app, ['width' => 1200]);
+    $zv = zona($app, ['height' => 100]);
+    $app->zony()->prirad((int)$zs['id'], [$kid], []);
+    $app->zony()->prirad((int)$zv['id'], [$kid], []);
+    eq([$a, $b], array_map(fn($x) => (int)$x['id'], $app->dorucovani()->kandidati($zs, kontext())));
+    eq([$a, $c], array_map(fn($x) => (int)$x['id'], $app->dorucovani()->kandidati($zv, kontext())));
+});
+
 test('druh a priorita: exkluzivní před standardní, zbytková jen bez jiných, vyšší priorita vyhrává', function () {
     $app = novaApp();
     $z = zona($app);
@@ -195,6 +209,21 @@ test('kódy pro vložení: všechny způsoby, PHP kód je platný', function () 
     }
     ok(str_contains($k->kod($z, 'asyn'), '<ins data-twbr-zona="' . $z['id'] . '" style="display:inline-block;width:728px;height:90px"></ins>'));
     ok(str_contains($k->kod($z, 'odkaz'), 'width="728" height="90"'));
+    // zóna jen se šířkou: asynchronní vložení jen šířku, rám výšku podle největšího banneru
+    $zs = zona($app, ['width' => 1200]);
+    ok(str_contains($k->kod($zs, 'asyn'), 'style="display:inline-block;width:1200px"></ins>'), $k->kod($zs, 'asyn'));
+    ok(str_contains($k->kod($zs, 'iframe'), 'width="1200" height="250"'), 'bez bannerů výchozí výška');
+    ok(str_contains($k->kod($zs, 'odkaz'), 'width="1200" border'), $k->kod($zs, 'odkaz'));
+    ok(str_contains($k->kod($zs, 'okno'), "zona={$zs['id']}&amp;vyska=600\""), $k->kod($zs, 'okno'));
+    $kid = kampan($app);
+    htmlBanner($app, $kid, 1200, 100);
+    htmlBanner($app, $kid, 1200, 280);
+    $app->zony()->prirad((int)$zs['id'], [$kid], []);
+    ok(str_contains($k->kod($zs, 'iframe'), 'width="1200" height="280"'), $k->kod($zs, 'iframe'));
+    ok(str_contains($k->kod($zs, 'okno'), '&amp;vyska=280"'));
+    $zv = zona($app, ['height' => 90]);
+    ok(str_contains($k->kod($zv, 'asyn'), 'style="display:inline-block;height:90px"></ins>'));
+    ok(str_contains($k->kod($zv, 'okno'), '&amp;sirka=800"'));
     foreach (['php', 'xmlrpc'] as $zp) {
         $f = docasna('kod') . '.php';
         file_put_contents($f, $k->kod($z, $zp));

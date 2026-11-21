@@ -26,12 +26,14 @@ final class Kody
     public function kod(array $zona, string $zpusob): string
     {
         $id = (int)$zona['id'];
-        $w = (int)($zona['width'] ?? 0);
-        $hh = (int)($zona['height'] ?? 0);
-        $rozmer = $w ? " width=\"$w\" height=\"$hh\"" : ' width="300" height="250"';
+        $zw = ($zona['width'] ?? null) !== null ? (int)$zona['width'] : 0;
+        $zh = ($zona['height'] ?? null) !== null ? (int)$zona['height'] : 0;
+        // rám potřebuje oba rozměry: nezadaný se vezme z bannerů zóny (největší), jinak 300×250
+        [$w, $hh] = $this->app->zony()->rozmerVlozeni($zona);
+        $rozmer = " width=\"$w\" height=\"$hh\"";
         switch ($zpusob) {
             case 'asyn':
-                $styl = $w ? " style=\"display:inline-block;width:{$w}px;height:{$hh}px\"" : ' style="display:inline-block"';
+                $styl = ' style="display:inline-block' . ($zw ? ";width:{$zw}px" : '') . ($zh ? ";height:{$zh}px" : '') . '"';
                 return "<ins data-twbr-zona=\"$id\"$styl></ins>\n<script async src=\"" . self::h($this->u('asyn.php')) . "\"></script>";
             case 'js':
                 $u = $this->u('js.php') . "?zona=$id";
@@ -41,9 +43,11 @@ final class Kody
                 return '<iframe src="' . self::h($this->u('ram.php') . "?zona=$id") . "\"$rozmer frameborder=\"0\" scrolling=\"no\" style=\"border:0;overflow:hidden\" title=\"Reklama\" loading=\"lazy\"></iframe>";
             case 'odkaz':
                 return '<a href="' . self::h($this->u('klik.php') . "?zona=$id&n=NAHODNE") . "\" target=\"_blank\" rel=\"sponsored noopener\">"
-                    . '<img src="' . self::h($this->u('obr.php') . "?zona=$id&n=NAHODNE") . "\"$rozmer border=\"0\" alt=\"Reklama\"></a>";
+                    . '<img src="' . self::h($this->u('obr.php') . "?zona=$id&n=NAHODNE") . '"' . ($zw ? " width=\"$zw\"" : '') . ($zh ? " height=\"$zh\"" : '')
+                    . ($zw || $zh ? '' : $rozmer) . ' border="0" alt="Reklama"></a>';
             case 'okno':
-                return '<script src="' . self::h($this->u('okno.php') . "?zona=$id" . ($w ? '' : '&sirka=800&vyska=600')) . '"></script>';
+                [$ow, $oh] = $this->app->zony()->rozmerVlozeni($zona, 800, 600);
+                return '<script src="' . self::h($this->u('okno.php') . "?zona=$id" . ($zw ? '' : "&sirka=$ow") . ($zh ? '' : "&vyska=$oh")) . '"></script>';
             case 'php':
                 $u = $this->u('data.php') . "?zona=$id";
                 return "<?php\n// TWB Reklamy – zóna #$id\n\$u = " . var_export($u, true) . " . '&' . http_build_query([\n"
@@ -68,7 +72,7 @@ final class Kody
                     . "if (\$odpoved && preg_match('~<name>html</name>\\s*<value><string>(.*?)</string>~s', \$odpoved, \$x)) echo htmlspecialchars_decode(\$x[1], ENT_QUOTES | ENT_XML1);\n";
             case 'json':
                 return 'GET ' . $this->u('data.php') . "?zona=$id\n    volitelně &loc=<stránka>&ref=<odkud>&ua=<prohlížeč návštěvníka>; víc zón najednou: ?zony=$id,…\n\n"
-                    . "{\"zony\": [{\"zona\": $id, \"html\": \"<a …><img …></a>\",\n  \"banner\": {\"id\": 1, \"kampan\": 1, \"typ\": \"image\", \"sirka\": " . ($w ?: 300) . ", \"vyska\": " . ($hh ?: 250)
+                    . "{\"zony\": [{\"zona\": $id, \"html\": \"<a …><img …></a>\",\n  \"banner\": {\"id\": 1, \"kampan\": 1, \"typ\": \"image\", \"sirka\": " . $w . ", \"vyska\": " . $hh
                     . ", \"alt\": \"\",\n             \"klik\": \"…/d/klik.php?…\", \"obrazek\": \"…/d/b.php?…\", \"dokument\": null}}]}\n\n"
                     . "Zobrazení se započítá při každém volání. Bez banneru je \"banner\": null a \"html\" obsahuje náhradní HTML zóny.";
         }

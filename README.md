@@ -4,7 +4,7 @@ Společný repozitář aplikací TWB a jejich sdílených modulů.
 
 ```
 modules/   sdílené moduly (jádro, přihlášení, galerie, slidy, HTML, data, …)
-apps/      aplikace: planovac-medii, social-planner, reklamy (připravuje se)
+apps/      aplikace: planovac-medii, social-planner, reklamy (TWB Reklamy, ve vývoji – apps/reklamy/README.md)
 tools/     sestavení balíčků aplikací z modulů
 tests/     testy modulů
 docs/      dokumentace (Update Server a další)

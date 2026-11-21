@@ -11,7 +11,7 @@ Aplikace je složená z modulů platformy (`modules/`), vlastní kód je v `lib/
 | 0.2 | Doručování: výběr banneru (druh, priorita, váha, termín, limity), vložení asynchronním JS, JS, iframe, odkazem (obrázek + proklik), popup, XML-RPC (`openads.view`), JSON, PHP na serveru; počítání zobrazení a prokliků po hodinách, makra v HTML bannerech, generátor kódů a náhled zóny | hotovo |
 | 0.3 | HTML5 bannery (ZIP, `clickTag`, bezpečné rozbalení, izolace), HTML s proměnnými a písmy (moduly html, data, pisma), editor slidů pro bannery libovolného rozměru (modul slidy), stránka Proměnné | hotovo |
 | 0.4 | Konverze a trackery (pixel, JS, proměnné jako hodnota objednávky), přiřazení po prokliku (a volitelně po zobrazení), omezení doručení (čas, den, zařízení, jazyk, stránka) a frekvence | hotovo |
-| 0.5 | Statistiky (dny, měsíce, kampaně, bannery, zóny, weby; CTR, konverze, hodnota), grafy, export CSV, nápověda, obnova zálohy a aktualizace v rozhraní, balíček pro Update Server | |
+| 0.5 | Statistiky (dny, měsíce, kampaně, bannery, zóny, weby; CTR, konverze, hodnota), grafy, export CSV, nápověda, obnova zálohy a aktualizace v rozhraní, balíček pro Update Server | hotovo |
 
 ## Struktura
 ```
@@ -28,6 +28,7 @@ health.php       kontrola po aktualizaci (modul aktualizace)
 d/               veřejné doručování reklam (viz níže)
 lib/             třídy Reklamy\… (App, Schema, Kampane, Bannery, Weby, Zony, Dorucovani, Vykresleni, Vydej, Kody, XmlRpc, Ui, Vstup …)
 stranky/         stránky administrace (PHP šablony)
+help/            nápověda v Markdownu (_obsah.json + sekce/stránka.md), vykresluje modul napoveda
 assets/          style.css, app.js, ikona, slide-shim.js (napojení editoru slidů), slide-init.js
 data/            databáze reklamy.sqlite, galerie (media/), zálohy (backups/), písma (fonts/), balíčky HTML5 (html5/),
                  vykreslené slidy (slidy/, dají se kdykoli vykreslit znovu) – chráněno .htaccess
@@ -59,6 +60,18 @@ takže nemají přístup k cookies ani stránkám administrace na stejné domén
 Makra v HTML bannerech: `{clickurl}` (proklik na cíl banneru, `{clickurl}https://…` na jinou povolenou adresu), `{clickurl_enc}`, `{targeturl}`, `{random}`, `{cachebuster}`, `{timestamp}`, `{bannerid}`, `{zoneid}`, `{campaignid}`, `{width}`, `{height}`.
 Před makry se dosadí proměnné modulu data (`{datum}`, `{svatek}`, `{odpocet:24. 12. 2026}`, `{Skupina:parametr}`, vlastní proměnné; ne uvnitř `<script>` a `<style>`)
 a když kód jmenuje písmo z modulu pisma (`font-family: 'Montserrat'`), vloží se do dokumentu jako `@font-face`.
+
+## Statistiky, nápověda a správa (0.5)
+- **Statistiky** (`stranky/statistiky.php`, `Statistiky::prehled`): období (předvolby nebo od–do), seskupení po dnech, týdnech (ISO), měsících, hodinách dne,
+  kampaních, bannerech, zónách a webech; filtr kampaň / banner / web / zóna. Časové řady mají i dny bez provozu. Graf je SVG ze serveru (jedna řada,
+  přepínač ukazatele, popisek při najetí), tabulka má CTR, konverzní poměr a součet. CSV pro Excel: UTF-8 s BOM, středník, desetinná čárka, text začínající `=`, `+`, `-`, `@` se nespustí jako vzorec.
+  Statistiky smazaného banneru zůstanou (u kampaní jako „smazané bannery“), zobrazení bez zóny pocházejí z vložení ze serveru.
+- **Nápověda** (`help/`, stránka `?p=napoveda&s=<id>`, hledání `&q=`): stránky vykresluje `TWB\Napoveda\Markdown` na serveru, hledá `Napoveda::hledej`.
+  Tlačítko „?“ u nadpisu vede na stránku podle `kontext` v `_obsah.json` (klíč = stránka administrace). Test hlídá, že obsah projde kontrolou a každá stránka menu má nápovědu.
+- **Obnova zálohy** (Nastavení → Zálohy): záloha z úložiště nebo nahraný soubor (`…-nahrana.zip`) → heslo (prázdné = současné) → náhled obsahu → potvrzení.
+  Heslo zůstává jen v relaci (10 minut), před obnovou modul zalohy vytvoří pojistnou zálohu, po obnově se databáze převede na současnou verzi.
+- **Aktualizace** (Nastavení → Aktualizace): stav, zjistit novou verzi, nainstalovat nabídnutou, vrátit předchozí (modul aktualizace; cron zjišťuje jednou denně).
+- **Balíček**: `php tools/sestavit.php reklamy`; `tests/reklamy/balicek_test.php` ověří obsah, zámek modulů a že rozbalený balíček běží samostatně s moduly z `modules/`.
 
 ## Konverze, cílení a frekvence (0.4)
 - **Trackery** (stránka Konverze): kód na webu inzerenta, druh (nákup, poptávka, registrace, jiné), výchozí hodnota, okno po prokliku (1–365 dní) a po zobrazení (0–90, 0 = vypnuto),
@@ -104,7 +117,7 @@ a když kód jmenuje písmo z modulu pisma (`font-family: 'Montserrat'`), vlož�
 
 ## Vývoj a testy
 ```
-php tests/run.php reklamy                 # testy aplikace (správa dat, doručování, obsah banerů, web na vestavěném serveru PHP, Chromium)
+php tests/run.php reklamy                 # testy aplikace (správa dat, doručování, obsah banerů, konverze, statistiky, zálohy, balíček, web na vestavěném serveru PHP, Chromium)
 php tools/sestavit.php reklamy            # dist/twb-reklamy-<verze>-full.zip a -update.zip
 ```
 Test vložení do stránky, editoru slidů a HTML5 v rámu běží ve skutečném prohlížeči (Playwright + Chromium); bez nich se přeskočí. Webové testy spouštějí `php -S` s konfigurací z proměnné `REKLAMY_CONFIG` (platí jen pro vestavěný server) a ověřují i to, že žádná stránka nevypíše varování PHP.

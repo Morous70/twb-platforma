@@ -23,10 +23,37 @@ if (isset($_GET['stahnout'])) {
     exit;
 }
 
-if ($post) {
+// Obnova ze zálohy ve dvou krocích: náhled obsahu (heslo zůstane jen v relaci, 10 minut), pak potvrzení.
+$nahled = null;
+$obnovaVRelaci = function () use ($zalohy): ?array {
+    $o = $_SESSION['twbr_obnova'] ?? null;
+    if (!is_array($o) || ($o['do'] ?? 0) < time()) return null;
+    try { $zalohy->cesta((string)$o['zaloha']); } catch (RuntimeException) { return null; }
+    return $o;
+};
+if ($post && ($_POST['akce'] ?? '') === 'obnova-nahled') {
+    $ui->zpracuj(function () use ($zalohy, $n, &$nahled) {
+        $f = $_FILES['soubor'] ?? null;
+        if (is_array($f) && ($f['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE) {
+            if ($f['error'] !== UPLOAD_ERR_OK || !is_uploaded_file((string)$f['tmp_name'])) throw new Chyba('Soubor se nepodařilo nahrát (příliš velký nebo přerušený přenos).');
+            $nazev = 'twb-reklamy-' . date('Y-m-d-His') . '-nahrana.zip';
+            if (!move_uploaded_file((string)$f['tmp_name'], $zalohy->slozka() . '/' . $nazev)) throw new Chyba('Nahranou zálohu nelze uložit.');
+        } else {
+            $nazev = (string)($_POST['zaloha'] ?? '');
+            if ($nazev === '') throw new Chyba('Vyberte zálohu nebo nahrajte soubor.');
+        }
+        $cesta = $zalohy->cesta($nazev);
+        $heslo = (string)($_POST['heslo'] ?? '') !== '' ? (string)$_POST['heslo'] : (string)$n->dej('backup_password', '');
+        $info = $zalohy->info($cesta, $heslo);
+        $_SESSION['twbr_obnova'] = ['zaloha' => $nazev, 'heslo' => $heslo, 'do' => time() + 600];
+        $nahled = ['zaloha' => $nazev] + $info;
+    });
+}
+
+if ($post && ($_POST['akce'] ?? '') !== 'obnova-nahled') {
     $akce = (string)($_POST['akce'] ?? '');
     $zprava = 'Uloženo.';
-    if ($ui->zpracuj(function () use ($akce, $app, $n, $zalohy, &$zprava) {
+    if ($ui->zpracuj(function () use ($akce, $app, $n, $zalohy, $obnovaVRelaci, &$zprava) {
         switch ($akce) {
             case 'heslo':
                 if (!$app->heslo()->over((string)($_POST['stare'] ?? ''))) throw new Chyba('Současné heslo nesouhlasí.');
@@ -65,12 +92,41 @@ if ($post) {
                 $z = $zalohy->vytvor('rucni', true);
                 $zprava = 'Záloha vytvořena: ' . $z['name'];
                 break;
+            case 'obnova':
+                $o = $obnovaVRelaci();
+                if (!$o || $o['zaloha'] !== (string)($_POST['zaloha'] ?? '')) throw new Chyba('Potvrzení obnovy vypršelo. Vyberte zálohu znovu.');
+                unset($_SESSION['twbr_obnova']);
+                $r = $zalohy->obnov($zalohy->cesta($o['zaloha']), $o['heslo']);
+                $app->log('info', "Obnovena záloha {$o['zaloha']} (pojistná záloha {$r['safety']}).");
+                $zprava = "Záloha obnovena. Předchozí stav je v pojistné záloze {$r['safety']}."
+                    . ($r['missing'] ? ' Chybí soubory: ' . implode(', ', array_slice($r['missing'], 0, 5)) . (count($r['missing']) > 5 ? ' …' : '') . '.' : '');
+                break;
+            case 'obnova-zrusit':
+                unset($_SESSION['twbr_obnova']);
+                $zprava = 'Obnova zrušena.';
+                break;
+            case 'aktualizace-zjistit':
+                $st = $app->aktualizace()->zkontroluj();
+                if (($st['result']['result'] ?? '') !== 'ok' && ($st['result']['result'] ?? '') !== 'no_release') throw new Chyba((string)($st['result']['message'] ?? 'Kontrola se nezdařila.'));
+                $zprava = (string)($st['result']['message'] ?? 'Hotovo.');
+                break;
+            case 'aktualizace-instalovat':
+                $r = $app->aktualizace()->instaluj((string)($_POST['verze'] ?? ''));
+                if (!$r['ok']) throw new Chyba($r['message']);
+                $zprava = $r['message'];
+                break;
+            case 'aktualizace-vratit':
+                $r = $app->aktualizace()->vratPredchozi();
+                $zprava = "Vrácena verze {$r['version']}" . ($r['db_restored'] ? ' i s databází ze zálohy před aktualizací.' : '.');
+                break;
             default:
                 throw new Chyba('Neznámá akce.');
         }
     })) {
         $ui->zprava('ok', $zprava);
-        $ui->presmeruj(Ui::odkaz('nastaveni') . '#' . (str_starts_with($akce, 'zalo') ? 'zalohy' : ($akce === 'mereni' ? 'mereni' : 'zabezpeceni')));
+        $kotva = match (true) { str_starts_with($akce, 'zalo'), str_starts_with($akce, 'obnova') => 'zalohy', str_starts_with($akce, 'aktualizace') => 'aktualizace',
+            $akce === 'mereni' => 'mereni', default => 'zabezpeceni' };
+        $ui->presmeruj(Ui::odkaz('nastaveni') . '#' . $kotva);
     }
 }
 
@@ -159,6 +215,55 @@ $cron = (int)$n->dej('cron_last_run', 0);
     <?php endif; ?>
   <?php endif; ?>
 
+  <h3 id="obnova">Obnova ze zálohy</h3>
+  <?php if ($nahled): ?>
+    <div class="karta hlaska-varovani">
+      <p style="margin-top:0"><b>Obnovit zálohu <?= Ui::h($nahled['zaloha']) ?>?</b></p>
+      <dl class="udaje">
+        <dt>Vytvořena</dt><dd><?= Ui::h($nahled['created_at'] ?? '?') ?> (verze <?= Ui::h($nahled['app_version']) ?>)</dd>
+        <dt>Obsah</dt><dd>kampaně <?= (int)($nahled['tabulky']['campaigns'] ?? 0) ?>, bannery <?= (int)($nahled['tabulky']['banners'] ?? 0) ?>,
+          zóny <?= (int)($nahled['tabulky']['zones'] ?? 0) ?>, řádky statistik <?= Ui::cislo($nahled['tabulky']['stats'] ?? 0) ?>, soubory <?= (int)$nahled['files'] ?></dd>
+      </dl>
+      <p class="mala">Současná data se nahradí obsahem zálohy. Před obnovou se vytvoří pojistná záloha současného stavu. Přihlašovací údaje zůstanou.</p>
+      <div class="tlacitka">
+        <form method="post" class="inline"><?= $ui->csrf() ?><input type="hidden" name="akce" value="obnova"><input type="hidden" name="zaloha" value="<?= Ui::h($nahled['zaloha']) ?>">
+          <button type="submit" class="nebezpecne">Obnovit zálohu</button></form>
+        <form method="post" class="inline"><?= $ui->csrf() ?><input type="hidden" name="akce" value="obnova-zrusit"><button type="submit">Zrušit</button></form>
+      </div>
+    </div>
+  <?php elseif (!$zalohy->podporovano()): ?>
+    <form method="post" enctype="multipart/form-data" class="formular karta">
+      <?= $ui->csrf() ?><input type="hidden" name="akce" value="obnova-nahled">
+      <?php $volby = ['' => '— vyberte —']; foreach ($zalohy->seznam() as $z) $volby[$z['name']] = Ui::datum($z['time']) . ($z['files'] ? ' (se soubory)' : '') . ($z['before_restore'] ? ' – před obnovou' : '') . ($z['uploaded'] ? ' – nahraná' : ''); ?>
+      <?= Ui::vyber('Záloha z úložiště', 'zaloha', $volby, '') ?>
+      <label class="pole"><span>…nebo nahrajte soubor zálohy (.zip)</span><input type="file" name="soubor" accept=".zip,application/zip"></label>
+      <?= Ui::pole('Heslo zálohy', 'heslo', '', ['type' => 'password', 'autocomplete' => 'off'], 'Prázdné = současné heslo záloh.') ?>
+      <div class="tlacitka"><button type="submit">Pokračovat</button></div>
+    </form>
+  <?php endif; ?>
+
+  <h2 id="aktualizace">Aktualizace</h2>
+  <?php $akt = $app->aktualizace()->stav(); ?>
+  <div class="karta">
+    <dl class="udaje">
+      <dt>Nainstalovaná verze</dt><dd><?= Ui::h($akt['version']) ?></dd>
+      <dt>Token</dt><dd><?= $akt['token'] !== '' ? Ui::h($akt['token']) : 'v config.php chybí <code>update_token</code>' ?></dd>
+      <dt>Naposledy zjišťováno</dt><dd><?= $akt['checked_at'] ? Ui::h(Ui::datum($akt['checked_at'])) : 'zatím ne' ?></dd>
+      <?php if ($akt['result']): ?><dt>Výsledek</dt><dd><?= Ui::h($akt['result']['message'] ?? '') ?></dd><?php endif; ?>
+    </dl>
+    <?php if ($akt['unsupported']): ?><p class="hlaska hlaska-varovani"><?= Ui::h($akt['unsupported']) ?></p><?php endif; ?>
+    <div class="tlacitka">
+      <?php if (!$akt['unsupported']): ?><?= $ui->tlacitko('Zjistit novou verzi', 'aktualizace-zjistit', [], '') ?><?php endif; ?>
+      <?php if ($akt['available']): ?>
+        <?= $ui->tlacitko('Nainstalovat verzi ' . $akt['available']['version'], 'aktualizace-instalovat', ['verze' => $akt['available']['version']], 'hlavni',
+            "Nainstalovat verzi {$akt['available']['version']}? Před instalací se zálohuje databáze; když nová verze nepoběží, vrátí se předchozí.") ?>
+      <?php endif; ?>
+      <?php if ($akt['previous']): ?>
+        <?= $ui->tlacitko('Vrátit verzi ' . $akt['previous'], 'aktualizace-vratit', [], 'maly', "Vrátit předchozí verzi {$akt['previous']}?") ?>
+      <?php endif; ?>
+    </div>
+  </div>
+
   <h2 id="mereni">Měření a cookies</h2>
   <form method="post" class="formular karta">
     <?= $ui->csrf() ?><input type="hidden" name="akce" value="mereni">
@@ -178,7 +283,7 @@ $cron = (int)$n->dej('cron_last_run', 0);
       <dt>PHP</dt><dd><?= Ui::h(PHP_VERSION) ?></dd>
       <dt>Adresa</dt><dd><?= Ui::h($app->url()) ?></dd>
       <dt>Cron</dt><dd><?= $cron ? 'naposledy ' . Ui::h(Ui::datum($cron)) : 'zatím neběžel' ?></dd>
-      <dt>Aktualizace</dt><dd><?= (string)$app->cfg('update_token', '') !== '' ? 'token nastaven' : 'v config.php chybí update_token' ?></dd>
+      <dt>Protokol</dt><dd><a href="<?= Ui::h(Ui::odkaz('protokol')) ?>">Události a chyby aplikace</a></dd>
     </dl>
     <?php if ($cronKlic === '' || $cronKlic === 'ZMENTE-NA-DLOUHY-NAHODNY-RETEZEC'): ?>
       <p class="hlaska hlaska-varovani" style="margin:1rem 0 0">V config.php nastavte <code>cron_key</code> (dlouhý náhodný řetězec).</p>

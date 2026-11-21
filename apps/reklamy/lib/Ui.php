@@ -17,6 +17,49 @@ final class Ui
         'nastaveni' => 'Nastavení',
     ];
 
+    /** Skupiny postranního menu (nadpis => stránky). Nápověda je v menu navíc, nemá vlastní titulek v MENU. */
+    public const SKUPINY = [
+        'Reklama' => ['prehled', 'kampane', 'bannery', 'weby', 'konverze', 'statistiky'],
+        'Obsah' => ['galerie', 'promenne'],
+        'Správa' => ['nastaveni', 'napoveda'],
+    ];
+
+    /** Ikony ve stylu Feather Icons (MIT, viz assets/LICENCE.txt): obsah prvku <svg viewBox="0 0 24 24">. */
+    private const IKONY = [
+        'prehled' => '<path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>',
+        'kampane' => '<path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/>',
+        'bannery' => '<rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/>',
+        'weby' => '<circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>',
+        'konverze' => '<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/>',
+        'statistiky' => '<line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/>',
+        'galerie' => '<path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>',
+        'promenne' => '<polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/>',
+        'nastaveni' => '<line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/>',
+        'napoveda' => '<circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/>',
+        'odhlasit' => '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>',
+        'zobrazeni' => '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>',
+        'prokliky' => '<path d="M3 3l7.07 16.97 2.51-7.39 7.39-2.51L3 3z"/><path d="M13 13l6 6"/>',
+        'ctr' => '<line x1="19" y1="5" x2="5" y2="19"/><circle cx="6.5" cy="6.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/>',
+        'zony' => '<rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/>',
+        'hodnota' => '<line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>',
+    ];
+
+    /** Ikona (SVG v textu stránky, barva podle textu). Neznámá ikona = prázdný řetězec. */
+    public static function ikona(string $nazev, int $velikost = 18): string
+    {
+        $obsah = self::IKONY[$nazev] ?? '';
+        if ($obsah === '') return '';
+        return '<svg class="ikona" width="' . $velikost . '" height="' . $velikost . '" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"'
+            . ' stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">' . $obsah . '</svg>';
+    }
+
+    /** Dlaždice s číslem (přehled, statistiky). $popis je HTML. */
+    public static function dlazdice(string $popis, string $cislo, string $ikona = ''): string
+    {
+        return '<div class="dlazdice"><div class="popis">' . $popis . '</div>' . ($ikona !== '' ? '<span class="dlazdice-ikona">' . self::ikona($ikona) . '</span>' : '')
+            . '<div class="cislo">' . $cislo . '</div></div>';
+    }
+
     /** @var list<string> chyby k zobrazení na této stránce (neplatný formulář) */
     public array $chyby = [];
 
@@ -138,9 +181,11 @@ final class Ui
     private function hlavicka(string $titulek, string $trida = ''): string
     {
         $v = self::h($this->app->verze);
+        // skryté postranní menu (počítač) se nastaví dřív, než se stránka vykreslí – bez probliknutí
         return "<!doctype html>\n<html lang=\"cs\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">"
             . '<meta name="robots" content="noindex, nofollow"><title>' . self::h($titulek) . ' – ' . App::NAZEV . '</title>'
             . "<link rel=\"stylesheet\" href=\"assets/style.css?v=$v\"><link rel=\"icon\" href=\"assets/ikona.svg\" type=\"image/svg+xml\">"
+            . '<script>try{if(localStorage.getItem("twbr-menu")==="skryte")document.documentElement.classList.add("menu-skryte")}catch(e){}</script>'
             . "<script src=\"assets/app.js?v=$v\" defer></script></head><body class=\"" . self::h($trida) . '">';
     }
 
@@ -153,7 +198,7 @@ final class Ui
         return $out;
     }
 
-    /** Celá stránka administrace s menu. */
+    /** Celá stránka administrace: postranní menu, horní lišta, obsah a patička. */
     /** @param string $kontext stránka administrace pro tlačítko „?“ (kontext nápovědy, viz help/_obsah.json) */
     public function stranka(string $titulek, string $aktivni, string $obsah, string $kontext = ''): void
     {
@@ -162,17 +207,30 @@ final class Ui
         header('Cache-Control: no-store');
         header('X-Frame-Options: DENY');
         $menu = '';
-        foreach (self::MENU as $p => $t) $menu .= '<a href="' . self::h(self::odkaz($p)) . '"' . ($p === $aktivni ? ' class="aktivni" aria-current="page"' : '') . '>' . self::h($t) . '</a>';
+        foreach (self::SKUPINY as $skupina => $stranky) {
+            $menu .= '<li class="menu-skupina">' . self::h($skupina) . '</li>';
+            foreach ($stranky as $p) {
+                $t = self::MENU[$p] ?? ($p === 'napoveda' ? 'Nápověda' : $p);
+                $menu .= '<li><a href="' . self::h(self::odkaz($p)) . '"' . ($p === $aktivni ? ' class="aktivni" aria-current="page"' : '') . '>'
+                    . self::ikona($p) . '<span>' . self::h($t) . '</span></a></li>';
+            }
+        }
         $limit = $this->app->limitNecinnosti();
-        echo $this->hlavicka($titulek)
-            . '<header class="lista"><a class="logo" href="index.php"><img src="assets/ikona.svg" alt="" width="24" height="24">' . App::NAZEV . '</a>'
-            . '<button type="button" class="menu-prepinac" aria-label="Menu" data-prepni="menu">☰</button>'
-            . '<nav id="menu">' . $menu . '</nav>'
-            . '<a class="napoveda-odkaz' . ($aktivni === 'napoveda' ? ' aktivni' : '') . '" href="' . self::h(self::odkaz('napoveda')) . '">Nápověda</a>'
-            . '<form method="post" action="index.php?p=odhlasit" class="odhlasit">' . $this->csrf() . '<button type="submit" class="odkaz">Odhlásit</button></form></header>'
+        $verze = self::h($this->app->verze);
+        echo $this->hlavicka($titulek, 'administrace')
+            . '<div class="obal"><nav id="menu" class="postranni" aria-label="Hlavní menu">'
+            . '<a class="logo" href="index.php"><img src="assets/ikona.svg" alt="" width="28" height="28"><span>' . App::NAZEV . '</span></a>'
+            . '<ul>' . $menu . '</ul>'
+            . '<div class="postranni-pata">Verze ' . $verze . '</div></nav>'
+            . '<div class="zaclona" data-prepni="menu" hidden></div>'
+            . '<div class="hlavni-cast"><header class="lista">'
+            . '<button type="button" class="menu-prepinac" aria-label="Zobrazit nebo skrýt menu" aria-controls="menu" data-prepni="menu"><i></i></button>'
+            . '<span class="mezera"></span>'
+            . '<a class="lista-odkaz' . ($aktivni === 'napoveda' ? ' aktivni' : '') . '" href="' . self::h(self::odkaz('napoveda')) . '" title="Nápověda">' . self::ikona('napoveda') . '<span>Nápověda</span></a>'
+            . '<form method="post" action="index.php?p=odhlasit" class="odhlasit">' . $this->csrf() . '<button type="submit" class="lista-odkaz" title="Odhlásit">' . self::ikona('odhlasit') . '<span>Odhlásit</span></button></form></header>'
             . '<main' . ($limit > 0 ? ' data-necinnost="' . $limit . '"' : '') . '><h1>' . self::h($titulek)
             . ($pomoc ? ' <a class="pomoc" href="' . self::h(self::odkaz('napoveda', ['s' => $pomoc])) . '" title="Nápověda k této stránce" aria-label="Nápověda k této stránce">?</a>' : '') . '</h1>' . $this->hlasky() . $obsah . '</main>'
-            . '<footer>' . App::NAZEV . ' ' . self::h($this->app->verze) . '</footer></body></html>';
+            . '<footer><span>' . App::NAZEV . ' ' . $verze . '</span><a href="' . self::h(self::odkaz('napoveda')) . '">Nápověda</a></footer></div></div></body></html>';
     }
 
     /** Jednoduchá stránka bez menu (přihlášení, instalace). */
@@ -181,7 +239,7 @@ final class Ui
         header('Content-Type: text/html; charset=utf-8');
         header('Cache-Control: no-store');
         header('X-Frame-Options: DENY');
-        echo $this->hlavicka($titulek, 'samostatna') . '<main class="karta-prihlaseni"><div class="logo velke"><img src="assets/ikona.svg" alt="" width="40" height="40">'
-            . App::NAZEV . '</div><h1>' . self::h($titulek) . '</h1>' . $this->hlasky() . $obsah . '</main></body></html>';
+        echo $this->hlavicka($titulek, 'samostatna') . '<div class="samostatna-obal"><div class="logo velke"><img src="assets/ikona.svg" alt="" width="40" height="40">'
+            . App::NAZEV . '</div><main class="karta-prihlaseni"><h1>' . self::h($titulek) . '</h1>' . $this->hlasky() . $obsah . '</main></div></body></html>';
     }
 }

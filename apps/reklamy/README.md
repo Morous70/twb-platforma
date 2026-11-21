@@ -12,6 +12,7 @@ Aplikace je složená z modulů platformy (`modules/`), vlastní kód je v `lib/
 | 0.3 | HTML5 bannery (ZIP, `clickTag`, bezpečné rozbalení, izolace), HTML s proměnnými a písmy (moduly html, data, pisma), editor slidů pro bannery libovolného rozměru (modul slidy), stránka Proměnné | hotovo |
 | 0.4 | Konverze a trackery (pixel, JS, proměnné jako hodnota objednávky), přiřazení po prokliku (a volitelně po zobrazení), omezení doručení (čas, den, zařízení, jazyk, stránka) a frekvence | hotovo |
 | 0.5 | Statistiky (dny, měsíce, kampaně, bannery, zóny, weby; CTR, konverze, hodnota), grafy, export CSV, nápověda, obnova zálohy a aktualizace v rozhraní, balíček pro Update Server | hotovo |
+| 0.6 | Nový vzhled administrace podle šablony AdminKit: tmavé postranní menu se skupinami a ikonami (skrytí na počítači, vysunutí na mobilu), horní lišta, karty a dlaždice se stínem, barvy a typografie; funkce beze změny | hotovo |
 
 ## Struktura
 ```
@@ -60,6 +61,15 @@ takže nemají přístup k cookies ani stránkám administrace na stejné domén
 Makra v HTML bannerech: `{clickurl}` (proklik na cíl banneru, `{clickurl}https://…` na jinou povolenou adresu), `{clickurl_enc}`, `{targeturl}`, `{random}`, `{cachebuster}`, `{timestamp}`, `{bannerid}`, `{zoneid}`, `{campaignid}`, `{width}`, `{height}`.
 Před makry se dosadí proměnné modulu data (`{datum}`, `{svatek}`, `{odpocet:24. 12. 2026}`, `{Skupina:parametr}`, vlastní proměnné; ne uvnitř `<script>` a `<style>`)
 a když kód jmenuje písmo z modulu pisma (`font-family: 'Montserrat'`), vloží se do dokumentu jako `@font-face`.
+
+## Vzhled administrace (0.6)
+- Inspirace šablonou **AdminKit** 3.5.0 (MIT): barvy (`#3b7ddd`, pozadí `#f5f7fb`, menu `#222e3c`), postranní menu 260 px, lišta se stínem, karty bez rámečku, písmo 14 px (`Inter`, pokud ho systém má, jinak systémové).
+  Styly v `assets/style.css` jsou napsané nově, bez Bootstrapu a bez souborů z internetu (písmo z Google Fonts se nenačítá). Licence AdminKitu a ikon Feather: `assets/LICENCE.txt`.
+- Rozvržení skládá `Ui::stranka()`: menu podle `Ui::SKUPINY` (Reklama, Obsah, Správa), ikony `Ui::ikona()` (vložené SVG, barva podle textu), dlaždice `Ui::dlazdice()`.
+- Přepínač menu (`assets/app.js`): na počítači menu skryje a pamatuje si to v prohlížeči (`localStorage` `twbr-menu`, třída `menu-skryte` na `<html>` se nastaví ještě před vykreslením),
+  pod 992 px menu vysune přes obsah, zavře ho klik na závoj nebo Esc. Tmavý režim podle systému zůstává.
+- Editor slidů si drží vlastní vzhled polí (`.pm`); na jeho stránce je užší okraj obsahu.
+- Test `tests/reklamy/vzhled_test.php`: menu (skupiny, ikony, aktivní položka), dlaždice, žádné externí adresy ve stylech a skriptu, přiložená licence a ve skutečném prohlížeči skrytí/vysunutí menu bez vodorovného posunu na mobilu.
 
 ## Statistiky, nápověda a správa (0.5)
 - **Statistiky** (`stranky/statistiky.php`, `Statistiky::prehled`): období (předvolby nebo od–do), seskupení po dnech, týdnech (ISO), měsících, hodinách dne,

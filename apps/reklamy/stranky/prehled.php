@@ -7,10 +7,10 @@ $db = $app->db;
 $kampane = $app->kampane()->seznam();
 $bezi = array_filter($kampane, fn($k) => Kampane::bezi($k));
 $pocty = [
-    'Běžící kampaně' => count($bezi),
-    'Aktivní bannery' => (int)$db->q("SELECT COUNT(*) FROM banners b JOIN campaigns c ON c.id = b.campaign_id WHERE b.status = 'active' AND c.status = 'active'")->fetchColumn(),
-    'Weby' => (int)$db->q('SELECT COUNT(*) FROM sites')->fetchColumn(),
-    'Zóny' => (int)$db->q('SELECT COUNT(*) FROM zones')->fetchColumn(),
+    'Běžící kampaně' => [count($bezi), 'kampane'],
+    'Aktivní bannery' => [(int)$db->q("SELECT COUNT(*) FROM banners b JOIN campaigns c ON c.id = b.campaign_id WHERE b.status = 'active' AND c.status = 'active'")->fetchColumn(), 'bannery'],
+    'Weby' => [(int)$db->q('SELECT COUNT(*) FROM sites')->fetchColumn(), 'weby'],
+    'Zóny' => [(int)$db->q('SELECT COUNT(*) FROM zones')->fetchColumn(), 'zony'],
 ];
 $n = $app->nastaveni();
 $upozorneni = [];
@@ -26,18 +26,18 @@ $st = $app->statistiky();
 $dnes = $st->souhrn(date('Y-m-d'), date('Y-m-d'));
 $tyden = $st->souhrn(date('Y-m-d', strtotime('-6 days')), date('Y-m-d'));
 ?>
-<div class="mrizka" style="margin-bottom:1rem">
-  <div class="dlazdice"><div class="cislo"><?= Ui::cislo($dnes['impressions']) ?></div><div class="popis">Zobrazení dnes (7 dní: <?= Ui::cislo($tyden['impressions']) ?>)</div></div>
-  <div class="dlazdice"><div class="cislo"><?= Ui::cislo($dnes['clicks']) ?></div><div class="popis">Prokliky dnes (7 dní: <?= Ui::cislo($tyden['clicks']) ?>)</div></div>
-  <div class="dlazdice"><div class="cislo"><?= Statistiky::ctr($tyden['impressions'], $tyden['clicks']) ?></div><div class="popis">CTR za 7 dní</div></div>
+<div class="mrizka">
+  <?= Ui::dlazdice('Zobrazení dnes', Ui::cislo($dnes['impressions']) . ' <small class="slabe mala">7 dní: ' . Ui::cislo($tyden['impressions']) . '</small>', 'zobrazeni') ?>
+  <?= Ui::dlazdice('Prokliky dnes', Ui::cislo($dnes['clicks']) . ' <small class="slabe mala">7 dní: ' . Ui::cislo($tyden['clicks']) . '</small>', 'prokliky') ?>
+  <?= Ui::dlazdice('CTR za 7 dní', Ui::h(Statistiky::ctr($tyden['impressions'], $tyden['clicks'])), 'ctr') ?>
 </div>
 <div class="mrizka">
-<?php foreach ($pocty as $popis => $cislo): ?>
-  <div class="dlazdice"><div class="cislo"><?= Ui::cislo($cislo) ?></div><div class="popis"><?= Ui::h($popis) ?></div></div>
+<?php foreach ($pocty as $popis => [$cislo, $ikona]): ?>
+  <?= Ui::dlazdice(Ui::h($popis), Ui::cislo($cislo), $ikona) ?>
 <?php endforeach; ?>
 </div>
 <?php foreach ($upozorneni as [$text, $kam]): ?>
-  <div class="hlaska hlaska-varovani" style="margin-top:1rem"><?= Ui::h($text) ?> <a href="<?= Ui::h($kam) ?>">Opravit</a></div>
+  <div class="hlaska hlaska-varovani"><?= Ui::h($text) ?> <a href="<?= Ui::h($kam) ?>">Opravit</a></div>
 <?php endforeach; ?>
 
 <h2>Běžící kampaně</h2>
@@ -59,4 +59,4 @@ $tyden = $st->souhrn(date('Y-m-d', strtotime('-6 days')), date('Y-m-d'));
   <?php endforeach; ?>
 </table></div>
 <?php endif; ?>
-<p class="slabe mala">Podrobné statistiky (po dnech, zónách, grafy, export) přibudou v další verzi.</p>
+<p class="slabe mala">Podrobné statistiky po dnech, zónách a webech, grafy a export najdete ve <a href="<?= Ui::h(Ui::odkaz('statistiky')) ?>">Statistikách</a>.</p>

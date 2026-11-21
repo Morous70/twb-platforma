@@ -8,10 +8,21 @@
     if (f.dataset && f.dataset.potvrdit && !window.confirm(f.dataset.potvrdit)) e.preventDefault();
   });
 
-  // Přepínač menu na mobilu
-  document.querySelectorAll('[data-prepni]').forEach(function (b) {
-    b.addEventListener('click', function () { document.getElementById(b.dataset.prepni).classList.toggle('otevreno'); });
+  // Přepínač postranního menu: na počítači menu skryje (zapamatuje se), na mobilu ho vysune přes obsah (klik na závoj ho zavře)
+  var uzky = window.matchMedia('(max-width: 991.98px)');
+  document.querySelectorAll('[data-prepni="menu"]').forEach(function (b) {
+    b.addEventListener('click', function () {
+      if (uzky.matches) {
+        document.body.classList.toggle('menu-otevrene');
+      } else {
+        var skryte = document.documentElement.classList.toggle('menu-skryte');
+        try { localStorage.setItem('twbr-menu', skryte ? 'skryte' : ''); } catch (e) { /* soukromé okno */ }
+      }
+      var prepinac = document.querySelector('.menu-prepinac');
+      if (prepinac) prepinac.setAttribute('aria-expanded', String(uzky.matches ? document.body.classList.contains('menu-otevrene') : !document.documentElement.classList.contains('menu-skryte')));
+    });
   });
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape') document.body.classList.remove('menu-otevrene'); });
 
   // Kopírování kódu do schránky
   document.addEventListener('click', function (e) {

@@ -11,6 +11,7 @@ final class Ui
         'bannery' => 'Bannery',
         'weby' => 'Weby a zóny',
         'konverze' => 'Konverze',
+        'statistiky' => 'Statistiky',
         'galerie' => 'Galerie',
         'promenne' => 'Proměnné',
         'nastaveni' => 'Nastavení',

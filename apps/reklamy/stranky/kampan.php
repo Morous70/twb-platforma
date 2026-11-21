@@ -119,6 +119,7 @@ seznam.cz"]) ?>
     <div class="dlazdice"><div class="cislo"><?= Ui::cislo($stK['conversions']) ?></div><div class="popis"><a href="<?= Ui::h(Ui::odkaz('konverze')) ?>">Konverze</a> (dnes <?= Ui::cislo($stDnes['conversions']) ?>)</div></div>
     <div class="dlazdice"><div class="cislo"><?= Ui::h(Reklamy\Konverze::kc($stK['revenue']) ?: '0 Kč') ?></div><div class="popis">Hodnota konverzí</div></div>
   </div>
+  <p style="margin-top:-.4rem"><a href="<?= Ui::h(Ui::odkaz('statistiky', ['kampan' => $k['id'], 'podle' => 'banner'])) ?>">Podrobné statistiky kampaně</a></p>
   <h2 style="margin-top:0">Bannery</h2>
   <div class="tlacitka" style="margin-bottom:.8rem">
     <?php foreach (Bannery::TYPY as $typ => $popis): ?>

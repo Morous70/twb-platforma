@@ -36,6 +36,16 @@
     });
   });
 
+  // Statistiky: změna data přepne období na vlastní, výběr období formulář rovnou odešle
+  var obdobi = document.querySelector('form.filtr #f-obdobi');
+  if (obdobi) {
+    obdobi.addEventListener('change', function () { if (obdobi.value !== 'vlastni') obdobi.form.submit(); });
+    ['f-od', 'f-do'].forEach(function (id) {
+      var d = document.getElementById(id);
+      if (d) d.addEventListener('change', function () { obdobi.value = 'vlastni'; });
+    });
+  }
+
   // Formulář banneru: obrázek z galerie doplní rozměr
   var media = document.getElementById('f-media_id');
   if (media) media.addEventListener('change', function () {

@@ -20,11 +20,30 @@ final class Vydej
         $this->pripraveno = $app->pripravDoruceni();
     }
 
-    /** Kontext z požadavku. Náhled z administrace (podepsaný parametr nahled) se nepočítá. @param array<string, mixed> $get */
+    /**
+     * Kontext z požadavku. Náhled z administrace (podepsaný parametr nahled) se nepočítá.
+     * Cookies návštěvníka (frekvence, přiřazení konverzí) jen z prohlížeče – volání ze serveru (parametr ua) je nemá.
+     * @param array<string, mixed> $get
+     */
     public function kontext(array $get, int $zona = 0): Kontext
     {
         $nahled = isset($get['nahled']) && $this->app->dorucovani()->overPodpis("nahled|$zona", $get['nahled']);
-        return Kontext::zPozadavku($get, $_SERVER, !$nahled);
+        $k = Kontext::zPozadavku($get, $_SERVER, !$nahled);
+        if ($this->cookiesPovolene() && !isset($get['ua'])) $k->nactiCookies($_COOKIE);
+        return $k;
+    }
+
+    /** Cookies návštěvníků povolené v nastavení (výchozí ano). */
+    public function cookiesPovolene(): bool { return $this->pripraveno && $this->app->nastaveni()->dej('visitor_cookies', '1') === '1'; }
+
+    /** Pošle cookies návštěvníka (nový identifikátor, změněná frekvence). Volat před výstupem. */
+    public static function ulozCookies(Kontext $k): void
+    {
+        if (!$k->cookies || headers_sent()) return;
+        $https = !empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off';
+        $o = ['path' => '/', 'secure' => $https, 'httponly' => true, 'samesite' => $https ? 'None' : 'Lax'];
+        if ($k->novyNavstevnik) setcookie('twbr_v', $k->navstevnik, ['expires' => time() + 365 * 86400] + $o);
+        if ($k->zmenaFrekvence) setcookie('twbr_f', $k->cookieFrekvence(), ['expires' => time() + 30 * 86400] + $o);
     }
 
     /** Podpis náhledu zóny pro administraci. */

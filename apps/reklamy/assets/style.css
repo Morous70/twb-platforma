@@ -127,3 +127,8 @@ details.kod-vlozeni textarea { min-height: 0; background: var(--kod); }
 /* bannery nemají tagy ani počasí */
 .pm #seTags, .pm #addWeather { display: none !important; }
 main:has(.slide-stranka) { max-width: 1600px; }
+
+/* cílení kampaně */
+details.cileni { border: 1px solid var(--okraj); border-radius: var(--polomer); padding: .5rem .9rem; margin: .5rem 0 1rem; }
+details.cileni summary { cursor: pointer; font-weight: 600; padding: .25rem 0; }
+.volby { display: flex; flex-wrap: wrap; gap: .25rem 1rem; }

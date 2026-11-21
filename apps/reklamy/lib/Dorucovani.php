@@ -8,7 +8,8 @@ namespace Reklamy;
  * Pravidla výběru:
  *  1. kandidáti = bannery zóny (přímo přiřazené i z přiřazených kampaní, vhodného rozměru),
  *     aktivní banner v aktivní kampani, v termínu kampaně, s nevyčerpanými limity,
- *     bez bannerů, které už na stránce jsou, a vyhovující dalším filtrům (cílení);
+ *     bez bannerů, které už na stránce jsou, splňující cílení kampaně a frekvenci (cookie návštěvníka)
+ *     a další filtry (pridejFiltr);
  *  2. druh kampaně: exkluzivní mají přednost před standardními, zbytkové přijdou na řadu jen bez jiných;
  *  3. v rámci druhu rozhoduje nejvyšší priorita;
  *  4. mezi zbylými se losuje podle váhy kampaně a v ní podle váhy banneru.
@@ -21,6 +22,9 @@ final class Dorucovani
     private array $filtry = [];
     /** @var callable(int): int */
     private $los;
+    /** @var array<int, array{campaign_id:int, cap:int, hodin:int}> */
+    private array $kampanBanneru = [];
+    private ?bool $zobrazeniProKonverze = null;
 
     /** @param ?callable(int): int $los náhodné číslo 0…n-1 (pro testy) */
     public function __construct(private App $app, ?callable $los = null)
@@ -55,7 +59,8 @@ final class Dorucovani
     {
         $ted = $k->ted();
         $rows = $this->app->db->q("SELECT b.*, c.name AS campaign_name, c.kind AS campaign_kind, c.priority AS campaign_priority, c.weight AS campaign_weight,
-                c.limit_impressions, c.limit_clicks, c.limit_conversions, c.daily_impressions, c.daily_clicks
+                c.limit_impressions, c.limit_clicks, c.limit_conversions, c.daily_impressions, c.daily_clicks,
+                c.targeting AS campaign_targeting, c.cap_impressions AS campaign_cap, c.cap_hours AS campaign_cap_hours
             FROM banners b JOIN campaigns c ON c.id = b.campaign_id
             WHERE b.status = 'active' AND c.status = 'active'
               AND (c.starts_at IS NULL OR c.starts_at <= ?) AND (c.ends_at IS NULL OR c.ends_at > ?)
@@ -63,6 +68,14 @@ final class Dorucovani
             ORDER BY b.id", [$ted, $ted, $zona['id'], $zona['id']])->fetchAll();
         $rows = array_filter($rows, fn($b) => Zony::pasuje($zona, $b) && !isset($k->vynechat[(int)$b['id']]) && (!$typy || in_array($b['type'], $typy, true)));
         $rows = $this->bezVycerpanych(array_values($rows), $ted);
+        $cileni = [];
+        $rows = array_values(array_filter($rows, function ($b) use ($k, &$cileni) {
+            $kid = (int)$b['campaign_id'];
+            $cileni[$kid] ??= Cileni::splnuje(json_decode((string)$b['campaign_targeting'], true) ?: null, $k);
+            if (!$cileni[$kid]) return false;
+            // frekvence jen s cookie návštěvníka (vložení ze serveru ji neumí)
+            return !($b['campaign_cap'] && $k->cookies && $k->videl($kid, (int)($b['campaign_cap_hours'] ?: 24)) >= (int)$b['campaign_cap']);
+        }));
         foreach ($this->filtry as $f) $rows = array_values(array_filter($rows, fn($b) => $f($b, $k)));
         usort($rows, fn($a, $b) => [self::PORADI[$a['campaign_kind']] ?? 9, -(int)$a['campaign_priority'], (int)$a['campaign_id'], (int)$a['id']]
             <=> [self::PORADI[$b['campaign_kind']] ?? 9, -(int)$b['campaign_priority'], (int)$b['campaign_id'], (int)$b['id']]);
@@ -160,17 +173,47 @@ final class Dorucovani
             [date('Y-m-d', $cas), (int)date('G', $cas), $banner, $zona, $kolik, $hodnota]);
     }
 
+    /** Kampaň banneru a její frekvence (z mezipaměti požadavku). @return array{campaign_id:int, cap:int, hodin:int} */
+    private function kampanBanneru(int $banner): array
+    {
+        if (!isset($this->kampanBanneru[$banner])) {
+            $r = $this->app->db->q('SELECT b.campaign_id, c.cap_impressions, c.cap_hours FROM banners b JOIN campaigns c ON c.id = b.campaign_id WHERE b.id = ?', [$banner])->fetch();
+            $this->kampanBanneru[$banner] = ['campaign_id' => (int)($r['campaign_id'] ?? 0), 'cap' => (int)($r['cap_impressions'] ?? 0), 'hodin' => (int)($r['cap_hours'] ?? 0) ?: 24];
+        }
+        return $this->kampanBanneru[$banner];
+    }
+
+    /** Zapisovat zobrazení návštěvníků? Jen když nějaký aktivní tracker přiřazuje konverze i po zobrazení. */
+    private function zobrazeniProKonverze(): bool
+    {
+        return $this->zobrazeniProKonverze ??= (bool)$this->app->db->q("SELECT 1 FROM trackers WHERE status = 'active' AND view_days > 0 LIMIT 1")->fetchColumn();
+    }
+
+    /** Zobrazení: statistika, frekvence kampaně (cookie) a záznam pro přiřazení konverzí po zobrazení. */
     public function zobrazeni(int $banner, int $zona, Kontext $k): void
     {
-        if ($k->zapocitat()) $this->pricti($banner, $zona, 'impressions', $k->ted());
+        if (!$k->zapocitat()) return;
+        $this->pricti($banner, $zona, 'impressions', $k->ted());
+        if (!$k->cookies) return;
+        $c = $this->kampanBanneru($banner);
+        if ($c['cap']) $k->zapisFrekvenci($c['campaign_id'], $c['hodin']);
+        if ($this->zobrazeniProKonverze()) {
+            $this->app->db->q('INSERT INTO views (visitor, banner_id, zone_id, campaign_id, at) VALUES (?, ?, ?, ?, ?)', [$k->navstevnik(), $banner, $zona, $c['campaign_id'], $k->ted()]);
+        }
     }
 
-    public function proklik(int $banner, int $zona, Kontext $k): void
+    /** Proklik: statistika a záznam pro přiřazení konverzí. Vrací ID prokliku (null = nepočítá se). */
+    public function proklik(int $banner, int $zona, Kontext $k): ?int
     {
-        if ($k->zapocitat()) $this->pricti($banner, $zona, 'clicks', $k->ted());
+        if (!$k->zapocitat()) return null;
+        $this->pricti($banner, $zona, 'clicks', $k->ted());
+        $c = $this->kampanBanneru($banner);
+        $this->app->db->q('INSERT INTO clicks (visitor, banner_id, zone_id, campaign_id, at) VALUES (?, ?, ?, ?, ?)',
+            [$k->cookies ? $k->navstevnik() : null, $banner, $zona, $c['campaign_id'], $k->ted()]);
+        return $this->app->db->posledniId();
     }
 
-    /** Konverze (hodnota v haléřích). */
+    /** Konverze do statistiky (hodnota v haléřích). */
     public function konverze(int $banner, int $zona, int $cas, int $hodnota = 0): void
     {
         $this->pricti($banner, $zona, 'conversions', $cas, 1, $hodnota);
@@ -190,9 +233,14 @@ final class Dorucovani
         return $b === false ? null : (int)$b;
     }
 
-    /** Smaže staré záznamy vložení odkazem (výchozí po 30 dnech). */
+    /** Smaže staré záznamy vložení odkazem (po 30 dnech) a prokliky a zobrazení návštěvníků starší než nejdelší okno trackerů. */
     public function uklid(int $dni = 30): int
     {
-        return $this->app->db->q('DELETE FROM view_map WHERE at < ?', [time() - $dni * 86400])->rowCount();
+        $db = $this->app->db;
+        $n = $db->q('DELETE FROM view_map WHERE at < ?', [time() - $dni * 86400])->rowCount();
+        $okna = $db->q('SELECT COALESCE(MAX(click_days), 30) AS c, COALESCE(MAX(view_days), 0) AS v FROM trackers')->fetch();
+        $n += $db->q('DELETE FROM clicks WHERE at < ?', [time() - max(30, (int)$okna['c']) * 86400])->rowCount();
+        $n += $db->q('DELETE FROM views WHERE at < ?', [time() - max(1, (int)$okna['v']) * 86400])->rowCount();
+        return $n;
     }
 }

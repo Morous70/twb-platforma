@@ -21,6 +21,7 @@ try {
         $r = $v->proZonu($z, $k);
         $out['zony'][] = ['zona' => $id, 'html' => $r['html'], 'banner' => $r['banner'] ? $v->udaje($r['banner'], $id) : null];
     }
+    Vydej::ulozCookies($k);
 } catch (Throwable $e) {
     if (isset($v)) $v->chyba($e, 'data.php');
 }

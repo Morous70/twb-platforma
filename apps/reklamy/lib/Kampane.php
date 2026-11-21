@@ -4,7 +4,7 @@ namespace Reklamy;
 
 use TWB\Tagy\Tagy;
 
-/** Kampaně: termín, druh a priorita, váha, limity zobrazení a prokliků. */
+/** Kampaně: termín, druh a priorita, váha, limity zobrazení a prokliků, cílení a frekvence. */
 final class Kampane
 {
     public const STAVY = ['active' => 'Aktivní', 'paused' => 'Pozastavená', 'archived' => 'Archiv'];
@@ -72,7 +72,13 @@ final class Kampane
             'daily_impressions' => Vstup::cislo($v, 'daily_impressions', 'Denní limit zobrazení', 1, PHP_INT_MAX),
             'daily_clicks' => Vstup::cislo($v, 'daily_clicks', 'Denní limit prokliků', 1, PHP_INT_MAX),
             'note' => Vstup::text($v, 'note', 'Poznámka', 5000, false),
+            'cap_impressions' => Vstup::cislo($v, 'cap_impressions', 'Frekvence – počet zobrazení', 1, 1000),
+            'cap_hours' => Vstup::cislo($v, 'cap_hours', 'Frekvence – za hodin', 1, 24 * 30),
         ];
+        $cil = Cileni::zFormulare($v);
+        $d['targeting'] = $cil ? json_encode($cil, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) : null;
+        if ($d['cap_impressions'] === null) $d['cap_hours'] = null;
+        else $d['cap_hours'] ??= 24;
         if ($d['starts_at'] && $d['ends_at'] && $d['ends_at'] <= $d['starts_at']) throw new Chyba('Konec kampaně musí být později než začátek.');
         try {
             $tagy = $this->tagy()->vycistiSeznam((string)($v['tags'] ?? ''));

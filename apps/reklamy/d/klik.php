@@ -32,7 +32,11 @@ try {
         $jiny = is_string($_GET['cil'] ?? null) ? trim($_GET['cil']) : '';
         if ($jiny !== '' && !in_array($banner['type'], Bannery::OBRAZKOVE, true) && Vykresleni::povolenyCil($banner, $jiny)) $cil = $jiny;
         if ($cil !== '' && Vydej::http($cil)) {
-            $d->proklik((int)$banner['id'], $zona, $v->kontext($_GET, $zona));
+            $k = $v->kontext($_GET, $zona);
+            $klikId = $d->proklik((int)$banner['id'], $zona, $k);
+            Vydej::ulozCookies($k);
+            // parametr twbr pro přiřazení konverze i bez cookies (kód trackeru si ho na webu zapamatuje)
+            if ($klikId !== null && $app->nastaveni()->dej('click_param', '1') === '1') $cil = Reklamy\Konverze::pridejParametr($cil, $app->konverze()->token($klikId));
             header('Location: ' . $cil, true, 302);
             exit;
         }

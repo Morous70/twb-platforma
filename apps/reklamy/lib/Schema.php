@@ -11,7 +11,7 @@ use TWB\Jadro\{Db, ModulMigrace};
  */
 final class Schema implements ModulMigrace
 {
-    public static function verze(): int { return 3; }
+    public static function verze(): int { return 4; }
 
     /** Tabulky, které musí existovat dřív než cokoli jiného (nastavení a protokol). */
     public static function zakladniTabulky(Db $db): void
@@ -101,5 +101,63 @@ final class Schema implements ModulMigrace
         }
         // verze 3 (0.3): jen nové tabulky modulu data (data_rows …) a obsah banerů html5 / slide ve sloupci content;
         // vlastní tabulky aplikace se nemění – verze se zvyšuje kvůli zálohám a návratu aktualizace.
+        if ($zVerze < 4) {
+            // cílení (JSON) a frekvence (nejvýš N zobrazení jednomu návštěvníkovi za X hodin)
+            // (převod je opakovatelný: přerušený nebo zopakovaný převod nic nezdvojí)
+            self::pridejSloupec($db, 'campaigns', 'targeting', 'TEXT NULL');
+            self::pridejSloupec($db, 'campaigns', 'cap_impressions', 'INTEGER NULL');
+            self::pridejSloupec($db, 'campaigns', 'cap_hours', 'INTEGER NULL');
+            // konverze: trackery (kód na webu inzerenta), prokliky a zobrazení návštěvníků pro přiřazení, zaznamenané konverze
+            $db->q("CREATE TABLE IF NOT EXISTS trackers (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name VARCHAR(200) NOT NULL,
+                status VARCHAR(10) NOT NULL DEFAULT 'active',      -- active | paused
+                kind VARCHAR(10) NOT NULL DEFAULT 'sale',          -- sale | lead | signup | other
+                value_default INTEGER NULL,                        -- hodnota v haléřích, když ji kód nepošle
+                click_days INTEGER NOT NULL DEFAULT 30,            -- okno přiřazení po prokliku
+                view_days INTEGER NOT NULL DEFAULT 0,              -- okno přiřazení po zobrazení (0 = vypnuto)
+                once_per_click INTEGER NOT NULL DEFAULT 0,         -- 1 = jedna konverze na proklik/zobrazení
+                note TEXT NULL,
+                created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL
+            )");
+            $db->q('CREATE TABLE IF NOT EXISTS tracker_campaigns (
+                tracker_id INTEGER NOT NULL REFERENCES trackers(id) ON DELETE CASCADE,
+                campaign_id INTEGER NOT NULL REFERENCES campaigns(id) ON DELETE CASCADE,
+                PRIMARY KEY (tracker_id, campaign_id)
+            )');
+            $db->q('CREATE TABLE IF NOT EXISTS clicks (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                visitor CHAR(32) NULL, banner_id INTEGER NOT NULL, zone_id INTEGER NOT NULL, campaign_id INTEGER NOT NULL, at INTEGER NOT NULL
+            )');
+            $db->q('CREATE INDEX IF NOT EXISTS clicks_visitor ON clicks (visitor, at)');
+            $db->q('CREATE INDEX IF NOT EXISTS clicks_at ON clicks (at)');
+            $db->q('CREATE TABLE IF NOT EXISTS views (
+                visitor CHAR(32) NOT NULL, banner_id INTEGER NOT NULL, zone_id INTEGER NOT NULL, campaign_id INTEGER NOT NULL, at INTEGER NOT NULL
+            )');
+            $db->q('CREATE INDEX IF NOT EXISTS views_visitor ON views (visitor, at)');
+            $db->q('CREATE INDEX IF NOT EXISTS views_at ON views (at)');
+            $db->q("CREATE TABLE IF NOT EXISTS conversions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                tracker_id INTEGER NOT NULL REFERENCES trackers(id) ON DELETE CASCADE,
+                campaign_id INTEGER NULL, banner_id INTEGER NULL, zone_id INTEGER NULL,
+                click_id INTEGER NULL,
+                via VARCHAR(5) NOT NULL DEFAULT '',                -- click | view | '' (nepřiřazená)
+                value INTEGER NOT NULL DEFAULT 0,                  -- haléře
+                ref VARCHAR(100) NULL,                             -- číslo objednávky (kvůli duplicitám)
+                at INTEGER NOT NULL
+            )");
+            $db->q('CREATE UNIQUE INDEX IF NOT EXISTS conversions_ref ON conversions (tracker_id, ref)');
+            $db->q('CREATE INDEX IF NOT EXISTS conversions_at ON conversions (at)');
+            $db->q('CREATE INDEX IF NOT EXISTS conversions_click ON conversions (tracker_id, click_id)');
+        }
+    }
+
+    /** ALTER TABLE … ADD COLUMN, jen když sloupec ještě není. */
+    private static function pridejSloupec(Db $db, string $tabulka, string $sloupec, string $definice): void
+    {
+        foreach ($db->q('PRAGMA table_info(' . $tabulka . ')')->fetchAll(\PDO::FETCH_ASSOC) as $r) {
+            if ($r['name'] === $sloupec) return;
+        }
+        $db->q("ALTER TABLE {$tabulka} ADD COLUMN {$sloupec} {$definice}");
     }
 }

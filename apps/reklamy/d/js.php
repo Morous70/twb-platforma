@@ -11,7 +11,11 @@ $html = '';
 try {
     $v = new Vydej($app);
     $z = $v->zona($_GET['zona'] ?? '');
-    if ($z) $html = $v->proZonu($z, $v->kontext($_GET, (int)$z['id']))['html'];
+    if ($z) {
+        $k = $v->kontext($_GET, (int)$z['id']);
+        $html = $v->proZonu($z, $k)['html'];
+        Vydej::ulozCookies($k);
+    }
 } catch (Throwable $e) {
     if (isset($v)) $v->chyba($e, 'js.php');
 }

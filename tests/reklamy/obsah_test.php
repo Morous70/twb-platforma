@@ -210,7 +210,7 @@ test('převod databáze z 0.2: doplní tabulky modulu data, bannery zůstanou', 
     $app->nastaveni()->uloz('schema_version', '2');
     $app2 = new App(KOREN . '/apps/reklamy', ['data_dir' => $app->data]);
     eq(true, $app2->pripravDoruceni());
-    eq('3', $app2->nastaveni()->dej('schema_version'));
+    eq((string)Reklamy\Schema::verze(), $app2->nastaveni()->dej('schema_version'));
     eq(0, (int)$app2->db->q('SELECT COUNT(*) FROM data_rows')->fetchColumn());
     eq('html', $app2->bannery()->radek($id)['type']);
 });

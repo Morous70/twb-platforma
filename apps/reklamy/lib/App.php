@@ -24,7 +24,7 @@ final class App
     /** Veřejný klíč Ed25519 TWB Update Serveru (veřejný, smí být v kódu). */
     public const UPDATE_KLIC = 'JTvTWDW+eSP/GtT9zG3t+3UraawTk82vKteb2Dci8Cg=';
     /** Tabulky v pořadí pro obnovu ze zálohy (nejdřív ty, na které ostatní odkazují). */
-    public const TABULKY = ['module_versions', 'settings', 'log', 'media', 'passkeys', 'campaigns', 'banners', 'sites', 'zones', 'zone_campaigns', 'zone_banners', 'stats', 'data_rows'];
+    public const TABULKY = ['module_versions', 'settings', 'log', 'media', 'passkeys', 'campaigns', 'banners', 'sites', 'zones', 'zone_campaigns', 'zone_banners', 'stats', 'data_rows', 'trackers', 'tracker_campaigns', 'clicks', 'views', 'conversions'];
     /** Nastavení, která patří k instalaci a obnova zálohy je nepřepíše. */
     public const MISTNI = ['login_fails', 'login_last_fail', 'update_result', 'update_checked_at', 'update_available', 'update_health_key'];
 
@@ -234,6 +234,7 @@ final class App
     public function html5(): Html5 { return $this->sluzba('html5', fn() => new Html5($this->data . '/html5')); }
     public function dokument(): Dokument { return $this->sluzba('dokument', fn() => new Dokument($this->pisma(), new ProHtml($this->promenne()))); }
 
+    public function konverze(): Konverze { return $this->sluzba('konverze', fn() => new Konverze($this)); }
     public function statistiky(): Statistiky { return $this->sluzba('statistiky', fn() => new Statistiky($this)); }
     public function kampane(): Kampane { return $this->sluzba('kampane', fn() => new Kampane($this)); }
     public function bannery(): Bannery { return $this->sluzba('bannery', fn() => new Bannery($this)); }

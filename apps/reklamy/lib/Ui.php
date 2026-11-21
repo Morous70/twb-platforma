@@ -10,6 +10,7 @@ final class Ui
         'kampane' => 'Kampaně',
         'bannery' => 'Bannery',
         'weby' => 'Weby a zóny',
+        'konverze' => 'Konverze',
         'galerie' => 'Galerie',
         'promenne' => 'Proměnné',
         'nastaveni' => 'Nastavení',

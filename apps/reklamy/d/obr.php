@@ -17,6 +17,7 @@ try {
             $n = is_string($_GET['n'] ?? null) && $_GET['n'] !== '' ? mb_substr($_GET['n'], 0, 64) : '';
             if ($n !== '') $app->dorucovani()->zapamatuj($n, (int)$z['id'], (int)$b['id'], $k->ted());
             $app->dorucovani()->zobrazeni((int)$b['id'], (int)$z['id'], $k);
+            Vydej::ulozCookies($k);
             if ($b['type'] === 'external') {
                 header('Location: ' . $b['image_url'], true, 302);
                 exit;

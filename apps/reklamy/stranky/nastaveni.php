@@ -56,6 +56,11 @@ if ($post) {
             case 'zalohy-auto':
                 $n->uloz('backup_auto', !empty($_POST['backup_auto']) ? '1' : '0');
                 break;
+            case 'mereni':
+                $n->uloz('visitor_cookies', !empty($_POST['visitor_cookies']) ? '1' : '0');
+                $n->uloz('click_param', !empty($_POST['click_param']) ? '1' : '0');
+                $app->log('info', 'Nastavení měření změněno (cookies ' . (!empty($_POST['visitor_cookies']) ? 'ano' : 'ne') . ', parametr twbr ' . (!empty($_POST['click_param']) ? 'ano' : 'ne') . ').');
+                break;
             case 'zaloha':
                 $z = $zalohy->vytvor('rucni', true);
                 $zprava = 'Záloha vytvořena: ' . $z['name'];
@@ -65,7 +70,7 @@ if ($post) {
         }
     })) {
         $ui->zprava('ok', $zprava);
-        $ui->presmeruj(Ui::odkaz('nastaveni') . '#' . (str_starts_with($akce, 'zalo') ? 'zalohy' : 'zabezpeceni'));
+        $ui->presmeruj(Ui::odkaz('nastaveni') . '#' . (str_starts_with($akce, 'zalo') ? 'zalohy' : ($akce === 'mereni' ? 'mereni' : 'zabezpeceni')));
     }
 }
 
@@ -153,6 +158,18 @@ $cron = (int)$n->dej('cron_last_run', 0);
     </table></div>
     <?php endif; ?>
   <?php endif; ?>
+
+  <h2 id="mereni">Měření a cookies</h2>
+  <form method="post" class="formular karta">
+    <?= $ui->csrf() ?><input type="hidden" name="akce" value="mereni">
+    <label class="zaskrtavatko"><input type="checkbox" name="visitor_cookies" value="1"<?= $n->dej('visitor_cookies', '1') === '1' ? ' checked' : '' ?>>
+      <span>Cookies návštěvníků (<code>twbr_v</code>, <code>twbr_f</code>) – frekvence kampaní a přiřazení konverzí podle návštěvníka.
+      <small class="slabe">Jde o měřicí cookies reklamy: na webech s lištou souhlasu je uveďte. Bez nich frekvence neplatí a konverze se přiřazují jen podle parametru twbr.</small></span></label>
+    <label class="zaskrtavatko"><input type="checkbox" name="click_param" value="1"<?= $n->dej('click_param', '1') === '1' ? ' checked' : '' ?>>
+      <span>Přidat k cílové adrese prokliku parametr <code>twbr</code> (token prokliku).
+      <small class="slabe">Skript <code>d/t.js</code> na webu inzerenta si ho zapamatuje a pošle s konverzí – funguje i v prohlížečích, které blokují cookies třetích stran.</small></span></label>
+    <div class="tlacitka"><button type="submit">Uložit</button></div>
+  </form>
 
   <h2 id="system">Systém</h2>
   <div class="karta">

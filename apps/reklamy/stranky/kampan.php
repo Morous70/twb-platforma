@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 // Nová kampaň nebo úprava kampaně, její bannery a zóny. Proměnné: $app, $ui, $post.
-use Reklamy\{Ui, Kampane, Bannery, Vstup, Zony, Chyba, Statistiky};
+use Reklamy\{Ui, Kampane, Bannery, Vstup, Zony, Chyba, Statistiky, Cileni};
 
 $kampane = $app->kampane();
 $id = isset($_GET['id']) ? (int)$_GET['id'] : null;
@@ -38,8 +38,11 @@ if ($post) {
     }
 }
 $z = $k ?? ['name' => '', 'status' => 'active', 'kind' => 'standard', 'priority' => 5, 'weight' => 1, 'starts_at' => null, 'ends_at' => null,
-    'limit_impressions' => null, 'limit_clicks' => null, 'limit_conversions' => null, 'daily_impressions' => null, 'daily_clicks' => null, 'note' => '', 'tags' => null];
+    'limit_impressions' => null, 'limit_clicks' => null, 'limit_conversions' => null, 'daily_impressions' => null, 'daily_clicks' => null, 'note' => '', 'tags' => null,
+    'targeting' => null, 'cap_impressions' => null, 'cap_hours' => null];
 $tagy = implode(', ', $kampane->tagy()->tagyPolozky($z));
+$cil = ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['akce'] ?? '') === 'ulozit') ? $_POST + ['cil_dny' => [], 'cil_zarizeni' => []] : Cileni::doFormulare($z['targeting'] ?? null);
+$zaskrtnuto = fn(string $pole, string|int $h) => in_array((string)$h, array_map('strval', (array)($cil[$pole] ?? [])), true) ? ' checked' : '';
 $bannery = $k ? $app->bannery()->seznam((int)$k['id']) : [];
 $stB = $k ? $app->statistiky()->poBannerech(null, null, (int)$k['id']) : [];
 $stK = $k ? $app->statistiky()->souhrn(null, null, (int)$k['id']) : null;
@@ -74,6 +77,27 @@ $stDnes = $k ? $app->statistiky()->souhrn(date('Y-m-d'), date('Y-m-d'), (int)$k[
       <?= Ui::pole('Prokliky za den', 'daily_clicks', $z['daily_clicks'], ['type' => 'number', 'min' => 1]) ?>
     </div>
   </fieldset>
+  <details class="cileni"<?= !empty($z['targeting']) || !empty($z['cap_impressions']) ? ' open' : '' ?>><summary>Cílení a frekvence<?= $k ? ' <span class="slabe mala">(' . Ui::h(Cileni::popis($z['targeting'] ?? null, $z['cap_impressions'] ? (int)$z['cap_impressions'] : null, $z['cap_hours'] ? (int)$z['cap_hours'] : null)) . ')</span>' : '' ?></summary>
+    <p class="slabe mala">Nic nezaškrtnuté = bez omezení. Stránku a odkud pozná vložení skriptem, rámem i odkazem (podle hlavičky Referer); vložení ze serveru jen když je pošle.</p>
+    <div class="pole"><span>Dny v týdnu</span><div class="volby"><?php foreach (Cileni::DNY as $d => $n): ?>
+      <label class="zaskrtavatko"><input type="checkbox" name="cil_dny[]" value="<?= $d ?>"<?= $zaskrtnuto('cil_dny', $d) ?>> <?= $n ?></label><?php endforeach; ?></div></div>
+    <div class="radek">
+      <?= Ui::pole('Od hodiny', 'cil_od', $cil['cil_od'] ?? '', ['type' => 'number', 'min' => 0, 'max' => 23, 'placeholder' => '0']) ?>
+      <?= Ui::pole('Do hodiny', 'cil_do', $cil['cil_do'] ?? '', ['type' => 'number', 'min' => 1, 'max' => 24, 'placeholder' => '24'], 'Např. 22–6 = přes noc.') ?>
+    </div>
+    <div class="pole"><span>Zařízení</span><div class="volby"><?php foreach (Cileni::ZARIZENI as $zk => $n): ?>
+      <label class="zaskrtavatko"><input type="checkbox" name="cil_zarizeni[]" value="<?= $zk ?>"<?= $zaskrtnuto('cil_zarizeni', $zk) ?>> <?= $n ?></label><?php endforeach; ?></div></div>
+    <?= Ui::pole('Jazyk prohlížeče', 'cil_jazyky', $cil['cil_jazyky'] ?? '', ['placeholder' => 'cs, sk', 'maxlength' => 100]) ?>
+    <?= Ui::oblast('Jen na stránkách, jejichž adresa obsahuje', 'cil_stranky', $cil['cil_stranky'] ?? '', ['rows' => 2, 'placeholder' => "kazbo.eu/clanky/
+/sport"], 'Každý řádek zvlášť, stačí shoda jednoho.') ?>
+    <?= Ui::oblast('Ne na stránkách, jejichž adresa obsahuje', 'cil_bez_stranek', $cil['cil_bez_stranek'] ?? '', ['rows' => 2]) ?>
+    <?= Ui::oblast('Jen když návštěvník přišel z adresy obsahující', 'cil_odkud', $cil['cil_odkud'] ?? '', ['rows' => 2, 'placeholder' => "google.
+seznam.cz"]) ?>
+    <div class="radek">
+      <?= Ui::pole('Nejvýš zobrazení jednomu návštěvníkovi', 'cap_impressions', $z['cap_impressions'] ?? null, ['type' => 'number', 'min' => 1, 'max' => 1000]) ?>
+      <?= Ui::pole('Za hodin', 'cap_hours', $z['cap_hours'] ?? null, ['type' => 'number', 'min' => 1, 'max' => 720, 'placeholder' => '24'], 'Frekvence se hlídá cookie návštěvníka (Nastavení → Cookies).') ?>
+    </div>
+  </details>
   <?= Ui::pole('Tagy', 'tags', $tagy, ['maxlength' => 400], 'Oddělte čárkou, nejvýš 10.') ?>
   <?= Ui::oblast('Poznámka', 'note', $z['note'], ['rows' => 3]) ?>
   <div class="tlacitka">
@@ -88,10 +112,12 @@ $stDnes = $k ? $app->statistiky()->souhrn(date('Y-m-d'), date('Y-m-d'), (int)$k[
 
 <?php if ($k): ?>
 <section>
-  <div class="mrizka" style="grid-template-columns:repeat(3,1fr);margin-bottom:1rem">
+  <div class="mrizka" style="grid-template-columns:repeat(auto-fill,minmax(9rem,1fr));margin-bottom:1rem">
     <div class="dlazdice"><div class="cislo"><?= Ui::cislo($stK['impressions']) ?></div><div class="popis">Zobrazení (dnes <?= Ui::cislo($stDnes['impressions']) ?>)</div></div>
     <div class="dlazdice"><div class="cislo"><?= Ui::cislo($stK['clicks']) ?></div><div class="popis">Prokliky (dnes <?= Ui::cislo($stDnes['clicks']) ?>)</div></div>
     <div class="dlazdice"><div class="cislo"><?= Statistiky::ctr($stK['impressions'], $stK['clicks']) ?></div><div class="popis">CTR</div></div>
+    <div class="dlazdice"><div class="cislo"><?= Ui::cislo($stK['conversions']) ?></div><div class="popis"><a href="<?= Ui::h(Ui::odkaz('konverze')) ?>">Konverze</a> (dnes <?= Ui::cislo($stDnes['conversions']) ?>)</div></div>
+    <div class="dlazdice"><div class="cislo"><?= Ui::h(Reklamy\Konverze::kc($stK['revenue']) ?: '0 Kč') ?></div><div class="popis">Hodnota konverzí</div></div>
   </div>
   <h2 style="margin-top:0">Bannery</h2>
   <div class="tlacitka" style="margin-bottom:.8rem">
@@ -109,7 +135,7 @@ $stDnes = $k ? $app->statistiky()->souhrn(date('Y-m-d'), date('Y-m-d'), (int)$k[
       <td><a href="<?= Ui::h(Ui::odkaz('banner', ['id' => $b['id']])) ?>"><?= Ui::h($b['name']) ?></a><br>
         <span class="slabe mala"><?= Ui::h(Bannery::TYPY[$b['type']] ?? $b['type']) ?>, <?= (int)$b['width'] ?>×<?= (int)$b['height'] ?></span></td>
       <td><?= Ui::stav($b['status'], Bannery::STAVY[$b['status']]) ?></td>
-      <td class="cisla mala"><?= Ui::cislo($stB[$b['id']]['impressions'] ?? 0) ?> / <?= Ui::cislo($stB[$b['id']]['clicks'] ?? 0) ?></td>
+      <td class="cisla mala"><?= Ui::cislo($stB[$b['id']]['impressions'] ?? 0) ?> / <?= Ui::cislo($stB[$b['id']]['clicks'] ?? 0) ?><?= !empty($stB[$b['id']]['conversions']) ? ' / ' . Ui::cislo($stB[$b['id']]['conversions']) . ' konv.' : '' ?></td>
       <td><div class="akce">
         <?= $b['status'] === 'active' ? $ui->tlacitko('Pozastavit', 'banner-stav', ['banner' => $b['id'], 'stav' => 'paused']) : $ui->tlacitko('Spustit', 'banner-stav', ['banner' => $b['id'], 'stav' => 'active']) ?>
         <?= $ui->tlacitko('Kopie', 'banner-kopie', ['banner' => $b['id']]) ?>

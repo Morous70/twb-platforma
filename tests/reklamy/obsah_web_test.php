@@ -11,6 +11,7 @@ $s = new TestServer();
 register_shutdown_function(fn() => $s->zastav());
 $app = new App(KOREN . '/apps/reklamy', ['data_dir' => $s->data . '/data', 'base_url' => $s->url]);
 $app->migruj();
+$app->nastaveni()->uloz('click_param', '0'); // token twbr v cíli prokliku zkouší konverze_web_test
 $app->heslo()->nastav('tajneheslo1');
 $b = new Prohlizec($s);
 $kid = kampan($app, ['name' => 'Obsah']);

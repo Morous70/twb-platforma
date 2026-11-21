@@ -1,0 +1,7 @@
+{
+  "name": "napoveda",
+  "version": "0.1.0",
+  "php": ">=8.1",
+  "popis": "Nápověda z Markdown souborů: obsah, stránky, související stránky, hledání a kontrola obsahu. Klient (assets/help.js) pochází z Plánovače.",
+  "requires": { "jadro": ">=0.1.0" }
+}

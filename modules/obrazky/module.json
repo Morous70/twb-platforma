@@ -1,0 +1,7 @@
+{
+  "name": "obrazky",
+  "version": "0.1.0",
+  "php": ">=8.1",
+  "popis": "Zpracování obrázků: komprese a zmenšení (JPG/PNG), oprava orientace z EXIF, detekce průhlednosti a animovaných GIFů.",
+  "requires": { "jadro": ">=0.1.0" }
+}

@@ -24,5 +24,12 @@ php tests/run.php tagy       # jeden modul
 | jadro | 0.1.0 | zavaděč, Db, Nastaveni, Protokol, Registr, Host, Migrace |
 | tagy | 0.1.0 | hotovo, sloučeno z obou aplikací |
 | pisma | 0.1.0 | hotovo; vestavěná písma ve složce `fonty/` |
-| obrazky, zalohy, aktualizace, napoveda, prihlaseni | – | další v pořadí |
+| obrazky | 0.1.0 | hotovo; komprese, EXIF, průhlednost, animované GIFy (opravena detekce GIFu se dvěma snímky) |
+| napoveda | 0.1.0 | hotovo (PHP); klient `assets/help.js` je zatím převzatý z Plánovače beze změny |
+| prihlaseni, zalohy, aktualizace | – | další v pořadí; přihlášení a zálohy se v aplikacích výrazně liší |
 | galerie, slidy, html, data | – | po jednoduchých modulech |
+
+## Známé chyby nalezené při vyčleňování
+- `Napoveda::zkontroluj()` a původní `help_check()` v Plánovači: ve zprávách typu `„$k“` bere PHP uvozovku jako součást jména proměnné. V modulu opraveno, v Plánovači zmizí po přepnutí na modul.
+- Původní `img_is_animated_gif()` nepoznala GIF se dvěma snímky, takže by se zmenšil a přišel o animaci. V modulu opraveno.
+- `imagedestroy()` je od PHP 8.5 zastaralé, moduly ho nepoužívají.

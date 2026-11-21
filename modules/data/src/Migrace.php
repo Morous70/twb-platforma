@@ -4,10 +4,10 @@ namespace TWB\Data;
 
 use TWB\Jadro\{Db, ModulMigrace};
 
-/** Tabulka `data_rows` (Skupina | Parametr | Hodnota) ve tvaru Social Planneru, pro nové aplikace. */
+/** Tabulky `data_rows` (Skupina | Parametr | Hodnota) a `sources` (vzdálené zdroje) ve tvaru Social Planneru, pro nové aplikace. */
 final class Migrace implements ModulMigrace
 {
-    public static function verze(): int { return 1; }
+    public static function verze(): int { return 2; }
 
     public static function proved(Db $db, int $zVerze): void
     {
@@ -18,5 +18,14 @@ final class Migrace implements ModulMigrace
             id $pk, grp VARCHAR(100) NOT NULL, param VARCHAR(200) NOT NULL, value TEXT NOT NULL,
             updated_at INT NOT NULL DEFAULT 0
         )$engine");
+        if ($zVerze < 2) {
+            $velky = $sqlite ? 'TEXT' : 'MEDIUMTEXT';
+            $db->q("CREATE TABLE IF NOT EXISTS sources (
+                id $pk, name VARCHAR(60) NOT NULL, url TEXT NOT NULL, format VARCHAR(8) NOT NULL DEFAULT 'json',
+                csv_header INT NOT NULL DEFAULT 1, interval_min INT NOT NULL DEFAULT 15,
+                payload $velky NULL, hash CHAR(32) NULL, fetched_at INT NULL, ok_at INT NULL, error TEXT NULL,
+                created_at INT NOT NULL DEFAULT 0
+            )$engine");
+        }
     }
 }

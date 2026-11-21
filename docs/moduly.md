@@ -30,7 +30,8 @@ php tests/run.php tagy       # jeden modul
 | zalohy | 0.1.0 | hotovo: `Zalohy` (šifrovaný ZIP AES-256, denní záloha, obnova s pojistnou zálohou, kontrola kontrolních součtů souborů), `Skupina` (galerie, písma …), `Snimek` (SQLite VACUUM INTO – způsob Social Planneru) |
 | aktualizace | 0.1.0 | hotovo: `Aktualizace`, `Manifest` (Ed25519), `Balicek` (bezpečné rozbalení), `Curl`; vyžaduje modul `zalohy` |
 | galerie | 0.1.0 | hotovo: `Galerie` (nahrání s kontrolou typu i obsahu, nahrazení souboru, komprese s uchováním originálu, archiv, tagy, mazání s vazbami aplikace), `Nahravani` (soubor po částech), `Sloupce` (přiřazení ke sloupcům tabulky), `Migrace` (výchozí tabulka `media`) |
-| slidy, html, data | – | další v pořadí |
+| slidy | 0.1.0 | serverová část hotova: `Navrh` (očištění šablony, formáty dodá aplikace, volitelný vlastní rozměr 16–4096 px pro bannery), `Vykresleni` (JPEG + klíč obsahu), `Text`, `Fx`, `Kulicky`, `Gd`; rozšíření přes rozhraní `Zdroje`, `Promenne`, `Prvek`. Editor v prohlížeči zatím chybí |
+| html, data | – | další v pořadí |
 
 ## Známé chyby nalezené při vyčleňování
 - `Napoveda::zkontroluj()` a původní `help_check()` v Plánovači: ve zprávách typu `„$k“` bere PHP uvozovku jako součást jména proměnné. V modulu opraveno, v Plánovači zmizí po přepnutí na modul.
@@ -57,3 +58,10 @@ php tests/run.php tagy       # jeden modul
 - Zdroj nahraného souboru se přesune a po chybě smaže. Názvy souborů na disku jsou náhodné; originál po kompresi se uchovává a komprese vždy vychází z něj.
 - Zvláštní chování oproti Plánovači: nahrávání po částech vyžaduje souvislé pořadí částí a hlídá celkovou velikost (výchozí 512 MB).
 - Sloupec `Galerie::soubory()` se použije jako zdroj pro `Skupina` v modulu `zalohy`.
+
+## Slidy
+
+- Výstup je shodný s Social Plannerem 1.9.2 bajt po bajtu: test spouští zmrazenou kopii původního `slide.php` (`tests/slidy/original/`, needitovat) v samostatném procesu a porovnává očištěnou šablonu, klíč obsahu i výsledný JPEG.
+- Počasí a proměnné/podmínky nejsou součástí modulu: patří do modulu `data` a připojí se přes `Prvek` a `Promenne`.
+- Šablony Plánovače nemají `format/w/h`; po přechodu je dostanou a klíče vykreslení se jednou změní (slidy se jednou přegenerují).
+- JS editor (dvě rozdílné verze v aplikacích) se sloučí zvlášť.

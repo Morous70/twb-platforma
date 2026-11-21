@@ -1,0 +1,7 @@
+{
+  "name": "slidy",
+  "version": "0.1.0",
+  "php": ">=8.1",
+  "popis": "Slidy a bannery: šablona (JSON) → obrázek vykreslený v GD na plátně libovolné velikosti. Texty s grafickými efekty, obdélníky, obrázky, kuličky; proměnné, obrázky a další typy prvků dodává aplikace.",
+  "requires": { "jadro": ">=0.1.0", "pisma": ">=0.1.0" }
+}

@@ -75,3 +75,7 @@ test('aktualizace: stav, zjištění nové verze, instalace bez nabídky', funct
     $r = $b->odesli('index.php?p=nastaveni', ['akce' => 'aktualizace-vratit']);
     ok(str_contains($r['body'], 'Předchozí verze není uložená'));
 });
+
+test('aktualizace se ptá Update Serveru na slug twb-reklamy', function () use ($app) {
+    eq('twb-reklamy', $app->aktualizace()->stav()['app']);
+});

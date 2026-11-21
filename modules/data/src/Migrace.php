@@ -4,10 +4,10 @@ namespace TWB\Data;
 
 use TWB\Jadro\{Db, ModulMigrace};
 
-/** Tabulky `data_rows` (Skupina | Parametr | Hodnota) a `sources` (vzdálené zdroje) ve tvaru Social Planneru, pro nové aplikace. */
+/** Tabulky `data_rows` (Skupina | Parametr | Hodnota), `sources` (vzdálené zdroje) a `weather` (mezipaměť počasí) ve tvaru Social Planneru, pro nové aplikace. */
 final class Migrace implements ModulMigrace
 {
-    public static function verze(): int { return 2; }
+    public static function verze(): int { return 3; }
 
     public static function proved(Db $db, int $zVerze): void
     {
@@ -25,6 +25,12 @@ final class Migrace implements ModulMigrace
                 csv_header INT NOT NULL DEFAULT 1, interval_min INT NOT NULL DEFAULT 15,
                 payload $velky NULL, hash CHAR(32) NULL, fetched_at INT NULL, ok_at INT NULL, error TEXT NULL,
                 created_at INT NOT NULL DEFAULT 0
+            )$engine");
+        }
+        if ($zVerze < 3) {
+            $db->q("CREATE TABLE IF NOT EXISTS weather (
+                place_key VARCHAR(100) NOT NULL PRIMARY KEY, place VARCHAR(100) NOT NULL, payload TEXT NULL,
+                fetched_at INT NULL, ok_at INT NULL, error TEXT NULL
             )$engine");
         }
     }

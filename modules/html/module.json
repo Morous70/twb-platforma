@@ -1,0 +1,7 @@
+{
+  "name": "html",
+  "version": "0.1.0",
+  "php": ">=8.1",
+  "popis": "HTML dokumenty jako obrázkové zdroje: kontrola zdroje, dosazení proměnných (ne uvnitř skriptů a stylů), vložení písem do dokumentu, seznam externích adres.",
+  "requires": { "jadro": ">=0.1.0", "pisma": ">=0.1.0" }
+}

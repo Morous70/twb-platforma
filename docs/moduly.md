@@ -31,7 +31,8 @@ php tests/run.php tagy       # jeden modul
 | aktualizace | 0.1.0 | hotovo: `Aktualizace`, `Manifest` (Ed25519), `Balicek` (bezpečné rozbalení), `Curl`; vyžaduje modul `zalohy` |
 | galerie | 0.1.0 | hotovo: `Galerie` (nahrání s kontrolou typu i obsahu, nahrazení souboru, komprese s uchováním originálu, archiv, tagy, mazání s vazbami aplikace), `Nahravani` (soubor po částech), `Sloupce` (přiřazení ke sloupcům tabulky), `Migrace` (výchozí tabulka `media`) |
 | slidy | 0.1.0 | serverová část hotova: `Navrh` (očištění šablony, formáty dodá aplikace, volitelný vlastní rozměr 16–4096 px pro bannery), `Vykresleni` (JPEG + klíč obsahu), `Text`, `Fx`, `Kulicky`, `Gd`; rozšíření přes rozhraní `Zdroje`, `Promenne`, `Prvek`. Editor v prohlížeči: `web/` (kopie ze Social Planneru + `HOST.md` s tím, co dodává aplikace) |
-| html, data | – | další v pořadí |
+| html | 0.1.0 | hotovo: `Dokument` (kontrola zdroje do 5 MB, dosazení proměnných mimo skripty/styly/komentáře s HTML escapem, vložení písem z `pisma` do dokumentu, seznam externích adres, klíč obsahu), rozhraní `Promenne`; ukládání řeší aplikace |
+| data | – | další v pořadí |
 
 ## Známé chyby nalezené při vyčleňování
 - `Napoveda::zkontroluj()` a původní `help_check()` v Plánovači: ve zprávách typu `„$k“` bere PHP uvozovku jako součást jména proměnné. V modulu opraveno, v Plánovači zmizí po přepnutí na modul.
@@ -65,3 +66,8 @@ php tests/run.php tagy       # jeden modul
 - Počasí a proměnné/podmínky nejsou součástí modulu: patří do modulu `data` a připojí se přes `Prvek` a `Promenne`.
 - Šablony Plánovače nemají `format/w/h`; po přechodu je dostanou a klíče vykreslení se jednou změní (slidy se jednou přegenerují).
 - JS editor: základem je verze Social Planneru (nadmnožina Plánovačovy; rozdíl je jen formáty plátna, čas náhledu, písma a pole `grp`). Test hlídá shodu kopie, syntaxi a úplnost popisu v `web/HOST.md`. V prohlížeči zatím neotestováno.
+
+## HTML
+
+- Chování je shodné s `lib/html.php` z Plánovače médií; test spouští zmrazenou kopii (`tests/html/original/`) a porovnává kontrolu, dosazení, písma, sestavení i externí adresy. Výchozí dokument má volitelný rozměr (pro bannery), bez zadání je 1920×1080 jako dosud.
+- Modul nic neukládá a nezná databázi: zdroj, hotový soubor a pravidelné přegenerování (`regenerate_html` v Plánovači) patří aplikaci, která si hlídá změnu přes `klic()`.

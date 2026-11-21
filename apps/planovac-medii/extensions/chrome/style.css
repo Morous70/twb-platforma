@@ -1,0 +1,28 @@
+/* Vzhled pluginu – stejné barvy jako aplikace TWB Plánovač médií (světlý i tmavý vzhled podle systému). */
+:root {
+  --bg: #f4f2ee; --panel: #ffffff; --ink: #1d1c1a; --muted: #6f6b64; --line: #e4e0d8;
+  --accent: #d2502c; --ok: #2f7d4f; --warn: #b7791f; --err: #b42318; --err-bg: #fbe9e7; --warn-bg: #fdf3e1;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #171614; --panel: #22201d; --ink: #f1eee8; --muted: #a39e95; --line: #35322d;
+    --err-bg: #3a1d1a; --warn-bg: #3a2f1a; --err: #f08a80; --ok: #6fc192; color-scheme: dark; }
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+body { margin: 0; font: 14px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; background: var(--panel); color: var(--ink); }
+button, input { font: inherit; color: inherit; }
+.head { display: flex; align-items: center; gap: 10px; font-weight: 700; }
+.head img { width: 28px; height: 28px; border-radius: 7px; }
+.head small { display: block; font-weight: 500; color: var(--muted); font-size: 11.5px; }
+.btn { border: 1px solid var(--line); background: var(--panel); border-radius: 8px; padding: 8px 12px; font-weight: 600; cursor: pointer; }
+.btn:hover { border-color: var(--muted); }
+.btn.pri { background: var(--accent); border-color: var(--accent); color: #fff; }
+.btn.pri:hover { filter: brightness(1.07); }
+.btn:disabled { opacity: .6; cursor: default; }
+.alert { border-radius: 8px; padding: 8px 10px; font-size: 13px; }
+.alert.err { background: var(--err-bg); color: var(--err); }
+.alert.warn { background: var(--warn-bg); color: var(--warn); }
+.ok-t { color: var(--ok); } .err-t { color: var(--err); } .muted { color: var(--muted); }
+a.lnk, button.lnk { color: var(--muted); text-decoration: none; border: 0; border-bottom: 1px dotted; background: none; padding: 0; cursor: pointer; font-size: 12.5px; }
+a.lnk:hover, button.lnk:hover { color: var(--ink); }

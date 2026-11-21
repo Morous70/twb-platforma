@@ -1,0 +1,48 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'cz.trafikabr.prehravac'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId 'cz.trafikabr.prehravac'
+        minSdk 21
+        targetSdk 34
+        versionCode 3
+        versionName '1.2.0'
+    }
+
+    // Vlastní klíč pro podpis: každá nová verze jde nainstalovat přes starou bez odinstalace.
+    // Repozitář musí zůstat soukromý.
+    signingConfigs {
+        twb {
+            storeFile file('twb-prehravac.jks')
+            storePassword 'twbprehravac'
+            keyAlias 'twb'
+            keyPassword 'twbprehravac'
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            signingConfig signingConfigs.twb
+        }
+        debug {
+            signingConfig signingConfigs.twb
+        }
+    }
+
+    buildFeatures { buildConfig true }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
+
+dependencies {
+    implementation 'androidx.webkit:webkit:1.11.0'
+}

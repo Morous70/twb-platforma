@@ -1,0 +1,44 @@
+{
+  "manifest_version": 3,
+  "name": "TWB Plánovač médií – přehrávač",
+  "short_name": "TWB přehrávač",
+  "version": "1.2.0",
+  "description": "Přehrává stejná média jako obrazovka v trafice (složka přehrávače z TWB Plánovače médií).",
+  "minimum_chrome_version": "116",
+  "icons": {
+    "16": "icons/icon-16.png",
+    "32": "icons/icon-32.png",
+    "48": "icons/icon-48.png",
+    "128": "icons/icon-128.png"
+  },
+  "action": {
+    "default_title": "TWB Plánovač médií – přehrávač",
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/icon-16.png",
+      "32": "icons/icon-32.png"
+    }
+  },
+  "background": {
+    "service_worker": "bg.js",
+    "type": "module"
+  },
+  "options_ui": {
+    "page": "options.html",
+    "open_in_tab": true
+  },
+  "permissions": [
+    "storage",
+    "alarms",
+    "unlimitedStorage",
+    "power"
+  ],
+  "sandbox": {
+    "pages": [
+      "frame.html"
+    ]
+  },
+  "content_security_policy": {
+    "sandbox": "sandbox allow-scripts; script-src 'self' 'unsafe-inline' 'unsafe-eval' https: data: blob:; child-src 'self' https: data: blob:; object-src 'none'"
+  }
+}

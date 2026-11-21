@@ -1,0 +1,15 @@
+# MCP server. Adresa konektoru funguje s lomítkem na konci (/mcp/) i bez něj (/mcp).
+# Bez lomítka by Apache přesměroval (301) a klient by POST změnil na GET – proto přesměrování vypínáme.
+DirectorySlash Off
+DirectoryIndex index.php
+# Předání hlavičky Authorization do PHP (bez toho ji Apache/FastCGI na sdíleném hostingu zahodí).
+<IfModule mod_setenvif.c>
+  SetEnvIf Authorization "(.+)" HTTP_AUTHORIZATION=$1
+</IfModule>
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteOptions AllowNoSlash
+  RewriteCond %{HTTP:Authorization} .
+  RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
+  RewriteRule (^|/mcp)$ index.php [L]
+</IfModule>

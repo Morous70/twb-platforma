@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1920, user-scalable=no">
+<title>TWB přehrávač</title>
+<link rel="stylesheet" href="style.css">
+<!-- rozhraní televize Samsung (spořič obrazovky); mimo televizi se nenačte, aplikace funguje i bez něj -->
+<script src="$WEBAPIS/webapis/webapis.js"></script>
+<script src="config.js"></script>
+</head>
+<body>
+  <div id="stage"></div>
+  <div id="msg" class="msg" hidden></div>
+
+  <div id="pair" class="screen" hidden>
+    <img src="icon.png" alt="" class="logo">
+    <div class="ttl">TWB Plánovač médií – přehrávač</div>
+    <div class="sub">V aplikaci otevřete <b>Nastavení → Zařízení → Spárovat televizi</b> a zadejte tento kód.</div>
+    <div class="code" id="pairCode">··· ···</div>
+    <div class="err" id="pairErr" hidden></div>
+    <div class="foot" id="pairFoot"></div>
+  </div>
+
+  <div id="errIcon" hidden></div>
+
+  <div id="status" class="panel" hidden>
+    <h3 id="stTitle">TWB přehrávač</h3>
+    <div class="err" id="stErr" hidden></div>
+    <div class="warn" id="stWarn" hidden></div>
+    <div class="grid" id="stGrid"></div>
+    <div class="row"><button class="tvbtn" id="stRefresh">⟳ Obnovit seznam</button></div>
+    <div class="keys"><span><b>Přehrát/Pauza</b>pauza</span><span><b>▶</b>další</span><span><b class="green">B</b>obnovit</span><span><b>Zpět</b>zavřít</span><span><b>Zpět</b>podržet = nastavení</span></div>
+  </div>
+
+  <div id="settings" class="screen dim" hidden>
+    <div class="box">
+      <h2>Nastavení přehrávače</h2>
+      <div class="grid" id="setInfo"></div>
+      <label class="lab" for="setBase">Adresa aplikace</label>
+      <input id="setBase" class="tvin" spellcheck="false" autocomplete="off">
+      <div class="col">
+        <button class="tvbtn" id="setSave">Uložit adresu</button>
+        <button class="tvbtn" id="setUnpair">Zrušit spárování</button>
+        <button class="tvbtn" id="setClose">Zavřít</button>
+      </div>
+      <div class="hint">Šipkami nahoru a dolů vyberte, tlačítkem OK potvrďte.</div>
+      <div class="note" id="setNote"></div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<title>Nastavení – TWB Plánovač médií – přehrávač</title>
+<link rel="stylesheet" href="style.css">
+<style>
+  body { background: var(--bg); padding: 32px 16px; }
+  .card { max-width: 520px; margin: 0 auto; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 20px 22px; }
+  label { display: block; font-size: 13px; font-weight: 600; margin: 16px 0 5px; }
+  input { width: 100%; border: 1px solid var(--line); border-radius: 8px; padding: 9px 11px; background: var(--panel); }
+  input#key { font-family: ui-monospace, Consolas, monospace; }
+  .hint { font-size: 12.5px; color: var(--muted); margin-top: 5px; }
+  .row { display: flex; gap: 10px; align-items: center; margin-top: 18px; flex-wrap: wrap; }
+  #result { margin-top: 14px; font-size: 13.5px; }
+  h1 { font-size: 17px; margin: 0; }
+  .steps { font-size: 13px; color: var(--muted); padding-left: 20px; margin: 14px 0 0; }
+</style>
+</head>
+<body>
+  <div class="card">
+    <div class="head"><img src="icons/icon.svg" alt=""><div><h1>Připojení k Plánovači</h1><small id="ver"></small></div></div>
+    <ol class="steps">
+      <li>V aplikaci otevřete <b>Nastavení → Zařízení</b> a klikněte na <b>+ Přidat zařízení</b>.</li>
+      <li>Zkopírujte <b>adresu aplikace</b> a <b>klíč zařízení</b> sem a klikněte na <b>Uložit a vyzkoušet</b>.</li>
+    </ol>
+    <form id="f">
+      <label for="base">Adresa aplikace</label>
+      <input id="base" placeholder="https://trafikabr.cz/media-planner" autocomplete="off" spellcheck="false">
+      <label for="key">Klíč zařízení</label>
+      <input id="key" placeholder="dev_…" autocomplete="off" spellcheck="false">
+      <div class="hint">Klíč umí jen číst seznam médií a stahovat je. Když ho ztratíte, v aplikaci vytvořte <b>Nový klíč</b>.</div>
+      <div class="row"><button class="btn pri" id="save" type="submit">Uložit a vyzkoušet</button><button class="btn" id="play" type="button" hidden>⛶ Spustit přehrávač</button></div>
+    </form>
+    <div id="result"></div>
+  </div>
+  <script type="module" src="options.js"></script>
+</body>
+</html>

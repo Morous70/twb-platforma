@@ -1,0 +1,6 @@
+# Metadata OAuth pro MCP (Claude, ChatGPT). Adresy bez přípony vedou na PHP soubory v této složce.
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteRule ^(oauth-authorization-server|openid-configuration)(/.*)?$ oauth-authorization-server.php [L]
+  RewriteRule ^oauth-protected-resource(/.*)?$ oauth-protected-resource.php [L]
+</IfModule>

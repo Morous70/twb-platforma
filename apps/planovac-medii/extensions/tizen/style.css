@@ -1,0 +1,50 @@
+/* Aplikace pro TV Samsung – obrazovka 1920×1080. Barvy jako TWB Plánovač médií. */
+html, body { margin: 0; width: 100%; height: 100%; background: #000; color: #fff; overflow: hidden;
+  font: 28px/1.4 "SamsungOne", "Samsung Sans", system-ui, sans-serif; cursor: none; }
+[hidden] { display: none !important; }
+#stage { position: fixed; top: 0; left: 0; right: 0; bottom: 0; }
+#stage > * { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: contain; opacity: 0; transition: opacity .45s ease; }
+#stage > .on { opacity: 1; }
+#stage canvas { top: 50%; left: 50%; width: auto; height: auto; max-width: 100%; max-height: 100%; transform: translate(-50%, -50%); }
+#stage .html { background: #000; }
+#stage .html iframe { position: absolute; left: 50%; top: 50%; width: 1920px; height: 1080px; border: 0; background: #fff; pointer-events: none; }
+#stage .text { display: flex; align-items: center; justify-content: center; background: #111; }
+#stage .text div { white-space: pre-wrap; text-align: center; font-weight: 700; line-height: 1.2; max-width: 90%; word-wrap: break-word; }
+.msg { position: fixed; top: 0; left: 0; right: 0; bottom: 0; display: flex; align-items: center; justify-content: center; text-align: center; padding: 60px; color: #ccc; }
+.msg b { display: block; color: #fff; font-size: 40px; margin-bottom: 10px; }
+
+.screen { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: #141312; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
+.screen.dim { background: rgba(10, 10, 9, .92); }
+.logo { width: 150px; height: auto; margin-bottom: 26px; }
+.ttl { font-size: 46px; font-weight: 700; }
+.sub { font-size: 30px; color: #bbb; margin: 18px 0 44px; max-width: 1300px; }
+.sub b { color: #fff; }
+.code { font: 800 170px/1 ui-monospace, "DejaVu Sans Mono", monospace; letter-spacing: .12em; }
+.foot { font-size: 24px; color: #888; margin-top: 50px; }
+.err { color: #ff9b90; }
+.warn { color: #f4c56b; }
+.screen .err { font-size: 30px; margin-top: 30px; max-width: 1300px; }
+
+#errIcon { position: fixed; right: 30px; bottom: 26px; background: rgba(180, 35, 24, .88); border-radius: 26px; padding: 6px 18px; font-size: 24px; font-weight: 700; }
+
+.panel { position: fixed; left: 70px; right: 70px; bottom: 60px; background: rgba(20, 19, 18, .93); border-radius: 24px; padding: 34px 44px; font-size: 28px; }
+.panel h3 { margin: 0 0 16px; font-size: 36px; }
+.panel .err, .panel .warn { margin-bottom: 14px; }
+.grid { display: grid; grid-template-columns: auto 1fr; grid-gap: 6px 30px; color: #bbb; text-align: left; }
+.grid b { color: #fff; font-weight: 600; word-wrap: break-word; }
+.row { margin-top: 22px; }
+.keys { margin-top: 22px; display: flex; flex-wrap: wrap; color: #ccc; font-size: 24px; }
+.keys span { margin-right: 36px; }
+.keys b { display: inline-block; background: #333; border-radius: 8px; padding: 2px 12px; margin-right: 10px; color: #fff; font-weight: 700; }
+.keys b.green { background: #2f9d4f; }
+
+.tvbtn { font: inherit; font-weight: 700; color: #fff; background: #2b2926; border: 4px solid transparent; border-radius: 16px; padding: 14px 34px; }
+.tvbtn:focus, .tvin:focus { outline: none; border-color: #d2502c; background: #3a3632; }
+.box { background: #1d1c1a; border-radius: 26px; padding: 50px 64px; width: 1200px; text-align: left; }
+.box h2 { margin: 0 0 24px; font-size: 44px; }
+.lab { display: block; margin: 30px 0 10px; color: #bbb; }
+.tvin { width: 100%; box-sizing: border-box; font: inherit; color: #fff; background: #2b2926; border: 4px solid transparent; border-radius: 16px; padding: 14px 20px; }
+.col { display: flex; flex-direction: column; align-items: flex-start; margin-top: 26px; }
+.col .tvbtn { margin-bottom: 14px; min-width: 520px; text-align: left; }
+.hint, .note { color: #999; font-size: 24px; margin-top: 10px; }
+.note { color: #f4c56b; }

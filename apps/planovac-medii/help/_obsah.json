@@ -1,0 +1,180 @@
+{
+  "sekce": [
+    {
+      "id": "zaciname",
+      "titulek": "Začínáme",
+      "stranky": [
+        "co-aplikace-umi",
+        "prihlaseni-a-orientace",
+        "jak-se-zmena-dostane-na-televizi",
+        "prvni-obrazek"
+      ]
+    },
+    {
+      "id": "jak-na",
+      "titulek": "Jak na…",
+      "skupiny": [
+        {
+          "titulek": "Média a galerie",
+          "stranky": [
+            "jak-nahrat-soubor",
+            "jak-pridat-plakat-z-telefonu",
+            "jak-usporadat-galerii",
+            "jak-nahradit-soubor",
+            "jak-pridat-bezici-text",
+            "jak-pridat-odkaz-na-web",
+            "jak-vytvorit-nahodny-vyber",
+            "jak-vytvorit-vyber-podle-data",
+            "jak-pridat-html-dokument",
+            "jak-pouzivat-tagy",
+            "jak-pouzit-archiv",
+            "jak-smazat-medium"
+          ]
+        },
+        {
+          "titulek": "Slidy a data",
+          "stranky": [
+            "jak-vytvorit-slide",
+            "jak-vlozit-hodnotu-do-slidu",
+            "jak-pridat-pocasi",
+            "jak-udelat-graficky-text",
+            "jak-pridat-pismo",
+            "jak-upravit-tabulku-data",
+            "jak-nastavit-vzdaleny-zdroj"
+          ]
+        },
+        {
+          "titulek": "Scénáře a plánování",
+          "stranky": [
+            "jak-vytvorit-scenar",
+            "jak-nastavit-kdy-scenar-bezi",
+            "jak-nastavit-vychozi-scenar",
+            "jak-nahradit-medium-skupina",
+            "jak-pozastavit-scenar",
+            "jak-vlozit-scenar",
+            "jak-smazat-nebo-duplikovat-scenar"
+          ]
+        },
+        {
+          "titulek": "Každodenní provoz",
+          "stranky": [
+            "jak-zkontrolovat-co-bezi",
+            "jak-vynutit-synchronizaci",
+            "jak-zmenit-heslo",
+            "jak-pridat-passkey",
+            "jak-nainstalovat-na-plochu"
+          ]
+        },
+        {
+          "titulek": "Správa",
+          "stranky": [
+            "jak-pripojit-google-disk",
+            "jak-prihlasit-pres-google",
+            "jak-nastavit-prehravac",
+            "jak-nainstalovat-plugin-chrome",
+            "jak-nainstalovat-aplikaci-tv",
+            "jak-nainstalovat-aplikaci-android",
+            "jak-nastavit-upozorneni",
+            "jak-zalohovat-a-obnovit",
+            "jak-aktualizovat-aplikaci",
+            "jak-spustit-diagnostiku"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "popis",
+      "titulek": "Popis částí aplikace",
+      "stranky": [
+        "menu-a-ovladani",
+        "prehled",
+        "scenare",
+        "editor-scenare",
+        "galerie",
+        "editor-slidu",
+        "data",
+        "protokol"
+      ]
+    },
+    {
+      "id": "nastaveni",
+      "titulek": "Nastavení",
+      "stranky": [
+        "nastaveni",
+        "nastaveni-google-disk",
+        "obrazky-komprese",
+        "nastaveni-tagy",
+        "nastaveni-pocasi",
+        "nastaveni-prehravac",
+        "nastaveni-zarizeni",
+        "nastaveni-upozorneni",
+        "nastaveni-zalohy",
+        "nastaveni-zabezpeceni",
+        "nastaveni-system"
+      ]
+    },
+    {
+      "id": "problemy",
+      "titulek": "Řešení problémů",
+      "stranky": [
+        "televize-se-nemeni",
+        "scenar-nebezi",
+        "na-televizi-bezi-neco-jineho",
+        "slide-promenne-nefunguji",
+        "hlasky-obecne",
+        "hlasky-prihlaseni",
+        "hlasky-galerie",
+        "hlasky-scenar",
+        "hlasky-data",
+        "hlasky-google-disk",
+        "hlasky-zalohy",
+        "zapomenute-heslo"
+      ]
+    },
+    {
+      "id": "faq",
+      "titulek": "Časté dotazy",
+      "stranky": [
+        "casto-kladene-dotazy"
+      ]
+    },
+    {
+      "id": "slovnicek",
+      "titulek": "Slovníček pojmů",
+      "stranky": [
+        "slovnicek"
+      ]
+    },
+    {
+      "id": "kontakt",
+      "titulek": "Kontakt a podpora",
+      "stranky": [
+        "kontakt"
+      ]
+    }
+  ],
+  "kontext": {
+    "menu": "menu-a-ovladani",
+    "prehled": "prehled",
+    "scenare": "scenare",
+    "editor-scenare": "editor-scenare",
+    "galerie": "galerie",
+    "editor-slidu": "editor-slidu",
+    "data": "data",
+    "protokol": "protokol",
+    "nastaveni": "nastaveni",
+    "nastaveni-google-disk": "nastaveni-google-disk",
+    "nastaveni-obrazky": "obrazky-komprese",
+    "nastaveni-tagy": "nastaveni-tagy",
+    "nastaveni-prehravac": "nastaveni-prehravac",
+    "nastaveni-upozorneni": "nastaveni-upozorneni",
+    "nastaveni-zalohy": "nastaveni-zalohy",
+    "nastaveni-system": "nastaveni-system",
+    "faq": "casto-kladene-dotazy",
+    "slovnicek": "slovnicek",
+    "kontakt": "kontakt",
+    "nastaveni-zabezpeceni": "nastaveni-zabezpeceni",
+    "nastaveni-zarizeni": "nastaveni-zarizeni",
+    "nastaveni-pocasi": "nastaveni-pocasi"
+  }
+}

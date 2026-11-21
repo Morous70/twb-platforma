@@ -1,0 +1,6 @@
+/* Styl rámu vizuálního editoru HTML dokumentu. Úmyslně skoro prázdný: dokument má vypadat stejně jako v přehrávači
+   (výchozí styly prohlížeče + styly dokumentu). Vzhled vybraných prvků při úpravách dodá editor. */
+html { background: #fff; }
+.sun-editor-editable { outline: 0; }
+.sun-editor-editable .se-component.se-component-copy { box-shadow: 0 0 0 2px #4592ff; }
+.sun-editor-editable figure img { display: block; }

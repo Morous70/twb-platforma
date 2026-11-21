@@ -1,0 +1,8 @@
+config.php
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+data/media/*
+data/tmp/*
+uploads/*
+!uploads/.gitkeep

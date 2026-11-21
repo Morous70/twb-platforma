@@ -1,0 +1,80 @@
+{
+  "sekce": [
+    {
+      "id": "zaciname",
+      "titulek": "Začínáme",
+      "stranky": [
+        "co-aplikace-umi",
+        "prvni-kampan",
+        "vlozeni-na-web"
+      ]
+    },
+    {
+      "id": "jak-na",
+      "titulek": "Jak na…",
+      "skupiny": [
+        {
+          "titulek": "Kampaně a bannery",
+          "stranky": [
+            "kampane-a-priority",
+            "druhy-banneru",
+            "editor-slidu",
+            "html5-bannery",
+            "promenne"
+          ]
+        },
+        {
+          "titulek": "Weby a vložení",
+          "stranky": [
+            "weby-a-zony",
+            "zpusoby-vlozeni"
+          ]
+        },
+        {
+          "titulek": "Měření",
+          "stranky": [
+            "konverze",
+            "cileni-a-frekvence",
+            "statistiky"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "sprava",
+      "titulek": "Správa",
+      "stranky": [
+        "prihlaseni",
+        "zalohy",
+        "aktualizace",
+        "cron"
+      ]
+    },
+    {
+      "id": "problemy",
+      "titulek": "Řešení potíží",
+      "stranky": [
+        "banner-se-nezobrazuje",
+        "konverze-se-neprirazuji"
+      ]
+    }
+  ],
+  "kontext": {
+    "prehled": "co-aplikace-umi",
+    "kampane": "kampane-a-priority",
+    "kampan": "kampane-a-priority",
+    "bannery": "druhy-banneru",
+    "banner": "druhy-banneru",
+    "weby": "weby-a-zony",
+    "web": "weby-a-zony",
+    "zona": "zpusoby-vlozeni",
+    "konverze": "konverze",
+    "tracker": "konverze",
+    "statistiky": "statistiky",
+    "galerie": "druhy-banneru",
+    "promenne": "promenne",
+    "nastaveni": "zalohy",
+    "protokol": "banner-se-nezobrazuje",
+    "slide": "editor-slidu"
+  }
+}

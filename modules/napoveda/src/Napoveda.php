@@ -101,6 +101,55 @@ final class Napoveda
         return ['sections' => $toc['sections'], 'context' => $toc['context'], 'index' => $index];
     }
 
+    /** Text bez diakritiky malými písmeny (pro hledání). */
+    public static function normalizuj(string $s): string
+    {
+        $s = mb_strtolower($s, 'UTF-8');
+        if (class_exists(\Normalizer::class)) return (string)preg_replace('/\p{Mn}+/u', '', (string)\Normalizer::normalize($s, \Normalizer::FORM_D));
+        return strtr($s, ['á' => 'a', 'č' => 'c', 'ď' => 'd', 'é' => 'e', 'ě' => 'e', 'í' => 'i', 'ň' => 'n', 'ó' => 'o', 'ř' => 'r', 'š' => 's', 'ť' => 't', 'ú' => 'u', 'ů' => 'u', 'ý' => 'y', 'ž' => 'z', 'ä' => 'a', 'ö' => 'o', 'ü' => 'u', 'ľ' => 'l', 'ĺ' => 'l', 'ŕ' => 'r', 'ô' => 'o']);
+    }
+
+    /** Hledaná slova: bez diakritiky, aspoň 2 znaky, zkrácená o koncovku (jako help.js). @return list<string> */
+    public static function slova(string $q): array
+    {
+        $kmen = fn(string $w) => strlen($w) >= 6 ? substr($w, 0, -2) : (strlen($w) >= 5 ? substr($w, 0, -1) : $w);
+        return array_values(array_map($kmen, array_filter(preg_split('/[^a-z0-9]+/', self::normalizuj($q)) ?: [], fn($t) => strlen($t) >= 2)));
+    }
+
+    /**
+     * Hledání na serveru se stejným bodováním jako klient help.js: titulek 10, klíčová slova 5, text 1 + výskyty.
+     * Musí se najít všechna slova. Nejvýš $limit výsledků.
+     * @return list<array{id: string, title: string, score: float, snippet: string}>
+     */
+    public function hledej(string $q, int $limit = 12): array
+    {
+        $slova = self::slova($q);
+        if (!$slova) return [];
+        $out = [];
+        foreach ($this->balicek()['index'] as $p) {
+            $titulek = self::normalizuj($p['title']);
+            $klice = self::normalizuj($p['keys']);
+            $text = self::normalizuj($p['text']);
+            $skore = 0.0;
+            $prvni = -1;
+            foreach ($slova as $t) {
+                $vT = str_contains($titulek, $t);
+                $vK = str_contains($klice, $t);
+                $kde = strpos($text, $t);
+                if (!$vT && !$vK && $kde === false) continue 2;
+                $skore += ($vT ? 10 : 0) + ($vK ? 5 : 0) + ($kde !== false ? 1 + min(5, substr_count($text, $t)) * 0.2 : 0);
+                if ($kde !== false && ($prvni < 0 || $kde < $prvni)) $prvni = $kde;
+            }
+            // pozice v textu bez diakritiky odpovídá znakům původního textu (normalizace nemění počet znaků u češtiny)
+            $znak = $prvni >= 0 ? mb_strlen(substr($text, 0, $prvni), 'UTF-8') : 0;
+            $od = max(0, $znak - 50);
+            $ukazka = $prvni >= 0 ? ($od ? '… ' : '') . mb_substr($p['text'], $od, 170, 'UTF-8') . ' …' : mb_substr($p['text'], 0, 150, 'UTF-8') . ' …';
+            $out[] = ['id' => (string)$p['id'], 'title' => (string)$p['title'], 'score' => $skore, 'snippet' => $ukazka];
+        }
+        usort($out, fn($a, $b) => $b['score'] <=> $a['score']);
+        return array_slice($out, 0, $limit);
+    }
+
     /**
      * Kontrola obsahu (pro testy a vydání): [chyby, počet nevyřešených [OVĚŘIT], počet značek [SNÍMEK]].
      * Chyba = chybějící soubor nebo hlavička, rozbitý odkaz, stránka mimo obsah, neznámý kontext.

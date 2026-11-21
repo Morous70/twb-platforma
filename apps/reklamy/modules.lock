@@ -2,10 +2,14 @@
     "app": "reklamy",
     "moduly": {
         "aktualizace": "0.1.0",
+        "data": "0.1.0",
         "galerie": "0.1.0",
+        "html": "0.1.0",
         "jadro": "0.1.0",
         "obrazky": "0.1.0",
+        "pisma": "0.1.0",
         "prihlaseni": "0.1.0",
+        "slidy": "0.1.0",
         "tagy": "0.1.0",
         "zalohy": "0.1.0"
     }

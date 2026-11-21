@@ -10,6 +10,7 @@ namespace Reklamy;
  *   {clickurl_enc}   totéž zakódované pro parametr adresy
  *   {targeturl}      cílová adresa banneru
  *   {random} {cachebuster} {timestamp} {bannerid} {zoneid} {campaignid} {width} {height}
+ * Proměnné modulu data ({datum}, {svatek}, {Skupina:parametr}, vlastní …) se dosadí před makry; neznámé zůstanou beze změny.
  */
 final class Vykresleni
 {
@@ -28,19 +29,33 @@ final class Vykresleni
         return $this->adresa('klik.php', ['b' => $b, 'z' => $zona, 'k' => $this->dorucovani->podpis("klik|$b|$zona")]);
     }
 
-    /** Adresa obrázku banneru (galerie přes d/b.php, jinak vlastní adresa). */
+    /** Adresa obrázku banneru (galerie a slidy přes d/b.php, jinak vlastní adresa). */
     public function obrazek(array $banner): string
     {
         if ($banner['type'] === 'external') return (string)$banner['image_url'];
-        $v = substr((string)$this->app->db->q('SELECT md5 FROM media WHERE id = ?', [$banner['media_id']])->fetchColumn(), 0, 8);
+        $v = $banner['type'] === 'slide' ? $this->app->slideBannery()->klic($banner)
+            : substr((string)$this->app->db->q('SELECT md5 FROM media WHERE id = ?', [$banner['media_id']])->fetchColumn(), 0, 8);
         return $this->adresa('b.php', ['b' => (int)$banner['id'], 'v' => $v]);
     }
 
-    /** Adresa HTML dokumentu banneru (pro iframe). */
+    /** Údaje balíčku HTML5 banneru. @return array{zip:string, index:string} */
+    public static function balicek(array $banner): array
+    {
+        $c = json_decode((string)($banner['content'] ?? ''), true);
+        if (!is_array($c) || !is_string($c['zip'] ?? null) || !is_string($c['index'] ?? null)) throw new Chyba('Banner nemá balíček HTML5.');
+        return $c;
+    }
+
+    /** Adresa HTML dokumentu banneru (pro iframe). HTML5: hlavní soubor balíčku, clickTag dostane podle podpisu. */
     public function dokument(array $banner, int $zona): string
     {
         $b = (int)$banner['id'];
-        return $this->adresa('b.php', ['b' => $b, 'z' => $zona, 'k' => $this->dorucovani->podpis("html|$b|$zona"), 'cb' => random_int(1, PHP_INT_MAX)]);
+        $p = ['b' => $b, 'z' => $zona, 'k' => $this->dorucovani->podpis("html|$b|$zona"), 'cb' => random_int(1, PHP_INT_MAX)];
+        if ($banner['type'] === 'html5') {
+            $c = self::balicek($banner);
+            return $this->adresa('h5.php/' . $c['zip'] . '/' . implode('/', array_map('rawurlencode', explode('/', $c['index']))), $p);
+        }
+        return $this->adresa('b.php', $p);
     }
 
     private static function h(mixed $s): string { return htmlspecialchars((string)$s, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'); }
@@ -57,7 +72,7 @@ final class Vykresleni
     {
         $w = (int)$banner['width'];
         $h = (int)$banner['height'];
-        if (in_array($banner['type'], ['image', 'external'], true)) {
+        if (in_array($banner['type'], Bannery::OBRAZKOVE, true)) {
             $img = '<img src="' . self::h($this->obrazek($banner)) . '" width="' . $w . '" height="' . $h . '" alt="' . self::h($banner['alt'] ?? '')
                 . '" style="border:0;display:block;max-width:100%;height:auto">';
             return $this->odkaz($banner, $zona, $img);
@@ -82,14 +97,28 @@ final class Vykresleni
         ]);
     }
 
-    /** Celý HTML dokument banneru (obsah iframe). Úplný dokument zůstane, jen se dosadí makra. */
-    public function dokumentHtml(array $banner, int $zona): string
+    /**
+     * Celý HTML dokument banneru (obsah iframe): dosazené proměnné, makra a písma z modulu pisma, pokud je kód jmenuje (font-family).
+     * Úplný dokument zůstane, jinak se kód obalí dokumentem bez okrajů.
+     */
+    public function dokumentHtml(array $banner, int $zona, ?\DateTimeImmutable $t = null): string
     {
-        $html = $this->makra((string)$banner['html'], $banner, $zona);
-        if (preg_match('~<html[\s>]~i', $html)) return $html;
-        $cil = self::h($banner['target'] ?: '_blank');
-        return "<!doctype html>\n<html lang=\"cs\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"><base target=\"$cil\">"
-            . '<style>html,body{margin:0;padding:0;overflow:hidden;background:transparent}</style></head><body>' . $html . '</body></html>';
+        $zdroj = (string)$banner['html'];
+        [$html] = $this->app->dokument()->dosad($zdroj, $t ?? new \DateTimeImmutable());
+        $html = $this->makra($html, $banner, $zona);
+        if (!preg_match('~<html[\s>]~i', $html)) {
+            $cil = self::h($banner['target'] ?: '_blank');
+            $html = "<!doctype html>\n<html lang=\"cs\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"><base target=\"$cil\">"
+                . '<style>html,body{margin:0;padding:0;overflow:hidden;background:transparent}</style></head><body>' . $html . '</body></html>';
+        }
+        return \TWB\Html\Dokument::vlozDoHlavicky($html, $this->app->dokument()->pismaCss($zdroj));
+    }
+
+    /** Hlavní soubor HTML5 banneru s clickTag (proklik na cíl banneru přes počítání prokliků). */
+    public function html5Index(array $banner, string $html, ?int $zona): string
+    {
+        $klik = $zona !== null && !empty($banner['target_url']) ? $this->klik($banner, $zona) : (string)($banner['target_url'] ?? '');
+        return Html5::sClickTagem($html, $klik);
     }
 
     /** Smí proklik HTML banneru vést na tuto adresu? Jen http(s) na doménu cíle banneru nebo adresa uvedená přímo v HTML banneru. */

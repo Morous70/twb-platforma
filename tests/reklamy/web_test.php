@@ -38,7 +38,7 @@ test('instalace: kontrola hesla, pak přihlášení', function () use ($s, $b) {
 });
 
 test('všechny stránky se načtou bez chyb', function () use ($b) {
-    foreach (['prehled', 'kampane', 'kampan', 'bannery', 'weby', 'galerie', 'nastaveni', 'protokol'] as $p) {
+    foreach (['prehled', 'kampane', 'kampan', 'bannery', 'weby', 'galerie', 'promenne', 'nastaveni', 'protokol'] as $p) {
         $r = $b->jdi("index.php?p=$p");
         eq(200, $r['code'], $p);
         ok(str_contains($r['body'], '<h1>'), $p);

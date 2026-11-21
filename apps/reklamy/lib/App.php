@@ -7,6 +7,10 @@ use TWB\Prihlaseni\{Heslo, Zamek, Relace, Tokeny, Google, Passkey};
 use TWB\Galerie\Galerie;
 use TWB\Zalohy\{Zalohy, Skupina};
 use TWB\Aktualizace\Aktualizace;
+use TWB\Pisma\Pisma;
+use TWB\Slidy\{Navrh, Text};
+use TWB\Data\{Tabulka, Promenne, ProSlidy, ProHtml};
+use TWB\Html\Dokument;
 
 /**
  * Aplikace TWB Reklamy: konfigurace, databáze, moduly a služby aplikace na jednom místě.
@@ -20,7 +24,7 @@ final class App
     /** Veřejný klíč Ed25519 TWB Update Serveru (veřejný, smí být v kódu). */
     public const UPDATE_KLIC = 'JTvTWDW+eSP/GtT9zG3t+3UraawTk82vKteb2Dci8Cg=';
     /** Tabulky v pořadí pro obnovu ze zálohy (nejdřív ty, na které ostatní odkazují). */
-    public const TABULKY = ['module_versions', 'settings', 'log', 'media', 'passkeys', 'campaigns', 'banners', 'sites', 'zones', 'zone_campaigns', 'zone_banners', 'stats'];
+    public const TABULKY = ['module_versions', 'settings', 'log', 'media', 'passkeys', 'campaigns', 'banners', 'sites', 'zones', 'zone_campaigns', 'zone_banners', 'stats', 'data_rows'];
     /** Nastavení, která patří k instalaci a obnova zálohy je nepřepíše. */
     public const MISTNI = ['login_fails', 'login_last_fail', 'update_result', 'update_checked_at', 'update_available', 'update_health_key'];
 
@@ -88,6 +92,7 @@ final class App
         $zmena = false;
         $zmena = $m->spust('prihlaseni', \TWB\Prihlaseni\Migrace::class) || $zmena;
         $zmena = $m->spust('galerie', \TWB\Galerie\Migrace::class) || $zmena;
+        $zmena = $m->spust('data', \TWB\Data\Migrace::class) || $zmena;
         $prvni = $m->verze(self::SLUG) === 0;
         $zmena = $m->spust(self::SLUG, Schema::class) || $zmena;
         if ($prvni) {
@@ -149,15 +154,24 @@ final class App
             priSmazani: function (array $r): void {
                 $n = (int)$this->db->q('SELECT COUNT(*) FROM banners WHERE media_id = ?', [$r['id']])->fetchColumn();
                 if ($n > 0) throw new \RuntimeException("Obrázek „{$r['nazev']}“ používá banner ({$n}×), nejdřív ho z banneru odeberte.");
+                $s = $this->slideBannery()->pouzivajiObrazek((int)$r['id']);
+                if ($s) throw new \RuntimeException("Obrázek „{$r['nazev']}“ je ve slidu " . implode(', ', array_map(fn($x) => "„{$x}“", array_slice($s, 0, 3))) . ', nejdřív ho ze slidu odeberte.');
             },
-            pouziti: fn(int $id) => array_map(fn($b) => 'Banner: ' . $b['name'], $this->db->q('SELECT name FROM banners WHERE media_id = ?', [$id])->fetchAll())));
+            pouziti: fn(int $id) => [
+                ...array_map(fn($b) => 'Banner: ' . $b['name'], $this->db->q('SELECT name FROM banners WHERE media_id = ?', [$id])->fetchAll()),
+                ...array_map(fn($n) => 'Slide: ' . $n, $this->slideBannery()->pouzivajiObrazek($id)),
+            ]));
     }
 
     public function zalohy(): Zalohy
     {
         return $this->sluzba('zalohy', fn() => new Zalohy($this->host, self::NAZEV, $this->verze, Schema::verze(), self::TABULKY,
             povinne: ['settings', 'campaigns', 'banners'], mistni: self::MISTNI,
-            skupiny: [new Skupina('media', $this->data . '/media', fn() => $this->galerie()->soubory(), bezKomprese: true)],
+            skupiny: [
+                new Skupina('media', $this->data . '/media', fn() => $this->galerie()->soubory(), bezKomprese: true),
+                new Skupina('fonts', $this->data . '/fonts', fn() => $this->pisma()->souboryProZalohu(), vzdy: true),
+                new Skupina('html5', $this->data . '/html5', fn() => $this->html5()->soubory($this->bannery()->balickyHtml5()), bezKomprese: true),
+            ],
             prefix: 'twb-reklamy-', kdeObnovit: 'Nastavení → Zálohy',
             poObnoveni: function (int $schema): void { $this->nastaveni()->obnov(); $this->migruj(); }));
     }
@@ -179,6 +193,46 @@ final class App
         if ((int)$this->nastaveni()->dej('schema_version', 0) !== Schema::verze()) $this->migruj();
         return (new Migrace($this->db))->verze(self::SLUG) > 0;
     }
+
+    // ---------- obsah banerů: písma, proměnné, slidy, HTML ----------
+
+    /** Složka modulů platformy (v balíčku modules/ vedle aplikace, při vývoji ../../modules). */
+    public static function moduly(): string { return dirname((new \ReflectionClass(Pisma::class))->getFileName(), 3); }
+
+    public function pisma(): Pisma
+    {
+        return $this->sluzba('pisma', fn() => new Pisma($this->nastaveni(), $this->host->protokol, self::moduly() . '/pisma/fonty', $this->data . '/fonts',
+            pouziti: fn(string $k) => $this->slideBannery()->pouzivajiPismo($k),
+            urlVlastni: 'api.php?a=pismo&klic={klic}', urlVestavene: 'api.php?a=pismo&soubor={soubor}&tloustka={tloustka}'));
+    }
+
+    public function tabulkaDat(): Tabulka { return $this->sluzba('tabulkaDat', fn() => new Tabulka($this->db)); }
+
+    /** Vlastní proměnné: [název malými písmeny => [name, type (text|list), value]]. @return array<string, array<string, string>> */
+    public function vlastniPromenne(): array
+    {
+        $v = json_decode((string)$this->nastaveni()->dej('user_vars', '{}'), true);
+        return is_array($v) ? $v : [];
+    }
+
+    public function promenne(): Promenne
+    {
+        return $this->sluzba('promenne', fn() => new Promenne($this->tabulkaDat(), fn() => $this->vlastniPromenne()));
+    }
+
+    public function navrh(): Navrh
+    {
+        return $this->sluzba('navrh', fn() => new Navrh($this->pisma(), SlideBannery::formaty(), '300x250', vlastniRozmer: true, min: 16, max: Bannery::MAX_ROZMER));
+    }
+
+    public function slidy(): \TWB\Slidy\Vykresleni
+    {
+        return $this->sluzba('slidy', fn() => new \TWB\Slidy\Vykresleni($this->navrh(), new Text($this->pisma()), new ObrazkyGalerie($this->galerie()), new ProSlidy($this->promenne())));
+    }
+
+    public function slideBannery(): SlideBannery { return $this->sluzba('slideBannery', fn() => new SlideBannery($this)); }
+    public function html5(): Html5 { return $this->sluzba('html5', fn() => new Html5($this->data . '/html5')); }
+    public function dokument(): Dokument { return $this->sluzba('dokument', fn() => new Dokument($this->pisma(), new ProHtml($this->promenne()))); }
 
     public function statistiky(): Statistiky { return $this->sluzba('statistiky', fn() => new Statistiky($this)); }
     public function kampane(): Kampane { return $this->sluzba('kampane', fn() => new Kampane($this)); }

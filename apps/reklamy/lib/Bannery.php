@@ -2,14 +2,18 @@
 declare(strict_types=1);
 namespace Reklamy;
 
-/** Bannery kampaní: obrázek z galerie, obrázek z jiné adresy, HTML. */
+/** Bannery kampaní: obrázek z galerie, obrázek z jiné adresy, HTML, HTML5 (ZIP), slide z editoru. */
 final class Bannery
 {
     public const TYPY = [
         'image' => 'Obrázek z galerie',
         'external' => 'Obrázek z jiné adresy',
         'html' => 'HTML kód',
+        'html5' => 'HTML5 (ZIP)',
+        'slide' => 'Slide z editoru',
     ];
+    /** Druhy, které se vydávají jako obrázek (i vložením odkazem do e-mailu). */
+    public const OBRAZKOVE = ['image', 'external', 'slide'];
     public const STAVY = ['active' => 'Aktivní', 'paused' => 'Pozastavený'];
     public const CILE = ['_blank' => 'Nové okno', '_top' => 'Stejné okno (celá stránka)', '_self' => 'Uvnitř rámce'];
     public const MAX_ROZMER = 4096;
@@ -53,7 +57,7 @@ final class Bannery
             'width' => Vstup::cislo($v, 'width', 'Šířka', 1, self::MAX_ROZMER),
             'height' => Vstup::cislo($v, 'height', 'Výška', 1, self::MAX_ROZMER),
             'weight' => Vstup::cislo($v, 'weight', 'Váha', 1, 1000) ?? 1,
-            'media_id' => null, 'image_url' => null, 'html' => null,
+            'media_id' => null, 'image_url' => null, 'html' => null, 'content' => null,
             'target_url' => Vstup::adresa($v, 'target_url', 'Cílová adresa'),
             'target' => Vstup::volba($v, 'target', 'Otevřít', self::CILE, '_blank'),
             'alt' => Vstup::text($v, 'alt', 'Popis obrázku (alt)', 255, false),
@@ -79,6 +83,26 @@ final class Bannery
                 if (!mb_check_encoding($html, 'UTF-8')) throw new Chyba('HTML kód banneru musí být v kódování UTF-8.');
                 $d['html'] = $html;
                 break;
+            case 'html5':
+                // nový balíček: ['tmp' => cesta, 'name' => původní název]; jinak zůstane uložený
+                $f = $v['balicek'] ?? null;
+                if (is_array($f) && !empty($f['tmp'])) {
+                    $info = $this->app->html5()->nahraj((string)$f['tmp'], (string)($f['name'] ?? 'banner.zip'));
+                    $d['width'] ??= $info['sirka'];
+                    $d['height'] ??= $info['vyska'];
+                } else {
+                    $info = json_decode((string)($stary['content'] ?? ''), true);
+                    if (!is_array($info) || empty($info['zip'])) throw new Chyba('Nahrajte balíček HTML5 (ZIP s index.html).');
+                }
+                $d['content'] = json_encode($info, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+                break;
+            case 'slide':
+                $design = array_key_exists('design', $v) ? $this->app->navrh()->vycisti($v['design']) : json_decode((string)($stary['content'] ?? ''), true);
+                if (!is_array($design) || empty($design['w'])) throw new Chyba('Slide nemá šablonu – otevřete ho v editoru.');
+                $d['content'] = json_encode($design, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+                $d['width'] = (int)$design['w'];
+                $d['height'] = (int)$design['h'];
+                break;
         }
         if ($d['width'] === null || $d['height'] === null) throw new Chyba('Vyplňte šířku a výšku banneru.');
         $d['updated_at'] = time();
@@ -98,6 +122,7 @@ final class Bannery
                 }
             });
         }
+        if ($stary !== null && $typ === 'html5' && $stary['content'] !== $d['content']) $this->app->html5()->uklid($this->balickyHtml5());
         return $id;
     }
 
@@ -122,6 +147,19 @@ final class Bannery
     {
         $b = $this->radek($id);
         $this->app->db->q('DELETE FROM banners WHERE id = ?', [$id]);
+        if ($b['type'] === 'slide') $this->app->slideBannery()->smazObrazky($id);
+        if ($b['type'] === 'html5') $this->app->html5()->uklid($this->balickyHtml5());
         $this->app->log('info', "Banner smazán: {$b['name']}");
+    }
+
+    /** Balíčky HTML5, které bannery používají (md5). @return list<string> */
+    public function balickyHtml5(): array
+    {
+        $out = [];
+        foreach ($this->app->db->q("SELECT content FROM banners WHERE type = 'html5'")->fetchAll(\PDO::FETCH_COLUMN) as $c) {
+            $z = json_decode((string)$c, true)['zip'] ?? null;
+            if (is_string($z)) $out[] = $z;
+        }
+        return array_values(array_unique($out));
     }
 }

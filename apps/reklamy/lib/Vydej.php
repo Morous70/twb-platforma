@@ -9,6 +9,8 @@ namespace Reklamy;
 final class Vydej
 {
     public const MAX_ZON = 20;
+    /** Izolace HTML banerů: dokument dostane vlastní (prázdný) původ, smí skripty, okna a přechod celé stránky po kliknutí. */
+    public const SANDBOX = "sandbox allow-scripts allow-popups allow-popups-to-escape-sandbox allow-top-navigation-by-user-activation allow-forms";
     public const GIF = "GIF89a\x01\x00\x01\x00\x80\x00\x00\x00\x00\x00\x00\x00\x00!\xf9\x04\x01\x00\x00\x00\x00,\x00\x00\x00\x00\x01\x00\x01\x00\x00\x02\x02D\x01\x00;";
 
     public readonly bool $pripraveno;
@@ -56,8 +58,8 @@ final class Vydej
             'id' => (int)$b['id'], 'kampan' => (int)$b['campaign_id'], 'typ' => (string)$b['type'],
             'sirka' => (int)$b['width'], 'vyska' => (int)$b['height'], 'alt' => (string)($b['alt'] ?? ''),
             'klik' => !empty($b['target_url']) ? $v->klik($b, $zona) : null,
-            'obrazek' => in_array($b['type'], ['image', 'external'], true) ? $v->obrazek($b) : null,
-            'dokument' => in_array($b['type'], ['image', 'external'], true) ? null : $v->dokument($b, $zona),
+            'obrazek' => in_array($b['type'], Bannery::OBRAZKOVE, true) ? $v->obrazek($b) : null,
+            'dokument' => in_array($b['type'], Bannery::OBRAZKOVE, true) ? null : $v->dokument($b, $zona),
         ];
     }
 

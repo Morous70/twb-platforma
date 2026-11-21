@@ -63,6 +63,9 @@ final class Prohlizec
 
     public function __construct(private TestServer $s) { $this->jar = $s->data . '/cookies-' . bin2hex(random_bytes(3)); }
 
+    /** Soubor s cookies (pro předání přihlášení do Playwrightu). */
+    public function jar(): string { return $this->jar; }
+
     /**
      * @param array<string, mixed>|null $post
      * @return array{code:int, body:string, location:?string, type:string}

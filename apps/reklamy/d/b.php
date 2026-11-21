@@ -1,6 +1,7 @@
 <?php
 declare(strict_types=1);
-// Obsah banneru: ?b=ID&v=VERZE – obrázek z galerie (dlouhá mezipaměť), ?b=ID&z=ZONA&k=PODPIS – HTML dokument banneru pro iframe.
+// Obsah banneru: ?b=ID&v=VERZE – obrázek z galerie nebo vykreslený slide (dlouhá mezipaměť),
+// ?b=ID&z=ZONA&k=PODPIS – HTML dokument banneru pro iframe (izolovaný: vlastní původ díky CSP sandbox).
 use Reklamy\{App, Vydej};
 
 /** @var App $app */
@@ -21,10 +22,23 @@ try {
         readfile($f['cesta']);
         exit;
     }
+    if ($b && $b['type'] === 'slide' && isset($_GET['v'])) {
+        $cesta = $app->slideBannery()->soubor($b);
+        $etag = '"' . basename($cesta, '.jpg') . '"';
+        // verze v adrese je klíč obsahu: když už neplatí (změnil se text s datem), krátká mezipaměť
+        header('Cache-Control: public, max-age=' . (str_ends_with(basename($cesta, '.jpg'), '-' . $_GET['v']) ? '31536000, immutable' : '300'));
+        header('ETag: ' . $etag);
+        if (trim((string)($_SERVER['HTTP_IF_NONE_MATCH'] ?? '')) === $etag) { http_response_code(304); exit; }
+        header('Content-Type: image/jpeg');
+        header('Content-Length: ' . filesize($cesta));
+        readfile($cesta);
+        exit;
+    }
     $z = (string)($_GET['z'] ?? '');
     if ($b && $b['type'] === 'html' && ctype_digit($z) && $app->dorucovani()->overPodpis("html|$id|$z", $_GET['k'] ?? null)) {
         Vydej::bezCache();
         header('Content-Type: text/html; charset=utf-8');
+        header('Content-Security-Policy: ' . Vydej::SANDBOX);
         echo $app->vykresleni()->dokumentHtml($b, (int)$z);
         exit;
     }

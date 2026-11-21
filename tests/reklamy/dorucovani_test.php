@@ -213,7 +213,7 @@ test('převod databáze z 0.1: doručování si ho provede samo', function () {
     $app->nastaveni()->uloz('schema_version', '1');
     $app2 = new App(KOREN . '/apps/reklamy', ['data_dir' => $app->data]);
     eq(true, $app2->pripravDoruceni());
-    eq('2', $app2->nastaveni()->dej('schema_version'));
+    eq((string)Reklamy\Schema::verze(), $app2->nastaveni()->dej('schema_version'));
     $app2->db->q('SELECT COUNT(*) FROM stats')->fetchColumn();
     $app2->db->q('SELECT COUNT(*) FROM view_map')->fetchColumn();
 });

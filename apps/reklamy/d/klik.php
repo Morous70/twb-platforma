@@ -3,7 +3,7 @@ declare(strict_types=1);
 // Proklik: započítá klik a přesměruje na cíl banneru.
 //   ?b=BANNER&z=ZONA&k=PODPIS[&cil=adresa]  – odkaz z vloženého banneru (cil jen u HTML bannerů, na povolenou adresu)
 //   ?zona=ID&n=X                           – vložení odkazem, banner se dohledá podle n z obr.php
-use Reklamy\{App, Vydej, Vykresleni};
+use Reklamy\{App, Vydej, Vykresleni, Bannery};
 
 /** @var App $app */
 $app = require dirname(__DIR__) . '/lib/bootstrap.php';
@@ -25,12 +25,12 @@ try {
         $id = $n !== '' ? $d->zapamatovany($n, $zona) : null;
         if ($id !== null) $banner = $app->db->q('SELECT * FROM banners WHERE id = ?', [$id])->fetch() ?: null;
         // bez záznamu (obrázek se nenačetl, mezitím uklizeno): banner, který by se zobrazil teď
-        $banner ??= $d->vyber($z, $v->kontext($_GET, $zona), ['image', 'external']);
+        $banner ??= $d->vyber($z, $v->kontext($_GET, $zona), Bannery::OBRAZKOVE);
     }
     if ($banner) {
         $cil = (string)($banner['target_url'] ?? '');
         $jiny = is_string($_GET['cil'] ?? null) ? trim($_GET['cil']) : '';
-        if ($jiny !== '' && $banner['type'] !== 'image' && $banner['type'] !== 'external' && Vykresleni::povolenyCil($banner, $jiny)) $cil = $jiny;
+        if ($jiny !== '' && !in_array($banner['type'], Bannery::OBRAZKOVE, true) && Vykresleni::povolenyCil($banner, $jiny)) $cil = $jiny;
         if ($cil !== '' && Vydej::http($cil)) {
             $d->proklik((int)$banner['id'], $zona, $v->kontext($_GET, $zona));
             header('Location: ' . $cil, true, 302);

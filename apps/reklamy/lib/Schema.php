@@ -11,7 +11,7 @@ use TWB\Jadro\{Db, ModulMigrace};
  */
 final class Schema implements ModulMigrace
 {
-    public static function verze(): int { return 2; }
+    public static function verze(): int { return 3; }
 
     /** Tabulky, které musí existovat dřív než cokoli jiného (nastavení a protokol). */
     public static function zakladniTabulky(Db $db): void
@@ -99,5 +99,7 @@ final class Schema implements ModulMigrace
             )');
             $db->q('CREATE INDEX view_map_at ON view_map (at)');
         }
+        // verze 3 (0.3): jen nové tabulky modulu data (data_rows …) a obsah banerů html5 / slide ve sloupci content;
+        // vlastní tabulky aplikace se nemění – verze se zvyšuje kvůli zálohám a návratu aktualizace.
     }
 }

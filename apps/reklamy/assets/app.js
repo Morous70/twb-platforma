@@ -30,8 +30,8 @@
     s.addEventListener('change', function () {
       if (!s.value) return;
       var r = s.value.split('x');
-      document.getElementById('f-width').value = r[0];
-      document.getElementById('f-height').value = r[1];
+      document.getElementById(s.dataset.sirka || 'f-width').value = r[0];
+      document.getElementById(s.dataset.vyska || 'f-height').value = r[1];
       s.value = '';
     });
   });

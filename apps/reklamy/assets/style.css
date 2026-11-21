@@ -121,3 +121,9 @@ dl.udaje dd { margin: 0; }
 details.kod-vlozeni { background: var(--plocha); border: 1px solid var(--okraj); border-radius: var(--polomer); padding: .5rem .8rem; margin-bottom: .5rem; }
 details.kod-vlozeni summary { cursor: pointer; font-weight: 600; }
 details.kod-vlozeni textarea { min-height: 0; background: var(--kod); }
+
+/* ---------- editor slidů (modul slidy, styl .pm) ---------- */
+.pm.slide-stranka { border-radius: 8px; }
+/* bannery nemají tagy ani počasí */
+.pm #seTags, .pm #addWeather { display: none !important; }
+main:has(.slide-stranka) { max-width: 1600px; }

@@ -37,6 +37,7 @@ try {
 }
 try {
     $app->dorucovani()->uklid();
+    $app->html5()->uklid($app->bannery()->balickyHtml5());
 } catch (Throwable $e) {
     $vystup[] = 'Úklid doručování selhal: ' . $e->getMessage();
 }

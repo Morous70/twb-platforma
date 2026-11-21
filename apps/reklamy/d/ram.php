@@ -19,7 +19,7 @@ try {
             $app->dorucovani()->zobrazeni((int)$b['id'], (int)$z['id'], $k);
             $cil = $b['target'] === '_self' ? '_self' : ($b['target'] ?: '_blank');
             // HTML banner je přímo obsahem rámu (bez dalšího vnořeného rámu)
-            if ($b['type'] === 'html') { echo $app->vykresleni()->dokumentHtml($b, (int)$z['id']); exit; }
+            if ($b['type'] === 'html') { header('Content-Security-Policy: ' . Vydej::SANDBOX); echo $app->vykresleni()->dokumentHtml($b, (int)$z['id']); exit; }
             $obsah = $app->vykresleni()->html($b, (int)$z['id']);
         } else {
             $obsah = (string)($z['fallback'] ?? '');

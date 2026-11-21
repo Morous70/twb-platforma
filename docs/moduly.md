@@ -65,7 +65,9 @@ php tests/run.php tagy       # jeden modul
 - Výstup je shodný s Social Plannerem 1.9.2 bajt po bajtu: test spouští zmrazenou kopii původního `slide.php` (`tests/slidy/original/`, needitovat) v samostatném procesu a porovnává očištěnou šablonu, klíč obsahu i výsledný JPEG.
 - Počasí a proměnné/podmínky nejsou součástí modulu: patří do modulu `data` a připojí se přes `Prvek` a `Promenne`.
 - Šablony Plánovače nemají `format/w/h`; po přechodu je dostanou a klíče vykreslení se jednou změní (slidy se jednou přegenerují).
-- JS editor: základem je verze Social Planneru (nadmnožina Plánovačovy; rozdíl je jen formáty plátna, čas náhledu, písma a pole `grp`). Test hlídá shodu kopie, syntaxi a úplnost popisu v `web/HOST.md`. V prohlížeči zatím neotestováno.
+- JS editor: základem je verze Social Planneru (nadmnožina Plánovačovy; rozdíl je jen formáty plátna, čas náhledu, písma a pole `grp`). Test hlídá shodu kopie, syntaxi a úplnost popisu v `web/HOST.md`.
+  První aplikace, která editor z modulu používá: TWB Reklamy 0.3 (`apps/reklamy/assets/slide-shim.js`, soubory editoru vydává `asset.php`); v prohlížeči ji ověřuje `tests/reklamy/obsah_web_test.php`
+  (plátno libovolného rozměru, uložení, bez chyb v konzoli). Editor v modulu zůstal beze změny – tagy a počasí Reklamy skrývají stylem.
 
 ## HTML
 

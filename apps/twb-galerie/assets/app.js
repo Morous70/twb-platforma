@@ -81,7 +81,7 @@
 
   // ---------- Okno náhledu (celá aplikace): obrázek, video, PDF v modálním okně. Šipky listují, Esc zavře. ----------
   // Spouští ho prvek s data-otevrit-okno uvnitř skupiny data-okno-skupina; položky (data-okno, data-okno-src…) vypisuje Ui::okno.
-  // Nic se neotevírá v nové kartě: Ctrl/Shift/Cmd i prostřední klik otevřou také okno.
+  // Nic se neotevírá v nové kartě: Ctrl/Cmd+klik i prostřední klik otevřou detail média ve stejné kartě (0.6.4).
   (function () {
     var okno = null, skupina = null, aktualni = -1, predOknem = null;
     var polozky = function () {
@@ -158,6 +158,11 @@
       document.body.classList.remove('okno-otevrene');
       if (predOknem && predOknem.focus) predOknem.focus();
     };
+    // Ctrl/Cmd+klik: detail média ve stejné kartě; kde detail není (už jsme v něm), otevře okno
+    var naDetail = function (a) {
+      var d = a.closest('[data-okno]').dataset.oknoDetail;
+      if (d) window.location.href = d; else otevri(a);
+    };
     var spoustec = function (e) {
       var a = e.target instanceof Element && e.target.closest('[data-otevrit-okno]');
       return a && a.closest('[data-okno-skupina]') && a.closest('[data-okno]') ? a : null;
@@ -166,14 +171,14 @@
       var a = spoustec(e);
       if (!a || e.button !== 0) return;
       e.preventDefault();
-      otevri(a);
+      if (e.ctrlKey || e.metaKey) naDetail(a); else otevri(a);
     });
-    // prostřední tlačítko: také okno, ne nová karta
+    // prostřední tlačítko jako Ctrl+klik: detail ve stejné kartě, ne nová karta
     document.addEventListener('auxclick', function (e) {
       var a = spoustec(e);
       if (!a || e.button !== 1) return;
       e.preventDefault();
-      otevri(a);
+      naDetail(a);
     });
     document.addEventListener('mousedown', function (e) { if (e.button === 1 && spoustec(e)) e.preventDefault(); });   // bez automatického posunu
     document.addEventListener('keydown', function (e) {

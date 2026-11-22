@@ -169,7 +169,7 @@ JS);
     eq('mrizka', (string)$s->db()->query("SELECT v FROM settings WHERE k = 'galerie_zobrazeni'")->fetchColumn());
 });
 
-test('0.6.2: klik na náhled otevře větší obrázek v okně; šipky listují; Esc zavře; Ctrl+klik i prostřední klik také okno, žádná nová karta', function () use ($pw, $s) {
+test('0.6.2: klik na náhled otevře větší obrázek v okně; šipky listují; Esc zavře; Ctrl+klik i prostřední klik detail ve stejné kartě, žádná nová karta', function () use ($pw, $s) {
     if (!$pw) { echo "      (přeskočeno: chybí node nebo playwright)\n"; return; }
     $v = prohlizec($s->url, <<<'JS'
   await p.goto(u + 'index.php?p=galerie');
@@ -194,13 +194,11 @@ test('0.6.2: klik na náhled otevře větší obrázek v okně; šipky listují;
   await p.click('.okno-plocha', { position: { x: 5, y: 5 } });
   v.klikVedle = await p.$$eval('.okno-nahled[hidden]', e => e.length);
   let stranek = 0; p.context().on('page', () => stranek++);
-  await p.click('.galerie figure >> nth=0 >> .nahled-medium', { modifiers: ['Control'] });
-  await p.waitForTimeout(300);
-  v.ctrl = [await p.$$eval('.okno-nahled:not([hidden])', e => e.length), p.url().endsWith('p=galerie')];
-  await p.keyboard.press('Escape');
-  await p.click('.galerie figure >> nth=0 >> .nahled-medium', { button: 'middle' });
-  await p.waitForTimeout(300);
-  v.prostredni = await p.$$eval('.okno-nahled:not([hidden])', e => e.length);
+  await Promise.all([p.waitForNavigation(), p.click('.galerie figure >> nth=0 >> .nahled-medium', { modifiers: ['Control'] })]);
+  v.ctrl = p.url();
+  await p.goto(u + 'index.php?p=galerie');
+  await Promise.all([p.waitForNavigation(), p.click('.galerie figure >> nth=1 >> .nahled-medium', { button: 'middle' })]);
+  v.prostredni = p.url();
   v.noveStranky = stranek;
 JS);
     ok(str_contains($v['otevreno']['src'], 'nahled=1920'), $v['otevreno']['src']);
@@ -218,8 +216,8 @@ JS);
     eq(1, $v['zavreno']);
     eq(0, $v['vyber'], 'klik na náhled nic nevybere');
     eq(1, $v['klikVedle'], 'klik mimo obrázek okno zavře');
-    eq([1, true], $v['ctrl'], 'Ctrl+klik otevře okno, ne novou kartu');
-    eq(1, $v['prostredni'], 'prostřední klik otevře okno');
+    ok(str_contains($v['ctrl'], 'p=medium&id=6'), 'Ctrl+klik: detail ve stejné kartě ' . $v['ctrl']);
+    ok(str_contains($v['prostredni'], 'p=medium&id=5'), 'prostřední klik: detail ve stejné kartě ' . $v['prostredni']);
     eq(0, $v['noveStranky'], 'žádná nová karta');
 });
 
@@ -236,7 +234,7 @@ test('0.6.3: v detailu a přehledu klik na obrázek otevře stejné okno, ne nov
     naDetail: document.querySelector('[data-okno-na-detail]').hidden, sipky: document.querySelector('.okno-dalsi').hidden }));
   v.adresa = p.url();
   await p.keyboard.press('Escape');
-  await p.click('.nahled-detail img', { modifiers: ['Control'] });
+  await p.click('.nahled-detail img', { modifiers: ['Control'] });   // v detailu už detail je: okno
   v.ctrl = await p.\$\$eval('.okno-nahled:not([hidden])', e => e.length);
   await p.keyboard.press('Escape');
   await p.goto(u + 'index.php?p=prehled');

@@ -19,6 +19,7 @@ Hosting Wedos NoLimit, PHP 8.5 (kód běží od 8.1), SQLite, bez Composeru.
 | 0.6.1 | Hledání `q` jako fulltext: každé slovo v názvu, tazích, autorovi i poznámce, bez diakritiky a velikosti písmen, fráze v uvozovkách, řazení podle relevance (`razeni=relevance`, výchozí s `q`, pole `relevance`), `q_rezim` všechna / kterékoli slovo, aliasy `all` / `any` u `q_rezim` i `tagy_rezim`; totéž hledání v galerii v administraci | hotovo |
 | 0.6.2 | Galerie v administraci: přepínač zobrazení **Mřížka / Seznam / Jen média** (zapamatuje se), větší náhled obrázku (1920 px) nebo přehrání videa v modálním okně s listováním šipkami; `media.php?nahled=<px>` | hotovo |
 | 0.6.3 | Okno náhledu jednotně v celé aplikaci (galerie, přehled, detail včetně originálu, PDF a veřejného odkazu); nic se neotevírá v nové kartě, Ctrl i prostřední klik otevřou okno; v okně Stáhnout místo Původní soubor | hotovo |
+| 0.6.4 | Ctrl/Cmd+klik a prostřední klik na náhled otevře **detail média ve stejné kartě** (ne zvětšený obrázek ani novou kartu); v detailu, kde detail není kam otevřít, otevře okno | hotovo |
 | 0.6 | Galerie jako zdroj médií pro jiné aplikace (podobně jako Pixabay nebo Wikimedia Commons): náhledy 150–1920 px (trvalé u veřejného odkazu, jinak podepsané na 1–2 h), stažení v dané velikosti, licence jako kód ze společného modulu `licence` (shodný se Social Plannerem) s verzí a hotovou atribucí, orientace, trvalá adresa média, rozpoznání vloženého odkazu (`/media/odkaz`), filtry orientace, min. rozměry, více tagů, kategorie podle názvu, výběr podle id, náhodné pořadí se semenem, číselník `/licence`, ETag/304, limit požadavků na klíč; nápověda „Napojení jiné aplikace“ | hotovo |
 
 ## Struktura
@@ -124,7 +125,8 @@ data/            databáze galerie.sqlite, média (media/), náhledy (nahledy/, 
   se pošle celý), video se přehraje, PDF se ukáže v rámu. Šipky ← → (i tlačítka) listují skupinou, sousední obrázky se načtou dopředu; Esc, křížek nebo klik
   vedle okno zavře. Dole název, rozměry, pořadí a tlačítka Detail (ve stejné kartě, v detailu se skryje), Stáhnout a Kopírovat odkaz.
   Skupiny: mřížka galerie, Naposledy nahrané v přehledu, obrázek / PDF v detailu, „zobrazit“ u originálu před kompresí, „Otevřít“ u veřejného odkazu.
-  **Nic se neotevírá v nové kartě**: klik s Ctrl/Shift/Cmd i prostřední tlačítko otevřou také okno; na detail vede název média (a tlačítko Detail v okně).
+  **Nic se neotevírá v nové kartě**: Ctrl/Cmd+klik i prostřední tlačítko na náhledu otevřou detail média ve stejné kartě (0.6.4; kde položka
+  nemá detail, tedy v detailu samotném, otevřou okno); na detail vede také název média a tlačítko Detail v okně. Shift+klik otevře okno.
   V nové kartě zůstává jen externí odkaz „podmínky licence“.
 - `media.php?nahled=<px>` vydá variantu `Media::varianta` pro px z `Media::NAHLEDY` (ETag obsahuje velikost); `nahled=1` zůstává 480 px pro mřížku.
 

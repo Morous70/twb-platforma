@@ -14,7 +14,9 @@ klicova: kategorie, složka, tag, štítek, archiv, hledání, hromadně
 - **Archiv** schová soubory, které už nepoužíváte, ale nechcete je mazat. Veřejný odkaz dál funguje. Archiv otevřete tlačítkem **Archiv** v galerii.
 
 ## Hledání a hromadné akce
-Nad mřížkou je hledání v názvu a poznámce a filtry podle druhu, kategorie a tagu. Kliknutím na štítek kategorie nebo tagu u souboru se galerie podle něj vyfiltruje.
+Nad mřížkou je hledání a filtry podle druhu, kategorie a tagu. Kliknutím na štítek kategorie nebo tagu u souboru se galerie podle něj vyfiltruje.
+
+Hledání prochází název, tagy, autora i poznámku a nehledí na velikost písmen ani diakritiku: „snezka mlha“ najde „Sněžka v mlze“ s tagem „mlha“. Víc slov znamená, že se musí najít všechna; frázi dejte do uvozovek („"černý les"“).
 
 Zaškrtněte soubory (nebo **Vybrat vše na stránce**), zvolte akci a klikněte na **Provést**: přesun do kategorie, přidání nebo odebrání tagu, archiv, smazání.
 

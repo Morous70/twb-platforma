@@ -42,9 +42,11 @@ final class Media
     }
 
     /**
-     * Seznam podle filtru. Filtr: q (text v názvu, poznámce a autorovi), druh, kategorie (id, 0 = bez kategorie), tag, archiv (bool), razeni, strana.
+     * Seznam podle filtru. Filtr: q (slova hledaná v názvu, tagech, autorovi a poznámce bez ohledu na diakritiku, viz Hledani;
+     * q_vse false = stačí kterékoli slovo), druh, kategorie (id, 0 = bez kategorie), tag, archiv (bool), razeni, strana.
      * Navíc (API): orientace, min_sirka, min_vyska, tagy (seznam) s tagy_vse (true = všechny, false = kterýkoli), id (seznam; pořadí
-     * se zachová, když razeni chybí), razeni „nahodne“ se semenem seme (stejné semeno = stejné pořadí, stránkování funguje).
+     * se zachová, když razeni chybí), razeni „nahodne“ se semenem seme (stejné semeno = stejné pořadí, stránkování funguje),
+     * razeni „relevance“ (výchozí, když je q a razeni chybí): podle skóre shody, při shodě nejnovější.
      * @param array<string, mixed> $f
      * @return array{polozky: list<array<string, mixed>>, celkem: int, strana: int, stran: int}
      */
@@ -52,12 +54,7 @@ final class Media
     {
         $kde = [!empty($f['archiv']) ? 'archived_at IS NOT NULL' : 'archived_at IS NULL'];
         $p = [];
-        $q = trim((string)($f['q'] ?? ''));
-        if ($q !== '') {
-            $kde[] = "(original_name LIKE ? ESCAPE '\\' OR note LIKE ? ESCAPE '\\' OR author LIKE ? ESCAPE '\\')";
-            $vzor = '%' . addcslashes($q, '%_\\') . '%';
-            array_push($p, $vzor, $vzor, $vzor);
-        }
+        $vyrazy = Hledani::vyrazy((string)($f['q'] ?? ''));
         if (isset(self::DRUHY[$f['druh'] ?? ''])) { $kde[] = 'kind = ?'; $p[] = $f['druh']; }
         $o = (string)($f['orientace'] ?? '');
         if ($o !== '') $kde[] = 'width > 0 AND height > 0 AND ' . match ($o) {
@@ -85,7 +82,19 @@ final class Media
                 return $vse ? $shoda === count(array_unique($hledane)) : $shoda > 0;
             }));
         }
-        if (($f['razeni'] ?? '') === 'nahodne') {
+        if ($vyrazy) {
+            // hledání ve všech textových polích a tazích, bez diakritiky (Hledani); skóre se přidá k řádku jako _skore
+            $vse = (bool)($f['q_vse'] ?? true);
+            $nalezene = [];
+            foreach ($radky as $r) {
+                $sk = Hledani::skore($r, $vyrazy, $vse);
+                if ($sk !== null) $nalezene[] = $r + ['_skore' => $sk];
+            }
+            $radky = $nalezene;
+        }
+        if ($vyrazy && in_array($f['razeni'] ?? '', ['', 'relevance'], true)) {
+            usort($radky, fn($a, $b) => [$b['_skore'], (int)$b['id']] <=> [$a['_skore'], (int)$a['id']]);
+        } elseif (($f['razeni'] ?? '') === 'nahodne') {
             $seme = (string)($f['seme'] ?? '');
             usort($radky, fn($a, $b) => strcmp(md5($seme . ':' . $a['id']), md5($seme . ':' . $b['id'])));
         } elseif ($ids && empty($f['razeni'])) {

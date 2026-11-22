@@ -84,7 +84,7 @@ $titulek = $f['archiv'] ? 'Archiv' : 'Galerie';
 <form method="get" class="filtr karta">
   <input type="hidden" name="p" value="galerie">
   <?php if ($f['archiv']): ?><input type="hidden" name="archiv" value="1"><?php endif; ?>
-  <input type="search" name="q" value="<?= Ui::h($f['q']) ?>" placeholder="Hledat v názvu a poznámce" aria-label="Hledat">
+  <input type="search" name="q" value="<?= Ui::h($f['q']) ?>" placeholder="Hledat v názvu, tazích, autorovi a poznámce" aria-label="Hledat">
   <select name="druh" aria-label="Druh"><option value="">Všechny druhy</option>
     <?php foreach (Media::DRUHY as $k => $t): ?><option value="<?= $k ?>"<?= $f['druh'] === $k ? ' selected' : '' ?>><?= Ui::h($t) ?></option><?php endforeach; ?></select>
   <select name="kategorie" aria-label="Kategorie"><option value="">Všechny kategorie</option><option value="0"<?= $f['kategorie'] === '0' ? ' selected' : '' ?>>Bez kategorie</option>

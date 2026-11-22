@@ -16,7 +16,7 @@ Galerii lze zapojit do jiné aplikace jako zdroj obrázků, stejně jako Pixabay
 ## Jak to aplikace dělá
 | Krok | Volání |
 |---|---|
-| Hledání | `GET /media?druh=image&q=…&na_stranku=24` (navíc `tagy`, `kategorie`, `orientace`, `min_sirka`…) |
+| Hledání | `GET /media?druh=image&q=…&na_stranku=24`; `q` hledá v názvu, tazích, autorovi i poznámce bez diakritiky a řadí podle relevance (`q_rezim=kterykoli` = stačí jedno slovo; navíc `tagy`, `kategorie`, `orientace`, `min_sirka`…) |
 | Náhled ve výsledcích | `nahledy.320` z odpovědi rovnou do `<img>` (bez klíče) |
 | Vložený odkaz | `GET /media/odkaz?url=…` (detail média, veřejný odkaz nebo adresa náhledu) |
 | Stažení | `GET /media/{id}/soubor?sirka=1920` s klíčem |

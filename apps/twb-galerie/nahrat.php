@@ -1,8 +1,8 @@
 <?php
 declare(strict_types=1);
 // Nahrávání do galerie po částech (assets/app.js): POST multipart s polí uid, index, celkem, nazev, cast (soubor),
-// volitelně kategorie, tagy (čárkami), nahradit (id média). Jen přihlášený, CSRF v hlavičce X-CSRF. Odpověď JSON.
-use MediaGalerie\{App, Media, Chyba};
+// volitelně kategorie, tagy (čárkami), nahradit (id média). Soubor .zip se rozbalí: každý obrázek jako samostatné médium. Jen přihlášený, CSRF v hlavičce X-CSRF. Odpověď JSON.
+use MediaGalerie\{App, Chyba};
 use TWB\Galerie\Nahravani;
 
 /** @var App $app */
@@ -39,9 +39,16 @@ try {
     $kategorie = (int)($_POST['kategorie'] ?? 0) ?: null;
     if ($kategorie !== null) $app->kategorie()->radek($kategorie);
     $tagy = array_filter(array_map('trim', explode(',', (string)($_POST['tagy'] ?? ''))));
-    $v = $app->galerie()->uloz($hotovo, $nazev, $tagy, $nahradit);
-    $media = new Media($app);
-    $media->poNahrani($v['id'], $nahradit === null ? $kategorie : null);
+    if ($nahradit === null && strtolower(pathinfo($nazev, PATHINFO_EXTENSION)) === 'zip') {
+        // ZIP s obrázky: každý obrázek zvlášť, název, štítky, autor a licence z metadat
+        $r = $app->media()->nahrajZip($hotovo, array_values($tagy), $kategorie);
+        if (!$r['media'] && !$r['chyby'] && !$r['preskoceno']) throw new Chyba('ZIP je prázdný.');
+        if (!$r['media'] && $r['chyby']) throw new Chyba('Z ZIPu se nenahrál žádný obrázek: ' . implode(' ', array_slice($r['chyby'], 0, 3)));
+        $zprava = 'obrázků ' . count($r['media']) . ($r['preskoceno'] ? ', přeskočeno ' . count($r['preskoceno']) . ' (jiné typy)' : '')
+            . ($r['chyby'] ? ', chyby: ' . implode(' ', array_slice($r['chyby'], 0, 3)) . (count($r['chyby']) > 3 ? ' …' : '') : '');
+        $odpoved(['ok' => true, 'hotovo' => true, 'zip' => true, 'media' => $r['media'], 'preskoceno' => $r['preskoceno'], 'chyby' => $r['chyby'], 'poznamka' => $zprava, 'nahrazeno' => false]);
+    }
+    $v = $app->media()->nahraj($hotovo, $nazev, array_values($tagy), $kategorie, $nahradit);
     $odpoved(['ok' => true, 'hotovo' => true, 'id' => $v['id'], 'poznamka' => $v['poznamka'], 'nahrazeno' => $v['nahrazeno']]);
 } catch (RuntimeException | InvalidArgumentException $e) {
     $odpoved(['ok' => false, 'error' => $e->getMessage()], 400);

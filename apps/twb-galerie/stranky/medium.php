@@ -25,9 +25,14 @@ if ($post) {
                 $kategorie = $k === '' ? null : (int)$k;
                 if ($kategorie !== null) $app->kategorie()->radek($kategorie);
                 $tagy = $galerie->tagy()->vycistiSeznam((string)($_POST['tagy'] ?? ''));
-                $app->db->transakce(function () use ($galerie, $media, $id, $m, $nazev, $pozn, $kategorie, $tagy) {
+                $autor = Vstup::text($_POST, 'author', 'Autor', 200, false);
+                $licence = Vstup::text($_POST, 'license', 'Licence', 2000, false);
+                $licenceUrl = Vstup::text($_POST, 'license_url', 'Odkaz na licenci', 500, false);
+                if ($licenceUrl !== null && !preg_match('~^https?://\S+$~i', $licenceUrl)) throw new Chyba('Odkaz na licenci musí začínat http:// nebo https://.');
+                $app->db->transakce(function () use ($galerie, $media, $id, $m, $nazev, $pozn, $kategorie, $tagy, $autor, $licence, $licenceUrl) {
                     if ($nazev !== $m['original_name']) $galerie->prejmenuj($id, $nazev);
                     $media->nastavPoznamku($id, $pozn);
+                    $media->nastavAutora($id, $autor, $licence, $licenceUrl);
                     $media->nastavKategorii([$id], $kategorie);
                     $galerie->tagy()->nastav($id, $tagy);
                 });
@@ -93,6 +98,9 @@ $src = 'media.php?id=' . $id . '&v=' . substr((string)$m['md5'], 0, 8);
       <?php if ($m['orig_filename']): ?><dt>Originál</dt><dd><?= (int)$m['orig_w'] ?>×<?= (int)$m['orig_h'] ?> px, <?= Ui::h(Zalohy::velikost((int)$m['orig_size'])) ?>
         · <a href="<?= Ui::h($src . '&original=1') ?>" target="_blank">zobrazit</a></dd><?php endif; ?>
       <dt>Nahráno</dt><dd><?= Ui::h(Ui::datum(strtotime((string)$m['created_at']))) ?><?= $m['upload_name'] && $m['upload_name'] !== $m['original_name'] ? ' jako ' . Ui::h($m['upload_name']) : '' ?></dd>
+      <?php if ($m['author']): ?><dt>Autor</dt><dd><?= Ui::h($m['author']) ?></dd><?php endif; ?>
+      <?php if ($m['license'] || $m['license_url']): ?><dt>Licence</dt><dd><?= Ui::h((string)$m['license']) ?>
+        <?php if ($m['license_url']): ?><?= $m['license'] ? ' · ' : '' ?><a href="<?= Ui::h($m['license_url']) ?>" target="_blank" rel="noopener noreferrer">podmínky licence</a><?php endif; ?></dd><?php endif; ?>
       <dt>Kontrolní součet</dt><dd class="mala"><code>MD5 <?= Ui::h($m['md5']) ?></code></dd>
     </dl>
     <div class="tlacitka" style="margin-top:1rem">
@@ -129,6 +137,10 @@ $src = 'media.php?id=' . $id . '&v=' . substr((string)$m['md5'], 0, 8);
     <?= Ui::pole('Tagy', 'tagy', implode(', ', Media::tagy($m)), ['list' => 'seznam-tagu', 'placeholder' => 'oddělte čárkou'], 'Nejvýš 10 tagů po 30 znacích.') ?>
     <datalist id="seznam-tagu"><?php foreach ($tagy as $t): ?><option value="<?= Ui::h($t['name']) ?>"><?php endforeach; ?></datalist>
     <?= Ui::oblast('Poznámka', 'note', $m['note'], ['rows' => 3]) ?>
+    <?= Ui::pole('Autor', 'author', $m['author'], ['maxlength' => 200, 'placeholder' => 'např. Jan Novák']) ?>
+    <?= Ui::oblast('Licence', 'license', $m['license'], ['rows' => 2, 'maxlength' => 2000, 'placeholder' => 'např. CC BY 4.0, vlastní dílo, zakoupeno na fotobance…']) ?>
+    <?= Ui::pole('Odkaz na licenci', 'license_url', $m['license_url'], ['type' => 'url', 'maxlength' => 500, 'placeholder' => 'https://…'],
+        'U nového obrázku se autor, licence, název a štítky načtou z metadat souboru, pokud v něm jsou.') ?>
     <div><button type="submit" class="hlavni">Uložit</button></div>
   </form>
 

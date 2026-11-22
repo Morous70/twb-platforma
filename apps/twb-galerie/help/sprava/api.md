@@ -28,8 +28,8 @@ Všechny cesty začínají `https://galerie.kazbo.eu/api.php/v1`.
 | GET `/media` | seznam médií (filtry níže) | čtení |
 | GET `/media/{id}` | jedno médium | čtení |
 | GET `/media/{id}/soubor` | stáhne soubor (`?original=1` originál před kompresí, `?stahnout=1`) | čtení |
-| POST `/media` | nahraje soubor nebo stáhne soubor z adresy | zápis |
-| PATCH `/media/{id}` | změní název, poznámku, kategorii, tagy nebo archiv | zápis |
+| POST `/media` | nahraje soubor (i ZIP s obrázky) nebo stáhne soubor z adresy | zápis |
+| PATCH `/media/{id}` | změní název, poznámku, kategorii, tagy, archiv, autora nebo licenci | zápis |
 | POST `/media/{id}/soubor` | nahradí soubor (odkaz a údaje zůstanou) | zápis |
 | POST `/media/{id}/odkaz` | vytvoří nový veřejný odkaz (starý přestane fungovat) | zápis |
 | DELETE `/media/{id}/odkaz` | vypne veřejný odkaz | zápis |
@@ -44,7 +44,7 @@ Všechny cesty začínají `https://galerie.kazbo.eu/api.php/v1`.
 ## Filtry seznamu médií
 | Parametr | Význam |
 |---|---|
-| `q` | text v názvu nebo poznámce |
+| `q` | text v názvu, poznámce nebo autorovi |
 | `druh` | `image`, `video` nebo `pdf` |
 | `kategorie` | id kategorie, `0` = bez kategorie |
 | `tag` | tag (velikost písmen nerozhoduje) |
@@ -52,16 +52,16 @@ Všechny cesty začínají `https://galerie.kazbo.eu/api.php/v1`.
 | `razeni` | `nove` (výchozí), `stare`, `nazev`, `velikost` |
 | `strana`, `na_stranku` | stránkování, na stránku 1–200 (výchozí 48) |
 
-Odpověď má `celkem`, `strana`, `stran` a pole `media`. Každé médium má `id`, `nazev`, `druh`, `mime`, `velikost` (bajty), `sirka`, `vyska`, `md5`, `kategorie` (`id`, `nazev`) nebo null, `tagy`, `poznamka`, `archivovano`, `vytvoreno`, `komprimovano`, `verejny_odkaz` (null, když je vypnutý) a `soubor` (adresa ke stažení přes API).
+Odpověď má `celkem`, `strana`, `stran` a pole `media`. Každé médium má `id`, `nazev`, `druh`, `mime`, `velikost` (bajty), `sirka`, `vyska`, `md5`, `kategorie` (`id`, `nazev`) nebo null, `tagy`, `poznamka`, `autor`, `licence`, `licence_url`, `archivovano`, `vytvoreno`, `komprimovano`, `verejny_odkaz` (null, když je vypnutý) a `soubor` (adresa ke stažení přes API).
 
 ## Nahrání
 POST `/media` jako `multipart/form-data`:
 
 | Pole | Význam |
 |---|---|
-| `soubor` | soubor (obrázek, video, PDF) |
+| `soubor` | soubor (obrázek, video, PDF) nebo ZIP s obrázky |
 | `url` | místo souboru: veřejná adresa http(s), ze které se soubor stáhne |
-| `nazev` | název (výchozí = název souboru) |
+| `nazev` | název (výchozí = název z metadat obrázku, jinak název souboru) |
 | `kategorie` | id kategorie |
 | `tagy` | tagy oddělené čárkou |
 | `poznamka` | poznámka |
@@ -70,13 +70,17 @@ POST `/media` jako `multipart/form-data`:
 Adresa (`url`) musí být veřejná: vnitřní síť a místní adresy se odmítnou, přesměrování nejvýš 3. Soubor může mít až 1 GB.
 Při nahrávání po částech vrací každá část kromě poslední `{"ok": true, "hotovo": false}`; poslední vrátí médium. Části musí jít popořadě.
 
+U obrázku se z metadat načtou štítky (přidají se k `tagy`), autor a licence – viz [Autor, licence a metadata](autor-a-licence).
+ZIP (soubor s příponou `.zip`) se rozbalí a každý obrázek se uloží zvlášť; odpověď má místo `medium` pole `media`, seznam přeskočených souborů `preskoceno` a `chyby`. Kategorie, tagy a poznámka platí pro všechny obrázky.
+
 ## Úpravy
-PATCH `/media/{id}` s tělem JSON (`Content-Type: application/json`), jen pole, která chcete změnit: `nazev`, `poznamka`, `kategorie` (id nebo null), `tagy` (pole), `archiv` (true/false).
+PATCH `/media/{id}` s tělem JSON (`Content-Type: application/json`), jen pole, která chcete změnit: `nazev`, `poznamka`, `kategorie` (id nebo null), `tagy` (pole), `archiv` (true/false), `autor`, `licence`, `licence_url` (http/https; null nebo prázdný text údaj smaže).
 Když je některé pole neplatné, nezmění se nic.
 
 ## Příklady
 - Seznam videí v kategorii 3: `curl -H "Authorization: Bearer tgk_…" "https://galerie.kazbo.eu/api.php/v1/media?druh=video&kategorie=3"`
 - Nahrání: `curl -H "Authorization: Bearer tgk_…" -F soubor=@banner.png -F kategorie=3 -F "tagy=web, léto" https://galerie.kazbo.eu/api.php/v1/media`
+- ZIP s obrázky: `curl -H "Authorization: Bearer tgk_…" -F soubor=@fotky.zip -F kategorie=3 https://galerie.kazbo.eu/api.php/v1/media`
 - Z adresy: `curl -H "Authorization: Bearer tgk_…" -F url=https://example.com/foto.jpg https://galerie.kazbo.eu/api.php/v1/media`
 - Úprava: `curl -X PATCH -H "Authorization: Bearer tgk_…" -H "Content-Type: application/json" -d '{"tagy":["web"],"archiv":false}' https://galerie.kazbo.eu/api.php/v1/media/12`
 

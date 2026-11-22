@@ -67,8 +67,9 @@ $titulek = $f['archiv'] ? 'Archiv' : 'Galerie';
 <div class="karta nahravani" id="nahravani" data-csrf="<?= Ui::h($app->relace()->csrfToken()) ?>" data-cast="<?= App::CAST_NAHRANI ?>" data-max="<?= App::MAX_NAHRANI ?>">
   <div class="nahravani-plocha" data-plocha>
     <p><strong>Přetáhněte sem soubory</strong> nebo <label class="odkaz-tlacitko">vyberte z počítače<input type="file" multiple hidden data-vyber
-      accept="<?= Ui::h(implode(',', array_map(fn($p) => '.' . $p, array_keys(TWB\Galerie\Galerie::POVOLENE)))) ?>"></label></p>
-    <p class="slabe mala">Obrázky (JPG, PNG, GIF, WebP, BMP), videa (MP4, MOV, WebM, AVI, MKV) a PDF, jeden soubor nejvýš <?= (int)(App::MAX_NAHRANI / 1048576) ?> MB.</p>
+      accept="<?= Ui::h(implode(',', array_map(fn($p) => '.' . $p, [...array_keys(TWB\Galerie\Galerie::POVOLENE), 'zip']))) ?>"></label></p>
+    <p class="slabe mala">Obrázky (JPG, PNG, GIF, WebP, BMP), videa (MP4, MOV, WebM, AVI, MKV) a PDF, jeden soubor nejvýš <?= (int)(App::MAX_NAHRANI / 1048576) ?> MB.
+      ZIP s obrázky se rozbalí – každý obrázek bude samostatné médium. Název, štítky, autor a licence se načtou z metadat obrázku (jinak název souboru).</p>
   </div>
   <div class="radek">
     <?= Ui::vyber('Nahrát do kategorie', 'nahrat_kategorie', ['' => '— bez kategorie —'] + $kategorie, $f['kategorie'] !== '0' ? $f['kategorie'] : '') ?>

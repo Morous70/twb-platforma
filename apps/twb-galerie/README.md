@@ -16,6 +16,7 @@ Hosting Wedos NoLimit, PHP 8.5 (kód běží od 8.1), SQLite, bez Composeru.
 | 0.4.1 | Kampaně přejmenované na **kategorie** (rozhraní, nápověda, API `/kategorie` a pole `kategorie`, tabulka `categories`, sloupec `media.category_id`; schéma 4 převede starší instalace) a upřesněný účel: odkladiště vlastních médií, která zatím nejsou použitá v aplikacích | hotovo |
 | 0.5 | Nahrání ZIPu s obrázky (galerie i API), název, štítky, autor a licence z metadat obrázku (XMP, IPTC, EXIF), autor a licence u média (detail, API, hledání), nápověda „Autor, licence a metadata“ | hotovo |
 | 0.5.1 | Galerie: nahrávání ve dvou sloupcích (soubory vlevo, kategorie a tagy vpravo), tagy jako štítky s našeptáváním (galerie i detail), výběr médií tažením myši (Ctrl/Shift přidá, Esc zruší, posun u okraje) | hotovo |
+| 0.6.1 | Hledání `q` jako fulltext: každé slovo v názvu, tazích, autorovi i poznámce, bez diakritiky a velikosti písmen, fráze v uvozovkách, řazení podle relevance (`razeni=relevance`, výchozí s `q`, pole `relevance`), `q_rezim` všechna / kterékoli slovo, aliasy `all` / `any` u `q_rezim` i `tagy_rezim`; totéž hledání v galerii v administraci | hotovo |
 | 0.6 | Galerie jako zdroj médií pro jiné aplikace (podobně jako Pixabay nebo Wikimedia Commons): náhledy 150–1920 px (trvalé u veřejného odkazu, jinak podepsané na 1–2 h), stažení v dané velikosti, licence jako kód ze společného modulu `licence` (shodný se Social Plannerem) s verzí a hotovou atribucí, orientace, trvalá adresa média, rozpoznání vloženého odkazu (`/media/odkaz`), filtry orientace, min. rozměry, více tagů, kategorie podle názvu, výběr podle id, náhodné pořadí se semenem, číselník `/licence`, ETag/304, limit požadavků na klíč; nápověda „Napojení jiné aplikace“ | hotovo |
 
 ## Struktura
@@ -31,7 +32,7 @@ soubor.php       veřejný odkaz soubor.php/<klíč>/<název> (bez přihlášen�
 nahled.php       podepsaný náhled nahled.php/<id>/<px>/<platí do>/<podpis>/<název> pro média bez veřejného odkazu (adresy vydává API)
 cron.php         pravidelné úlohy: cron.php?key=<cron_key> – denní záloha, kontrola aktualizací, úklid nahrávání, náhledů a protokolu
 api.php          JSON API api.php/v1/… (klíč v Authorization: Bearer nebo X-Api-Key), popis help/sprava/api.md
-lib/             App (služby a moduly), Schema, Media (i náhledy a podpisy), Metadata, Kategorie, Vydej, Api, ApiKlice, ZAdresy, Ui, Vstup, Http, ProtokolDb, Chyba, autoload, bootstrap
+lib/             App (služby a moduly), Schema, Media (i náhledy a podpisy), Hledani, Metadata, Kategorie, Vydej, Api, ApiKlice, ZAdresy, Ui, Vstup, Http, ProtokolDb, Chyba, autoload, bootstrap
 stranky/         prehled, galerie, medium (detail), kategorie, api (klíče), nastaveni, protokol, napoveda, prihlaseni
 help/            nápověda v Markdownu (_obsah.json + sekce/stránka.md), vykresluje modul napoveda
 assets/          style.css, app.js (nahrávání, štítky tagů `input[data-stitky]`, výběr tažením, Passkey…), ikona.svg
@@ -104,6 +105,11 @@ data/            databáze galerie.sqlite, média (media/), náhledy (nahledy/, 
   v config.php, výchozí 300, 0 = vypnuto; sloupce `api_keys.rate_window`, `rate_count`), hlavičky `X-RateLimit-Limit`, `X-RateLimit-Remaining`, při překročení 429 + `Retry-After`.
 - **Prompt pro napojení** jiné aplikace (adaptér hledání, odkaz, převod, stažení, licence): v projektových souborech `twb-galerie-api/prompt-napojeni-galerie.md`;
   totéž stručně v nápovědě `help/sprava/napojeni-aplikaci.md`.
+
+## Hledání (0.6.1)
+- `Hledani` (lib/Hledani.php): normalizace (malá písmena, bez diakritiky přes `Normalizer` NFD a záložní mapu pro hosting bez intl), výrazy z dotazu
+  (slova, fráze v uvozovkách, nejvýš 10), skóre podle polí (`Hledani::VAHY`). `Media::seznam` nejdřív zúží řádky SQL filtry, pak hledá v PHP
+  (bez FTS5: na hostingu nemusí být a diakritiku neumí; galerie jednoho uživatele má tisíce, ne miliony položek). Skóre jde k řádku jako `_skore`.
 
 ## Zálohy, aktualizace a cron (0.4)
 - **Zálohy** (modul zalohy, `App::zalohy`): šifrovaný ZIP `twb-galerie-…zip` v `data/backups/` s tabulkami `App::TABULKY` a skupinou souborů `media`

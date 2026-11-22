@@ -49,21 +49,24 @@ Všechny cesty začínají `https://galerie.kazbo.eu/api.php/v1`.
 ## Filtry seznamu médií
 | Parametr | Význam |
 |---|---|
-| `q` | text v názvu, poznámce nebo autorovi |
+| `q` | hledaná slova: každé se hledá v názvu, tazích, autorovi i poznámce, bez ohledu na velikost písmen a diakritiku („snezka“ najde „Sněžka“). Fráze v uvozovkách (`"černý les"`) se hledá vcelku; nejvýš 10 slov. |
+| `q_rezim` | `vse` (výchozí: médium obsahuje všechna slova) nebo `kterykoli` (aspoň jedno); místo nich jde i `all` / `any` |
 | `druh` | `image`, `video` nebo `pdf` |
 | `kategorie` | id kategorie, `0` = bez kategorie, nebo název kategorie |
 | `tag` | jeden tag (velikost písmen nerozhoduje) |
 | `tagy` | více tagů oddělených čárkou (nejvýš 10) |
-| `tagy_rezim` | `vse` (výchozí: médium má všechny tagy) nebo `kterykoli` (aspoň jeden) |
+| `tagy_rezim` | `vse` (výchozí: médium má všechny tagy) nebo `kterykoli` (aspoň jeden); místo nich jde i `all` / `any` |
 | `orientace` | `na_sirku`, `na_vysku` nebo `ctverec` (strany se liší nejvýš o 2 %) |
 | `min_sirka`, `min_vyska` | nejmenší šířka nebo výška v px |
 | `id` | jen tato média, id oddělená čárkou (nejvýš 200); bez `razeni` v zadaném pořadí |
 | `archiv` | `1` = jen archiv (jinak jen média mimo archiv) |
-| `razeni` | `nove` (výchozí), `stare`, `nazev`, `velikost`, `nahodne` |
+| `razeni` | `nove` (výchozí bez `q`), `relevance` (výchozí s `q`), `stare`, `nazev`, `velikost`, `nahodne` |
 | `seme` | u `razeni=nahodne`: stejné semeno = stejné pořadí (i při stránkování). Bez něj odpověď vrátí nové `seme`, které pošlete s další stránkou. |
 | `strana`, `na_stranku` | stránkování, na stránku 1–200 (výchozí 48) |
 
-Odpověď má `celkem`, `strana`, `stran` a pole `media`. Každé médium má:
+Odpověď má `celkem`, `strana`, `stran` a pole `media`. Při hledání s `q` má každé médium navíc `relevance`, číslo podle toho, kde se slova našla: celý tag 5, slovo v názvu 4, část názvu nebo tagu 3, autor 2, poznámka 1, sečtené přes všechna slova. Při stejném čísle je dřív novější médium.
+
+Každé médium má:
 
 | Pole | Význam |
 |---|---|
@@ -118,6 +121,7 @@ Když je některé pole neplatné, nezmění se nic.
 - Nahrání: `curl -H "Authorization: Bearer tgk_…" -F soubor=@banner.png -F kategorie=3 -F "tagy=web, léto" https://galerie.kazbo.eu/api.php/v1/media`
 - ZIP s obrázky: `curl -H "Authorization: Bearer tgk_…" -F soubor=@fotky.zip -F kategorie=3 https://galerie.kazbo.eu/api.php/v1/media`
 - Z adresy: `curl -H "Authorization: Bearer tgk_…" -F url=https://example.com/foto.jpg https://galerie.kazbo.eu/api.php/v1/media`
+- Hledání „západ slunce“ kdekoli (název, tagy, autor, poznámka), stačí jedno ze slov: `curl -G -H "Authorization: Bearer tgk_…" --data-urlencode "q=západ slunce" -d q_rezim=kterykoli https://galerie.kazbo.eu/api.php/v1/media`
 - Obrázky na šířku s tagem „léto“, nejméně 1200 px široké: `curl -H "Authorization: Bearer tgk_…" "https://galerie.kazbo.eu/api.php/v1/media?druh=image&tagy=léto&orientace=na_sirku&min_sirka=1200"`
 - Médium podle vloženého odkazu: `curl -G -H "Authorization: Bearer tgk_…" --data-urlencode "url=https://galerie.kazbo.eu/soubor.php/…" https://galerie.kazbo.eu/api.php/v1/media/odkaz`
 - Obrázek s delší stranou 1920 px: `curl -H "Authorization: Bearer tgk_…" -o foto.jpg "https://galerie.kazbo.eu/api.php/v1/media/12/soubor?sirka=1920"`

@@ -153,7 +153,8 @@ final class Api
             'kategorie' => $this->kategorieFiltr($get['kategorie'] ?? null),
             'tag' => (string)($get['tag'] ?? ''),
             'tagy' => $this->seznamZTextu($get['tagy'] ?? null, self::MAX_TAGU, 'tagy'),
-            'tagy_vse' => ($get['tagy_rezim'] ?? 'vse') !== 'kterykoli',
+            'tagy_vse' => !in_array($get['tagy_rezim'] ?? 'vse', ['kterykoli', 'any'], true),
+            'q_vse' => !in_array($get['q_rezim'] ?? 'vse', ['kterykoli', 'any'], true),
             'archiv' => !empty($get['archiv']) && $get['archiv'] !== '0',
             'razeni' => $razeni,
             'seme' => (string)($get['seme'] ?? ''),
@@ -164,16 +165,20 @@ final class Api
             'strana' => (int)($get['strana'] ?? 1),
         ];
         if ($f['druh'] !== '' && !isset(Media::DRUHY[$f['druh']])) throw new Chyba('druh musí být image, video nebo pdf.');
-        if ($razeni !== '' && $razeni !== 'nahodne' && !isset(Media::RAZENI[$razeni])) throw new Chyba('razeni musí být ' . implode(', ', array_keys(Media::RAZENI)) . ' nebo nahodne.');
+        if ($razeni !== '' && !in_array($razeni, ['nahodne', 'relevance'], true) && !isset(Media::RAZENI[$razeni])) throw new Chyba('razeni musí být ' . implode(', ', array_keys(Media::RAZENI)) . ', nahodne nebo relevance.');
         if ($f['orientace'] !== '' && !isset(Media::ORIENTACE[$f['orientace']])) throw new Chyba('orientace musí být ' . implode(', ', array_keys(Media::ORIENTACE)) . '.');
-        if (!in_array($get['tagy_rezim'] ?? 'vse', ['vse', 'kterykoli'], true)) throw new Chyba('tagy_rezim musí být vse nebo kterykoli.');
+        foreach (['tagy_rezim', 'q_rezim'] as $rez) {
+            if (!in_array($get[$rez] ?? 'vse', ['vse', 'kterykoli', 'all', 'any'], true)) throw new Chyba("{$rez} musí být vse nebo kterykoli (také all / any).");
+        }
         foreach ($f['id'] as $i) if ($i < 1) throw new Chyba('id musí být kladná čísla oddělená čárkou.');
         if ($razeni === 'nahodne' && $f['seme'] === '') $f['seme'] = bin2hex(random_bytes(4));
-        if ($razeni === '' && !$f['id']) $f['razeni'] = 'nove';
+        $hleda = Hledani::vyrazy($f['q']) !== [];
+        if ($razeni === '' && !$f['id'] && !$hleda) $f['razeni'] = 'nove';
+        if ($razeni === 'relevance' && !$hleda) $f['razeni'] = 'nove';
         $s = $this->app->media()->seznam($f, $na);
         return ['ok' => true, 'celkem' => $s['celkem'], 'strana' => $s['strana'], 'stran' => $s['stran'], 'na_stranku' => $na]
             + ($razeni === 'nahodne' ? ['seme' => $f['seme']] : [])
-            + ['media' => array_map([$this, 'medium'], $s['polozky'])];
+            + ['media' => array_map(fn($r) => $this->medium($r) + (isset($r['_skore']) ? ['relevance' => (int)$r['_skore']] : []), $s['polozky'])];
     }
 
     /** Kategorie v seznamu: id, 0 = bez kategorie, nebo název (velikost písmen nerozhoduje). */

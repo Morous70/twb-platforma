@@ -16,6 +16,7 @@ Hosting Wedos NoLimit, PHP 8.5 (kód běží od 8.1), SQLite, bez Composeru.
 | 0.4.1 | Kampaně přejmenované na **kategorie** (rozhraní, nápověda, API `/kategorie` a pole `kategorie`, tabulka `categories`, sloupec `media.category_id`; schéma 4 převede starší instalace) a upřesněný účel: odkladiště vlastních médií, která zatím nejsou použitá v aplikacích | hotovo |
 | 0.5 | Nahrání ZIPu s obrázky (galerie i API), název, štítky, autor a licence z metadat obrázku (XMP, IPTC, EXIF), autor a licence u média (detail, API, hledání), nápověda „Autor, licence a metadata“ | hotovo |
 | 0.5.1 | Galerie: nahrávání ve dvou sloupcích (soubory vlevo, kategorie a tagy vpravo), tagy jako štítky s našeptáváním (galerie i detail), výběr médií tažením myši (Ctrl/Shift přidá, Esc zruší, posun u okraje) | hotovo |
+| 0.6 | Galerie jako zdroj médií pro jiné aplikace (podobně jako Pixabay nebo Wikimedia Commons): náhledy 150–1920 px (trvalé u veřejného odkazu, jinak podepsané na 1–2 h), stažení v dané velikosti, licence jako kód ze společného modulu `licence` (shodný se Social Plannerem) s verzí a hotovou atribucí, orientace, trvalá adresa média, rozpoznání vloženého odkazu (`/media/odkaz`), filtry orientace, min. rozměry, více tagů, kategorie podle názvu, výběr podle id, náhodné pořadí se semenem, číselník `/licence`, ETag/304, limit požadavků na klíč; nápověda „Napojení jiné aplikace“ | hotovo |
 
 ## Struktura
 ```
@@ -26,10 +27,11 @@ passkey.php      JSON rozhraní Passkey (WebAuthn) pro assets/app.js
 health.php       kontrola po aktualizaci (modul aktualizace)
 nahrat.php       nahrávání po částech (JSON, jen přihlášený, CSRF v hlavičce X-CSRF), i nahrazení souboru
 media.php        soubor v administraci (jen přihlášený): ?id=, &nahled=1, &original=1, &stahnout=1
-soubor.php       veřejný odkaz soubor.php/<klíč>/<název> (bez přihlášení, ?stahnout=1)
+soubor.php       veřejný odkaz soubor.php/<klíč>/<název> (bez přihlášení, ?stahnout=1), náhled soubor.php/<klíč>/w<px>/<název>
+nahled.php       podepsaný náhled nahled.php/<id>/<px>/<platí do>/<podpis>/<název> pro média bez veřejného odkazu (adresy vydává API)
 cron.php         pravidelné úlohy: cron.php?key=<cron_key> – denní záloha, kontrola aktualizací, úklid nahrávání, náhledů a protokolu
 api.php          JSON API api.php/v1/… (klíč v Authorization: Bearer nebo X-Api-Key), popis help/sprava/api.md
-lib/             App (služby a moduly), Schema, Media, Metadata, Kategorie, Vydej, Api, ApiKlice, ZAdresy, Ui, Vstup, Http, ProtokolDb, Chyba, autoload, bootstrap
+lib/             App (služby a moduly), Schema, Media (i náhledy a podpisy), Metadata, Kategorie, Vydej, Api, ApiKlice, ZAdresy, Ui, Vstup, Http, ProtokolDb, Chyba, autoload, bootstrap
 stranky/         prehled, galerie, medium (detail), kategorie, api (klíče), nastaveni, protokol, napoveda, prihlaseni
 help/            nápověda v Markdownu (_obsah.json + sekce/stránka.md), vykresluje modul napoveda
 assets/          style.css, app.js (nahrávání, štítky tagů `input[data-stitky]`, výběr tažením, Passkey…), ikona.svg
@@ -82,6 +84,26 @@ data/            databáze galerie.sqlite, média (media/), náhledy (nahledy/, 
   (ne soukromé, rezervované, link-local, 100.64/10, IPv4 v IPv6), spojení přes `CURLOPT_RESOLVE` na ověřenou IP, přesměrování nejvýš 3 a každé se ověří,
   velikost se hlídá během stahování (1 GB). `stahovani_http` v config.php nahradí stahování (jen testy).
 - **Apache** předává hlavičku Authorization přes `SetEnvIf` v `.htaccess` (PHP jako CGI/FastCGI ji jinak nevidí); záloha je hlavička `X-Api-Key`.
+
+## Galerie jako zdroj pro jiné aplikace (0.6)
+- **Návrh** vychází z Knihovny médií Social Planneru 1.9.2 (`app/lib/stockimg.php`): aplikace volá zdroje **ze serveru**, výsledky převádí
+  do společného tvaru (název, náhled ~320 px, stažení ≤ 2000 px, rozměry, trvalá adresa stránky kvůli duplicitám, autor, licence jako kód),
+  obrázek si stáhne k sobě. Galerie je proto pro ostatní aplikace další zdroj s klíčem jen ke čtení; klíč pro prohlížeč (CORS) není potřeba.
+- **Náhledy** (`Media::varianta`, `Media::NAHLEDY` = 150, 320, 640, 1280, 1920 px delší strany): JPEG s bílým podkladem v `data/nahledy/<id>-<md5>-<px>.jpg`,
+  vzniknou při prvním použití; menší obrázek nebo nad 40 Mpx = původní soubor. Úklid smaže náhledy jiného obsahu i starý tvar `<id>-<md5>.jpg` z 0.5.
+- **Adresy náhledů** (`Media::adresyNahledu`): médium s veřejným odkazem → `soubor.php/<klíč>/w<px>/<název>.jpg?v=<md5>` (cache rok, immutable);
+  bez odkazu → `nahled.php/<id>/<px>/<platí do>/<HMAC>` (HMAC-SHA256 s místním nastavením `nahled_tajemstvi`, platnost zaokrouhlená na celé hodiny,
+  1–2 h, delší platnost se odmítne). Obě s CORS `*` a `Cross-Origin-Resource-Policy: cross-origin`, takže jdou do `<img>` na jiném webu.
+- **Licence**: modul `licence` (`TWB\Licence\Licence`: číselník `KODY` shodný s `IMG_LICENSES`, `vycisti`, `odhad`, `nazev`, `odkaz`, `uvedeni`).
+  Sloupce `media.license_code`, `license_version` (schéma 6, dosavadní text se převede odhadem; „©…“ zůstane neurčený). Text `license` zůstává jako podrobnosti.
+  Při nahrání obrázku se kód odhadne z metadat. Detail média: výběr licence, verze, podrobnosti, odkaz; zobrazí „Uvedení autora“.
+- **API**: nová pole média `licence_kod`, `licence_verze`, `licence_nazev`, `licence_odkaz`, `atribuce` (`text`, `html`, `povinne`), `orientace`, `nahledy`,
+  `nahledy_plati_do`, `stranka_url`; `GET /media/odkaz?url=` (detail, veřejný odkaz, náhled, adresa API – jen tento server), `GET /licence`,
+  `GET /media/{id}/soubor?sirka=`; filtry `orientace`, `min_sirka`, `min_vyska`, `tagy` + `tagy_rezim`, `kategorie` i názvem, `id=1,2,3`, `razeni=nahodne` + `seme`.
+- **Šetrnost**: čtení má `ETag` a `Cache-Control: private, no-cache` (If-None-Match → 304). Limit požadavků na klíč za minutu (`api_limit_za_minutu`
+  v config.php, výchozí 300, 0 = vypnuto; sloupce `api_keys.rate_window`, `rate_count`), hlavičky `X-RateLimit-Limit`, `X-RateLimit-Remaining`, při překročení 429 + `Retry-After`.
+- **Prompt pro napojení** jiné aplikace (adaptér hledání, odkaz, převod, stažení, licence): v projektových souborech `twb-galerie-api/prompt-napojeni-galerie.md`;
+  totéž stručně v nápovědě `help/sprava/napojeni-aplikaci.md`.
 
 ## Zálohy, aktualizace a cron (0.4)
 - **Zálohy** (modul zalohy, `App::zalohy`): šifrovaný ZIP `twb-galerie-…zip` v `data/backups/` s tabulkami `App::TABULKY` a skupinou souborů `media`

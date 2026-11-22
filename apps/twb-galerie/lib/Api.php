@@ -3,6 +3,7 @@ declare(strict_types=1);
 namespace MediaGalerie;
 
 use TWB\Galerie\Nahravani;
+use TWB\Licence\Licence;
 
 /**
  * JSON API (api.php/v1/…). Klíč v hlavičce `Authorization: Bearer tgk_…` (nebo `X-Api-Key`).
@@ -16,6 +17,13 @@ final class Api
 
     /** Soubor k vydání místo JSON (GET /media/{id}/soubor). @var ?array{cesta:string, mime:string, nazev:string, md5:string} */
     public ?array $soubor = null;
+
+    /** Hlavičky odpovědi navíc (limit požadavků, Retry-After). @var array<string, string> */
+    public array $hlavicky = [];
+
+    /** Nejvýš id v jednom výběru (?id=1,2,3) a tagů v ?tagy=. */
+    public const MAX_ID = 200;
+    public const MAX_TAGU = 10;
 
     public function __construct(private App $app) {}
 
@@ -32,6 +40,12 @@ final class Api
         if (!$k) {
             if ($klic !== null && $klic !== '') $klice->neuspech();
             return [401, ['ok' => false, 'chyba' => 'Chybí nebo neplatí API klíč (hlavička Authorization: Bearer …).']];
+        }
+        [$zbyva, $pockej] = $klice->pocitej($k);
+        if ($zbyva >= 0) $this->hlavicky += ['X-RateLimit-Limit' => (string)$klice->limit(), 'X-RateLimit-Remaining' => (string)$zbyva];
+        if ($pockej > 0) {
+            $this->hlavicky['Retry-After'] = (string)$pockej;
+            return [429, ['ok' => false, 'chyba' => "Příliš mnoho požadavků s tímto klíčem (nejvýš {$klice->limit()} za minutu), zkuste to za {$pockej} s."]];
         }
         $metoda = strtoupper($metoda);
         if ($metoda !== 'GET' && $metoda !== 'HEAD' && $k['scope'] !== 'write') return [403, ['ok' => false, 'chyba' => 'Klíč má jen oprávnění ke čtení.']];
@@ -67,6 +81,9 @@ final class Api
                 if ($m === 'GET') return [200, $this->seznam($get)];
                 if ($m === 'POST') return [201, ['ok' => true] + $this->nahraj($v, $soubory, null)];
                 return $nepovolena;
+            case 'media/odkaz':
+                if ($m !== 'GET') return $nepovolena;
+                return [200, ['ok' => true, 'medium' => $this->medium($this->podleOdkazu((string)($get['url'] ?? '')))]];
             case 'media/{id}':
                 if ($m === 'GET') return [200, ['ok' => true, 'medium' => $this->medium($this->app->media()->radek($id))]];
                 if ($m === 'PATCH' || $m === 'POST') return [200, ['ok' => true, 'medium' => $this->uprav($id, $v)]];
@@ -80,7 +97,12 @@ final class Api
             case 'media/{id}/soubor':
                 if ($m === 'GET') {
                     $r = $this->app->media()->radek($id);
-                    $this->soubor = $this->app->galerie()->soubor($id, !empty($get['original'])) + ['md5' => (string)$r['md5']];
+                    $sirka = isset($get['sirka']) && $get['sirka'] !== '' ? (int)$get['sirka'] : null;
+                    if ($sirka !== null && !in_array($sirka, Media::NAHLEDY, true)) throw new Chyba('sirka musí být ' . implode(', ', Media::NAHLEDY) . '.');
+                    $varianta = $sirka !== null && empty($get['original']) ? $this->app->media()->varianta($r, $sirka) : null;
+                    $this->soubor = $varianta !== null
+                        ? ['cesta' => $varianta, 'mime' => 'image/jpeg', 'nazev' => pathinfo((string)$r['original_name'], PATHINFO_FILENAME) . "-{$sirka}.jpg", 'md5' => "w{$sirka}" . $r['md5']]
+                        : $this->app->galerie()->soubor($id, !empty($get['original'])) + ['md5' => (string)$r['md5']];
                     return [200, ['ok' => true]];
                 }
                 if ($m === 'POST' || $m === 'PUT') return [200, ['ok' => true] + $this->nahraj($v, $soubory, $id)];
@@ -105,6 +127,11 @@ final class Api
                 }
                 if ($m === 'DELETE') return [200, ['ok' => true, 'smazano' => $id, 'odpojeno_medii' => $this->app->kategorie()->smaz($id)]];
                 return $nepovolena;
+            case 'licence':
+                if ($m !== 'GET') return $nepovolena;
+                return [200, ['ok' => true, 'licence' => array_map(fn($kod, $nazev) => ['kod' => $kod, 'nazev' => $nazev, 'napoveda' => Licence::NAPOVEDA[$kod],
+                    's_verzi' => in_array($kod, Licence::S_VERZI, true), 'povinne_uvedeni' => Licence::povinneUvedeni($kod), 'odkaz' => Licence::odkaz($kod)],
+                    array_keys(Licence::KODY), Licence::KODY)]];
             case 'tagy':
                 if ($m !== 'GET') return $nepovolena;
                 return [200, ['ok' => true, 'tagy' => array_values(array_map(fn($t) => ['nazev' => $t['name'], 'pocet' => $t['count']], $this->app->galerie()->tagy()->vsechny()))]];
@@ -119,20 +146,89 @@ final class Api
     {
         $na = (int)($get['na_stranku'] ?? Media::NA_STRANKU);
         if ($na < 1 || $na > self::MAX_NA_STRANKU) throw new Chyba('na_stranku musí být 1 až ' . self::MAX_NA_STRANKU . '.');
+        $razeni = (string)($get['razeni'] ?? '');
         $f = [
             'q' => (string)($get['q'] ?? ''),
             'druh' => (string)($get['druh'] ?? ''),
-            'kategorie' => isset($get['kategorie']) ? (string)(int)$get['kategorie'] : '',
+            'kategorie' => $this->kategorieFiltr($get['kategorie'] ?? null),
             'tag' => (string)($get['tag'] ?? ''),
+            'tagy' => $this->seznamZTextu($get['tagy'] ?? null, self::MAX_TAGU, 'tagy'),
+            'tagy_vse' => ($get['tagy_rezim'] ?? 'vse') !== 'kterykoli',
             'archiv' => !empty($get['archiv']) && $get['archiv'] !== '0',
-            'razeni' => (string)($get['razeni'] ?? 'nove'),
+            'razeni' => $razeni,
+            'seme' => (string)($get['seme'] ?? ''),
+            'orientace' => (string)($get['orientace'] ?? ''),
+            'min_sirka' => $this->cislo($get, 'min_sirka'),
+            'min_vyska' => $this->cislo($get, 'min_vyska'),
+            'id' => array_map('intval', $this->seznamZTextu($get['id'] ?? null, self::MAX_ID, 'id')),
             'strana' => (int)($get['strana'] ?? 1),
         ];
         if ($f['druh'] !== '' && !isset(Media::DRUHY[$f['druh']])) throw new Chyba('druh musí být image, video nebo pdf.');
-        if (!isset(Media::RAZENI[$f['razeni']])) throw new Chyba('razeni musí být ' . implode(', ', array_keys(Media::RAZENI)) . '.');
+        if ($razeni !== '' && $razeni !== 'nahodne' && !isset(Media::RAZENI[$razeni])) throw new Chyba('razeni musí být ' . implode(', ', array_keys(Media::RAZENI)) . ' nebo nahodne.');
+        if ($f['orientace'] !== '' && !isset(Media::ORIENTACE[$f['orientace']])) throw new Chyba('orientace musí být ' . implode(', ', array_keys(Media::ORIENTACE)) . '.');
+        if (!in_array($get['tagy_rezim'] ?? 'vse', ['vse', 'kterykoli'], true)) throw new Chyba('tagy_rezim musí být vse nebo kterykoli.');
+        foreach ($f['id'] as $i) if ($i < 1) throw new Chyba('id musí být kladná čísla oddělená čárkou.');
+        if ($razeni === 'nahodne' && $f['seme'] === '') $f['seme'] = bin2hex(random_bytes(4));
+        if ($razeni === '' && !$f['id']) $f['razeni'] = 'nove';
         $s = $this->app->media()->seznam($f, $na);
-        return ['ok' => true, 'celkem' => $s['celkem'], 'strana' => $s['strana'], 'stran' => $s['stran'], 'na_stranku' => $na,
-            'media' => array_map([$this, 'medium'], $s['polozky'])];
+        return ['ok' => true, 'celkem' => $s['celkem'], 'strana' => $s['strana'], 'stran' => $s['stran'], 'na_stranku' => $na]
+            + ($razeni === 'nahodne' ? ['seme' => $f['seme']] : [])
+            + ['media' => array_map([$this, 'medium'], $s['polozky'])];
+    }
+
+    /** Kategorie v seznamu: id, 0 = bez kategorie, nebo název (velikost písmen nerozhoduje). */
+    private function kategorieFiltr(mixed $k): string
+    {
+        if ($k === null || $k === '') return '';
+        $k = trim((string)$k);
+        if (ctype_digit($k)) return (string)(int)$k;
+        foreach ($this->app->kategorie()->volby() as $id => $nazev) if (mb_strtolower($nazev) === mb_strtolower($k)) return (string)$id;
+        throw new Chyba("Kategorie „{$k}“ nenalezena.");
+    }
+
+    /** Hodnoty oddělené čárkou (nebo pole) bez prázdných. @return list<string> */
+    private function seznamZTextu(mixed $v, int $max, string $pole): array
+    {
+        if ($v === null || $v === '') return [];
+        $h = array_values(array_filter(array_map('trim', is_array($v) ? array_map('strval', $v) : explode(',', (string)$v)), 'strlen'));
+        if (count($h) > $max) throw new Chyba("{$pole}: nejvýš {$max} hodnot.");
+        return $h;
+    }
+
+    private function cislo(array $get, string $pole): int
+    {
+        if (!isset($get[$pole]) || $get[$pole] === '') return 0;
+        if (!ctype_digit((string)$get[$pole])) throw new Chyba("{$pole} musí být celé číslo (px).");
+        return (int)$get[$pole];
+    }
+
+    /**
+     * Médium podle odkazu z této galerie: detail v administraci (index.php?p=medium&id=…), veřejný odkaz (soubor.php/<klíč>/…),
+     * podepsaný náhled (nahled.php/<id>/…) nebo adresa API (api.php/v1/media/<id>…). Jiný server = chyba.
+     */
+    public function podleOdkazu(string $url): array
+    {
+        $url = trim($url);
+        if ($url === '') throw new Chyba('Zadejte odkaz v parametru url.');
+        $u = parse_url($url);
+        $z = parse_url($this->app->url('/'));
+        if (!is_array($u) || !isset($u['host']) || !preg_match('~^https?$~i', (string)($u['scheme'] ?? ''))
+            || strcasecmp((string)$u['host'], (string)($z['host'] ?? '')) !== 0 || (int)($u['port'] ?? 0) !== (int)($z['port'] ?? 0)) {
+            throw new Chyba('Odkaz nevede do této galerie (' . $this->app->url() . ').');
+        }
+        $zaklad = rtrim((string)($z['path'] ?? ''), '/');
+        $cesta = rawurldecode((string)($u['path'] ?? '/'));
+        if ($zaklad !== '' && !str_starts_with($cesta, $zaklad . '/')) throw new Chyba('Odkaz nevede do této galerie (' . $this->app->url() . ').');
+        $cesta = substr($cesta, strlen($zaklad));
+        parse_str((string)($u['query'] ?? ''), $q);
+        $media = $this->app->media();
+        if (preg_match('~^/soubor\.php/([0-9a-f]{24})(/|$)~', $cesta, $m) || ($cesta === '/soubor.php' && is_string($q['k'] ?? null) && preg_match('~^([0-9a-f]{24})$~', $q['k'], $m))) {
+            return $media->podleKlice($m[1]) ?? throw new Chyba('Médium nenalezeno (veřejný odkaz byl vypnutý nebo změněný).');
+        }
+        if (preg_match('~^/nahled\.php/(\d+)/~', $cesta, $m)) return $media->radek((int)$m[1]);
+        if (preg_match('~^/api\.php/' . self::VERZE . '/media/(\d+)(/|$)~', $cesta, $m)) return $media->radek((int)$m[1]);
+        if (in_array($cesta, ['/', '/index.php'], true) && ($q['p'] ?? '') === 'medium' && ctype_digit((string)($q['id'] ?? ''))) return $media->radek((int)$q['id']);
+        throw new Chyba('Z odkazu nejde poznat médium. Použijte odkaz na detail média, veřejný odkaz nebo adresu z API.');
     }
 
     /** Médium pro API. @return array<string, mixed> */
@@ -142,6 +238,7 @@ final class Api
         $kategorie ??= $this->app->kategorie()->volby();
         $kid = $r['category_id'] !== null ? (int)$r['category_id'] : null;
         if ($kid !== null && !isset($kategorie[$kid])) $kategorie = $this->app->kategorie()->volby();
+        $nahledy = $this->app->media()->adresyNahledu($r);
         return [
             'id' => (int)$r['id'],
             'nazev' => (string)$r['original_name'],
@@ -156,11 +253,20 @@ final class Api
             'poznamka' => $r['note'],
             'autor' => $r['author'],
             'licence' => $r['license'],
+            'licence_kod' => $r['license_code'],
+            'licence_verze' => $r['license_version'],
+            'licence_nazev' => Licence::nazev($r['license_code'], $r['license_version']),
             'licence_url' => $r['license_url'],
+            'licence_odkaz' => Licence::odkaz($r['license_code'], $r['license_version'], $r['license_url']),
+            'atribuce' => Media::uvedeni($r),
+            'orientace' => Media::orientace($r),
             'archivovano' => $r['archived_at'] ? date('c', (int)strtotime((string)$r['archived_at'])) : null,
             'vytvoreno' => date('c', (int)strtotime((string)$r['created_at'])),
             'komprimovano' => !empty($r['orig_filename']) ? ['velikost' => (int)$r['orig_size'], 'sirka' => (int)$r['orig_w'], 'vyska' => (int)$r['orig_h']] : null,
             'verejny_odkaz' => $this->app->media()->verejnaAdresa($r),
+            'nahledy' => $nahledy['adresy'] ?? null,
+            'nahledy_plati_do' => isset($nahledy['plati_do']) ? date('c', $nahledy['plati_do']) : null,
+            'stranka_url' => $this->app->url('index.php?p=medium&id=' . (int)$r['id']),
             'soubor' => $this->app->url('api.php/' . self::VERZE . '/media/' . (int)$r['id'] . '/soubor'),
         ];
     }
@@ -239,11 +345,11 @@ final class Api
         return ['hotovo' => true, 'medium' => $this->medium($this->app->media()->radek($id)), 'poznamka_komprese' => $vysledek['poznamka']];
     }
 
-    /** Úprava údajů: nazev, poznamka, kategorie (id nebo null), tagy (pole nebo text s čárkami), archiv (bool), autor, licence, licence_url. Vše se ověří před zápisem. */
+    /** Úprava údajů: nazev, poznamka, kategorie (id nebo null), tagy (pole nebo text s čárkami), archiv (bool), autor, licence, licence_url, licence_kod, licence_verze. Vše se ověří před zápisem. */
     private function uprav(int $id, array $v): array
     {
         $r = $this->app->media()->radek($id);
-        $znama = ['nazev', 'poznamka', 'kategorie', 'tagy', 'archiv', 'autor', 'licence', 'licence_url'];
+        $znama = ['nazev', 'poznamka', 'kategorie', 'tagy', 'archiv', 'autor', 'licence', 'licence_url', 'licence_kod', 'licence_verze'];
         if ($nezname = array_diff(array_keys($v), $znama)) throw new Chyba('Neznámé pole: ' . implode(', ', $nezname) . '. Povolená: ' . implode(', ', $znama) . '.');
         $nazev = array_key_exists('nazev', $v) ? Vstup::text($v, 'nazev', 'nazev', 200) : null;
         $pozn = array_key_exists('poznamka', $v) ? Vstup::text($v, 'poznamka', 'poznamka', 5000, false) : null;
@@ -255,9 +361,16 @@ final class Api
         $licenceUrl = array_key_exists('licence_url', $v) ? Vstup::text($v, 'licence_url', 'licence_url', 500, false) : $r['license_url'];
         if ($licenceUrl !== null && $licenceUrl !== '' && !preg_match('~^https?://\S+$~i', $licenceUrl)) throw new Chyba('licence_url musí začínat http:// nebo https://.');
         $zmenaAutora = array_intersect(['autor', 'licence', 'licence_url'], array_keys($v)) !== [];
+        $zmenaKodu = array_intersect(['licence_kod', 'licence_verze'], array_keys($v)) !== [];
+        $kod = array_key_exists('licence_kod', $v) ? ($v['licence_kod'] === null ? null : (string)$v['licence_kod']) : $r['license_code'];
+        $verze = array_key_exists('licence_verze', $v) ? ($v['licence_verze'] === null ? null : (string)$v['licence_verze']) : $r['license_version'];
+        if ($zmenaKodu) {
+            try { [$kod, $verze] = Licence::vycisti($kod, $verze); } catch (\InvalidArgumentException $e) { throw new Chyba($e->getMessage()); }
+        }
         $g = $this->app->galerie();
-        $this->app->db->transakce(function () use ($g, $id, $r, $v, $nazev, $pozn, $kategorie, $tagy, $zmenaAutora, $autor, $licence, $licenceUrl) {
+        $this->app->db->transakce(function () use ($g, $id, $r, $v, $nazev, $pozn, $kategorie, $tagy, $zmenaAutora, $autor, $licence, $licenceUrl, $zmenaKodu, $kod, $verze) {
             if ($zmenaAutora) $this->app->media()->nastavAutora($id, $autor ?: null, $licence ?: null, $licenceUrl ?: null);
+            if ($zmenaKodu) $this->app->media()->nastavLicenci($id, $kod, $verze);
             if ($nazev !== null && $nazev !== $r['original_name']) $g->prejmenuj($id, $nazev);
             if (array_key_exists('poznamka', $v)) $this->app->media()->nastavPoznamku($id, $pozn);
             if ($kategorie !== false) $this->app->media()->nastavKategorii([$id], $kategorie);

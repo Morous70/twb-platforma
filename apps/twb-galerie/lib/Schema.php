@@ -3,16 +3,17 @@ declare(strict_types=1);
 namespace MediaGalerie;
 
 use TWB\Jadro\{Db, ModulMigrace};
+use TWB\Licence\Licence;
 
 /**
  * Databázové schéma aplikace (SQLite). Verze se ukládá v module_versions pod „twb-galerie“
  * a do nastavení schema_version (podle ní moduly zalohy a aktualizace poznají starší data).
  * Tabulku media zakládá modul galerie, tabulky auth_tokens a passkeys modul prihlaseni.
- * Aplikace k media přidává kategorii, poznámku, autora, licenci a klíč veřejného odkazu (sloupce, které modul nezná a nečte).
+ * Aplikace k media přidává kategorii, poznámku, autora, licenci (text, kód a verzi) a klíč veřejného odkazu (sloupce, které modul nezná a nečte).
  */
 final class Schema implements ModulMigrace
 {
-    public static function verze(): int { return 5; }
+    public static function verze(): int { return 6; }
 
     /** Tabulky, které musí existovat dřív než cokoli jiného (nastavení a protokol). */
     public static function zakladniTabulky(Db $db): void
@@ -73,6 +74,21 @@ final class Schema implements ModulMigrace
             foreach (['author' => 'VARCHAR(200)', 'license' => 'TEXT', 'license_url' => 'VARCHAR(500)'] as $sl => $typ) {
                 if (!in_array($sl, $sloupce, true)) $db->q("ALTER TABLE media ADD COLUMN $sl $typ NULL");
             }
+        }
+        if ($zVerze < 6) {
+            // 0.6: licence jako kód ze společného číselníku (modul licence) a verze; dosavadní text se převede odhadem
+            $sloupce = array_column($db->q('PRAGMA table_info(media)')->fetchAll(), 'name');
+            foreach (['license_code' => 'VARCHAR(20)', 'license_version' => 'VARCHAR(120)'] as $sl => $typ) {
+                if (!in_array($sl, $sloupce, true)) $db->q("ALTER TABLE media ADD COLUMN $sl $typ NULL");
+            }
+            foreach ($db->q("SELECT id, license, license_url FROM media WHERE license_code IS NULL AND (license IS NOT NULL OR license_url IS NOT NULL)")->fetchAll() as $r) {
+                $o = Licence::odhad($r['license'], $r['license_url']);
+                if ($o['kod'] !== null) $db->q('UPDATE media SET license_code = ?, license_version = ? WHERE id = ?', [$o['kod'], $o['verze'], $r['id']]);
+            }
+            // limit požadavků na API klíč (okno jedné minuty)
+            $sloupce = array_column($db->q('PRAGMA table_info(api_keys)')->fetchAll(), 'name');
+            if (!in_array('rate_window', $sloupce, true)) $db->q('ALTER TABLE api_keys ADD COLUMN rate_window INTEGER NULL');
+            if (!in_array('rate_count', $sloupce, true)) $db->q('ALTER TABLE api_keys ADD COLUMN rate_count INTEGER NOT NULL DEFAULT 0');
         }
     }
 }

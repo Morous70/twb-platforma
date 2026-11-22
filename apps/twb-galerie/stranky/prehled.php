@@ -1,12 +1,19 @@
 <?php
 declare(strict_types=1);
-// Přehled: počty médií podle druhu a obsazené místo. Proměnné: $app, $ui.
+// Přehled: počty médií, upozornění (e-mail pro obnovu, zálohy, cron, nová verze), naposledy nahrané. Proměnné: $app, $ui.
 use MediaGalerie\Ui;
 use TWB\Zalohy\Zalohy;
 
 $s = $app->media()->souhrn();
 $velikost = $s['velikost'];
 $posledni = $app->media()->seznam(['razeni' => 'nove'], 8)['polozky'];
+$n = $app->nastaveni();
+$upozorneni = [];
+if ($app->emailObnovy() === '') $upozorneni[] = ['Není nastavený e-mail pro obnovu hesla.', Ui::odkaz('nastaveni') . '#zabezpeceni'];
+if ((string)$n->dej('backup_password', '') === '') $upozorneni[] = ['Zálohy nejsou nastavené – zadejte heslo záloh.', Ui::odkaz('nastaveni') . '#zalohy'];
+$cron = (int)$n->dej('cron_last_run', 0);
+if ($cron < time() - 2 * 86400) $upozorneni[] = [$cron ? 'Cron neběží od ' . Ui::datum($cron) . '.' : 'Cron zatím nikdy neběžel (denní záloha, kontrola aktualizací).', Ui::odkaz('nastaveni') . '#system'];
+if ($dalsi = $app->aktualizace()->stav()['available'] ?? null) $upozorneni[] = ['Je k dispozici nová verze ' . $dalsi['version'] . '.', Ui::odkaz('nastaveni') . '#aktualizace'];
 ?>
 <div class="mrizka">
   <?= Ui::dlazdice('Obrázky', Ui::cislo($s['image']), 'obrazky') ?>
@@ -14,9 +21,9 @@ $posledni = $app->media()->seznam(['razeni' => 'nove'], 8)['polozky'];
   <?= Ui::dlazdice('Obsazené místo', $velikost > 0 ? Ui::h(Zalohy::velikost($velikost)) : '0 B', 'velikost') ?>
   <?= Ui::dlazdice('V archivu', Ui::cislo($s['archiv']), 'galerie') ?>
 </div>
-<?php if ($app->emailObnovy() === ''): ?>
-<div class="hlaska hlaska-varovani">Není nastavený e-mail pro obnovu hesla. Doplňte ho v <a href="<?= Ui::h(Ui::odkaz('nastaveni')) ?>#zabezpeceni">Nastavení → Zabezpečení</a>.</div>
-<?php endif; ?>
+<?php foreach ($upozorneni as [$text, $kam]): ?>
+  <div class="hlaska hlaska-varovani"><?= Ui::h($text) ?> <a href="<?= Ui::h($kam) ?>">Opravit</a></div>
+<?php endforeach; ?>
 <?php if ($posledni): ?>
 <h2>Naposledy nahrané</h2>
 <div class="galerie galerie-mala">

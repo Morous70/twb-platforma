@@ -23,7 +23,10 @@
         "prihlaseni",
         "zapomenute-heslo",
         "google",
-        "api"
+        "api",
+        "zalohy",
+        "aktualizace",
+        "cron"
       ]
     }
   ],

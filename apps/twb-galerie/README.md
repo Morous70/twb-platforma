@@ -11,7 +11,7 @@ Hosting Wedos NoLimit, PHP 8.5 (kód běží od 8.1), SQLite, bez Composeru.
 | 0.1 | Kostra z modulů (jadro, prihlaseni, galerie, tagy, obrazky, zalohy, aktualizace, napoveda), instalace, přihlášení heslem / Google / Passkey, zámek pokusů, obnova zapomenutého hesla e-mailem, odhlášení po nečinnosti nastavitelné v aplikaci, vzhled administrace (jako TWB Reklamy), přehled, protokol, nápověda, kontrola zdraví | hotovo |
 | 0.2 | Galerie: nahrávání po částech (přetažením, až 1 GB), mřížka s náhledy, přehrání videa, detail, tagy, kampaně jako složky, hledání a filtry, stránkování, archiv, nahrazení souboru, komprese s uchováním originálu (ve výchozím stavu vypnutá), hromadné akce, veřejné neuhodnutelné odkazy na soubory (Range, ETag, CORS) | hotovo |
 | 0.3 | JSON API `api.php/v1` pro čtení i zápis: média (seznam s filtry, detail, stažení s Range, nahrání i po částech a z adresy, úpravy, nahrazení, odkaz, smazání), kampaně, tagy; API klíče s oprávněním čtení / zápis (jen otisk), zámek proti zkoušení klíčů, stránka API, popis v nápovědě | hotovo |
-| 0.4 | Zálohy (denní cronem, obnova v rozhraní), aktualizace z Update Serveru, cron, balíčky FULL a UPDATE | plán |
+| 0.4 | Zálohy (denní cronem, ruční, stažení, obnova v rozhraní s náhledem obsahu a pojistnou zálohou), aktualizace z Update Serveru (`twb-galerie`), cron s úklidem, upozornění v přehledu, nápověda, balíčky FULL a UPDATE | hotovo |
 
 ## Struktura
 ```
@@ -23,6 +23,7 @@ health.php       kontrola po aktualizaci (modul aktualizace)
 nahrat.php       nahrávání po částech (JSON, jen přihlášený, CSRF v hlavičce X-CSRF), i nahrazení souboru
 media.php        soubor v administraci (jen přihlášený): ?id=, &nahled=1, &original=1, &stahnout=1
 soubor.php       veřejný odkaz soubor.php/<klíč>/<název> (bez přihlášení, ?stahnout=1)
+cron.php         pravidelné úlohy: cron.php?key=<cron_key> – denní záloha, kontrola aktualizací, úklid nahrávání, náhledů a protokolu
 api.php          JSON API api.php/v1/… (klíč v Authorization: Bearer nebo X-Api-Key), popis help/sprava/api.md
 lib/             App (služby a moduly), Schema, Media, Kampane, Vydej, Api, ApiKlice, ZAdresy, Ui, Vstup, Http, ProtokolDb, Chyba, autoload, bootstrap
 stranky/         prehled, galerie, medium (detail), kampane, api (klíče), nastaveni, protokol, napoveda, prihlaseni
@@ -66,8 +67,25 @@ data/            databáze galerie.sqlite, média (media/), náhledy (nahledy/, 
   velikost se hlídá během stahování (1 GB). `stahovani_http` v config.php nahradí stahování (jen testy).
 - **Apache** předává hlavičku Authorization přes `SetEnvIf` v `.htaccess` (PHP jako CGI/FastCGI ji jinak nevidí); záloha je hlavička `X-Api-Key`.
 
+## Zálohy, aktualizace a cron (0.4)
+- **Zálohy** (modul zalohy, `App::zalohy`): šifrovaný ZIP `twb-galerie-…zip` v `data/backups/` s tabulkami `App::TABULKY` a skupinou souborů `media`
+  (média i originály). Denní záloha z cronu (`backup_auto`, nutné heslo záloh), ruční v Nastavení. Obnova: výběr nebo nahrání souboru → náhled
+  (počet médií, kampaní, souborů; potvrzení v relaci `twbg_obnova` platí 10 minut a jednou) → pojistná záloha → obnova. Místní nastavení (`App::MISTNI`),
+  heslo, Passkey a API klíče zůstávají. Veřejné odkazy jsou v tabulce `media`, takže po obnově platí ty ze zálohy.
+- **Aktualizace** (modul aktualizace): Update Server, slug `twb-galerie`, kořen balíčku `twb-galerie/`, `config.php` a `data/` se nemění; `update_token` v config.php.
+- **Cron**: klíč `cron_key` (instalace vygeneruje náhodný), čas posledního běhu `cron_last_run`; přehled upozorní, když cron neběží 2 dny, když chybí heslo záloh
+  nebo je k dispozici nová verze.
+
 ## Testy a vydání
 ```
 php tests/run.php twb-galerie              # testy aplikace (vestavěný server PHP)
-php tools/sestavit.php twb-galerie         # dist/twb-twb-galerie-<verze>-full.zip a -update.zip
+php tools/sestavit.php twb-galerie         # dist/twb-galerie-<verze>-full.zip a -update.zip
 ```
+
+## Instalace (Wedos NoLimit)
+1. Nahrát obsah `twb-galerie-<verze>-full.zip` (složka `twb-galerie/`) přes FTP do kořene domény galerie.kazbo.eu.
+2. Otevřít `https://galerie.kazbo.eu/` → instalace vytvoří `config.php` (s náhodným `cron_key`) a databázi, nastaví heslo a e-mail pro obnovu hesla.
+3. V `config.php` doplnit podle potřeby `google_client_id`, `google_client_secret` (přesměrování `https://galerie.kazbo.eu/google.php`) a `update_token`.
+4. V PHP na Wedosu zvýšit `upload_max_filesize` a `post_max_size` aspoň na 8 MB (nahrávání jde po 2 MB částech).
+5. V administraci Wedos nastavit cron na adresu z Nastavení → Systém (každých 5–15 minut).
+6. Nastavení → Zálohy: heslo záloh. Google účet a Passkey se propojují v Nastavení → Zabezpečení, API klíče na stránce API.

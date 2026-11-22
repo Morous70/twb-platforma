@@ -89,10 +89,10 @@ $src = 'media.php?id=' . $id . '&v=' . substr((string)$m['md5'], 0, 8);
   <?php if ($m['archived_at']): ?> <?= Ui::stav('paused', 'v archivu') ?><?php endif; ?></p>
 <div class="dva-sloupce">
 <section>
-  <div class="nahled nahled-detail">
-    <?php if ($m['kind'] === 'image'): ?><a href="<?= Ui::h($src) ?>" target="_blank"><img src="<?= Ui::h($src) ?>" alt=""></a>
+  <div class="nahled nahled-detail" data-okno-skupina<?= Ui::okno($m, $url, null, false) ?>>
+    <?php if ($m['kind'] === 'image'): ?><a href="<?= Ui::h($src) ?>" data-otevrit-okno title="Zvětšit"><img src="<?= Ui::h($src) ?>" alt=""></a>
     <?php elseif ($m['kind'] === 'video'): ?><video src="<?= Ui::h($src) ?>" controls preload="metadata" playsinline></video>
-    <?php else: ?><iframe src="<?= Ui::h($src) ?>" title="PDF"></iframe><p class="mala"><a href="<?= Ui::h($src) ?>" target="_blank">Otevřít PDF</a></p><?php endif; ?>
+    <?php else: ?><iframe src="<?= Ui::h($src) ?>" title="PDF"></iframe><p class="mala"><a href="<?= Ui::h($src) ?>" data-otevrit-okno>Zvětšit PDF</a></p><?php endif; ?>
   </div>
   <div class="karta" style="margin-top:1.5rem">
     <dl class="udaje">
@@ -100,7 +100,7 @@ $src = 'media.php?id=' . $id . '&v=' . substr((string)$m['md5'], 0, 8);
       <?php if ($m['width']): ?><dt>Rozměr</dt><dd><?= (int)$m['width'] ?>×<?= (int)$m['height'] ?> px</dd><?php endif; ?>
       <dt>Velikost</dt><dd><?= Ui::h(Zalohy::velikost((int)$m['size'])) ?></dd>
       <?php if ($m['orig_filename']): ?><dt>Originál</dt><dd><?= (int)$m['orig_w'] ?>×<?= (int)$m['orig_h'] ?> px, <?= Ui::h(Zalohy::velikost((int)$m['orig_size'])) ?>
-        · <a href="<?= Ui::h($src . '&original=1') ?>" target="_blank">zobrazit</a></dd><?php endif; ?>
+        · <span data-okno-skupina<?= Ui::okno($m, null, $src . '&original=1', false, (int)$m['orig_w'] . '×' . (int)$m['orig_h'] . ' · originál před kompresí') ?>><a href="<?= Ui::h($src . '&original=1') ?>" data-otevrit-okno>zobrazit</a></span></dd><?php endif; ?>
       <dt>Nahráno</dt><dd><?= Ui::h(Ui::datum(strtotime((string)$m['created_at']))) ?><?= $m['upload_name'] && $m['upload_name'] !== $m['original_name'] ? ' jako ' . Ui::h($m['upload_name']) : '' ?></dd>
       <?php if ($m['author']): ?><dt>Autor</dt><dd><?= Ui::h($m['author']) ?></dd><?php endif; ?>
       <?php $licOdkaz = Licence::odkaz($m['license_code'], $m['license_version'], $m['license_url']); $licNazev = Licence::nazev($m['license_code'], $m['license_version']); ?>
@@ -122,7 +122,7 @@ $src = 'media.php?id=' . $id . '&v=' . substr((string)$m['md5'], 0, 8);
     <h2 style="margin-top:0">Veřejný odkaz</h2>
     <?php if ($url): ?>
       <div class="tlacitka"><input id="verejny-odkaz" readonly value="<?= Ui::h($url) ?>" style="flex:1"><button type="button" class="maly" data-kopirovat="verejny-odkaz">Kopírovat</button>
-        <a class="tlacitko maly" href="<?= Ui::h($url) ?>" target="_blank" rel="noopener">Otevřít</a></div>
+        <span data-okno-skupina<?= Ui::okno($m, $url, $url, false, 'veřejný odkaz') ?>><a class="tlacitko maly" href="<?= Ui::h($url) ?>" data-otevrit-okno>Otevřít</a></span></div>
       <p class="slabe mala">Kdo zná odkaz, soubor zobrazí bez přihlášení (vložení do webu, e-mailu, reklamy). Po nahrazení souboru zůstává stejný.</p>
       <div class="tlacitka">
         <?= $ui->tlacitko('Nový odkaz', 'odkaz-novy', [], 'maly', 'Vytvořit nový odkaz? Starý přestane fungovat.') ?>

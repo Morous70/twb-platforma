@@ -26,9 +26,9 @@ if ($dalsi = $app->aktualizace()->stav()['available'] ?? null) $upozorneni[] = [
 <?php endforeach; ?>
 <?php if ($posledni): ?>
 <h2>Naposledy nahrané</h2>
-<div class="galerie galerie-mala">
+<div class="galerie galerie-mala" data-okno-skupina>
   <?php foreach ($posledni as $m): ?>
-  <figure><a class="nahled-medium" href="<?= Ui::h(Ui::odkaz('medium', ['id' => $m['id']])) ?>" title="<?= Ui::h($m['original_name']) ?>">
+  <figure<?= Ui::okno($m, $app->media()->verejnaAdresa($m)) ?>><a class="nahled-medium" href="<?= Ui::h(Ui::odkaz('medium', ['id' => $m['id']])) ?>" data-otevrit-okno title="<?= Ui::h($m['original_name']) ?>">
     <?php if ($m['kind'] === 'image'): ?><img src="media.php?id=<?= (int)$m['id'] ?>&amp;nahled=1&amp;v=<?= Ui::h(substr((string)$m['md5'], 0, 8)) ?>" alt="" loading="lazy">
     <?php elseif ($m['kind'] === 'video'): ?><video src="media.php?id=<?= (int)$m['id'] ?>#t=0.5" preload="metadata" muted playsinline></video><span class="znacka">Video</span>
     <?php else: ?><span class="pdf-ikona">PDF</span><?php endif; ?></a>

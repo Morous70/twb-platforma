@@ -131,12 +131,11 @@ $titulek = $f['archiv'] ? 'Archiv' : 'Galerie';
       <?php foreach (Media::ZOBRAZENI as $k => $t): ?><a class="tlacitko maly<?= $zobrazeni === $k ? ' aktivni' : '' ?>" href="<?= $odkazFiltru(['zobrazeni' => $k]) ?>"<?= $zobrazeni === $k ? ' aria-current="true"' : '' ?> title="<?= Ui::h($t) ?>"><?= Ui::h($t) ?></a><?php endforeach; ?>
     </nav>
   </div>
-  <div class="galerie zobrazeni-<?= $zobrazeni ?>" data-zobrazeni="<?= $zobrazeni ?>">
+  <div class="galerie zobrazeni-<?= $zobrazeni ?>" data-zobrazeni="<?= $zobrazeni ?>" data-okno-skupina>
     <?php foreach ($vysledek['polozky'] as $m): $id = (int)$m['id']; $url = $media->verejnaAdresa($m); $v = Ui::h(substr((string)$m['md5'], 0, 8)); ?>
-    <figure data-okno="<?= Ui::h($m['kind']) ?>" data-okno-src="<?= Ui::h($m['kind'] === 'image' ? "media.php?id={$id}&nahled=" . Media::NAHLED_VELKY_PX . '&v=' . substr((string)$m['md5'], 0, 8) : "media.php?id={$id}") ?>"
-      data-okno-nazev="<?= Ui::h($m['original_name']) ?>" data-okno-popis="<?= Ui::h(Media::popis($m)) ?>" data-okno-detail="<?= Ui::h(Ui::odkaz('medium', ['id' => $id])) ?>"<?= $url ? ' data-okno-odkaz="' . Ui::h($url) . '"' : '' ?>>
+    <figure<?= Ui::okno($m, $url) ?>>
       <label class="vyber-medium" title="Vybrat"><input type="checkbox" name="ids[]" value="<?= $id ?>" aria-label="Vybrat <?= Ui::h($m['original_name']) ?>"></label>
-      <a class="nahled-medium" href="<?= Ui::h(Ui::odkaz('medium', ['id' => $id])) ?>"<?= $m['kind'] !== 'pdf' ? ' data-otevrit-okno' : '' ?> title="<?= Ui::h($m['original_name']) ?>">
+      <a class="nahled-medium" href="<?= Ui::h(Ui::odkaz('medium', ['id' => $id])) ?>" data-otevrit-okno title="<?= Ui::h($m['original_name']) ?>">
         <?php if ($m['kind'] === 'image'): ?><img src="media.php?id=<?= $id ?>&amp;nahled=1&amp;v=<?= $v ?>" alt="" loading="lazy">
         <?php elseif ($m['kind'] === 'video'): ?><video src="media.php?id=<?= $id ?>#t=0.5" preload="metadata" muted playsinline></video><span class="znacka">Video</span>
         <?php else: ?><span class="pdf-ikona">PDF</span><?php endif; ?>

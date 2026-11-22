@@ -1,0 +1,7 @@
+# Metadata OAuth pro MCP konektory (Claude, ChatGPT). Adresy bez přípony vedou na PHP soubory v této složce.
+# Aplikace musí běžet v kořeni domény (např. https://galerie.kazbo.eu), klienti metadata hledají na /.well-known/….
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteRule ^(oauth-authorization-server|openid-configuration)(/.*)?$ oauth-authorization-server.php [L]
+  RewriteRule ^oauth-protected-resource(/.*)?$ oauth-protected-resource.php [L]
+</IfModule>

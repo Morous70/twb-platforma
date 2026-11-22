@@ -17,6 +17,13 @@ if (!$relace->jePrihlasen($app->limitNecinnosti())) {
     exit;
 }
 
+// po přihlášení zpět na souhlas s připojením AI (oauth.php?akce=authorize)
+if (!$post && is_string($_SESSION['po_prihlaseni'] ?? null)) {
+    $kam = $_SESSION['po_prihlaseni'];
+    unset($_SESSION['po_prihlaseni']);
+    if (str_starts_with($kam, 'oauth.php?')) $ui->presmeruj($kam);
+}
+
 if ($post && !$relace->csrfOver($_POST['csrf'] ?? null)) {
     $ui->zprava('chyba', 'Formulář vypršel, zkuste to prosím znovu.');
     $ui->presmeruj($_SERVER['REQUEST_URI'] ?? 'index.php');

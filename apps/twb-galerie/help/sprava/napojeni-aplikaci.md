@@ -10,7 +10,7 @@ klicova: napojení, zdroj, pixabay, commons, social planner, knihovna médií, a
 Galerii lze zapojit do jiné aplikace jako zdroj obrázků, stejně jako Pixabay nebo Wikimedia Commons v Knihovně médií Social Planneru: aplikace v galerii hledá, ukáže náhledy, a vybraný obrázek si stáhne k sobě i s autorem a licencí.
 
 ## Co je potřeba
-1. Na stránce **API** vytvořte klíč s oprávněním **Čtení**, pojmenovaný podle aplikace (např. „Social Planner“). Pro každou aplikaci zvlášť, ať jde jeden klíč zrušit bez vlivu na ostatní.
+1. Na stránce **API a MCP** vytvořte klíč s oprávněním **Čtení**, pojmenovaný podle aplikace (např. „Social Planner“). Pro každou aplikaci zvlášť, ať jde jeden klíč zrušit bez vlivu na ostatní.
 2. V nastavení té aplikace vyplňte **adresu galerie** (`https://galerie.kazbo.eu`) a **klíč**. Klíč patří jen na server aplikace, nikdy do JavaScriptu v prohlížeči ani do odkazu.
 
 ## Jak to aplikace dělá

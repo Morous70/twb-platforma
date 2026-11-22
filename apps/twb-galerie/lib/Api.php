@@ -67,6 +67,24 @@ final class Api
         }
     }
 
+    /**
+     * Volání API zevnitř aplikace (MCP server) bez klíče a bez limitu požadavků: stejné cesty, kontroly vstupu a odpovědi jako api.php/v1.
+     * Oprávnění ověřuje volající. Chyba = výjimka Chyba se stejným textem, jaký by vrátilo API.
+     * @param array<string, mixed> $get @param array<string, mixed> $vstup @param array<string, mixed> $soubory
+     * @return array<string, mixed>
+     */
+    public function vnitrni(string $metoda, string $cesta, array $get = [], array $vstup = [], array $soubory = []): array
+    {
+        $c = array_values(array_filter(explode('/', trim($cesta, '/')), 'strlen'));
+        try {
+            [$kod, $data] = $this->smeruj(strtoupper($metoda), $c, $get, $vstup, $soubory, ['name' => 'MCP', 'scope' => 'write']);
+        } catch (\InvalidArgumentException $e) {
+            throw new Chyba($e->getMessage());
+        }
+        if ($kod >= 400) throw new Chyba((string)($data['chyba'] ?? 'Požadavek se nepodařilo provést.'));
+        return $data;
+    }
+
     /** @param list<string> $c @return array{0:int, 1:array<string, mixed>} */
     private function smeruj(string $m, array $c, array $get, array $v, array $soubory, array $klic): array
     {

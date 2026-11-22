@@ -16,5 +16,6 @@ TWB Media galerie je soukromé odkladiště obrázků, videí a PDF, které si v
 - **Nastavení** obsahuje zabezpečení: heslo, e-mail pro obnovu hesla, automatické odhlášení, Google a Passkey.
 
 - **API** dovolí skriptům a jiným aplikacím média číst, nahrávat a upravovat.
+- **Připojení AI (MCP)**: Claude, ChatGPT a další AI asistenti do galerie rovnou ukládají média, která vytvoří (i s modelem a promptem), a umějí v ní hledat.
 
 Každý soubor má **veřejný odkaz** pro vložení na web. Zálohy a aktualizace z Update Serveru přibudou v další verzi.

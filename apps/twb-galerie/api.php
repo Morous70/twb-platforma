@@ -23,7 +23,7 @@ try {
     /** @var App $app */
     $app = require __DIR__ . '/lib/bootstrap.php';
     if (!$app->nainstalovano()) $odpoved(503, ['ok' => false, 'chyba' => 'Aplikace není nainstalovaná.']);
-    if ((int)$app->nastaveni()->dej('schema_version', 0) !== MediaGalerie\Schema::verze()) $app->migruj();
+    $app->migrujPodlePotreby();
     $klic = null;
     $auth = (string)($_SERVER['HTTP_AUTHORIZATION'] ?? $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ?? '');
     if (preg_match('/^Bearer\s+(\S+)$/i', $auth, $m)) $klic = $m[1];

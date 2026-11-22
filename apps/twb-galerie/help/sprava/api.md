@@ -12,7 +12,7 @@ API slouží skriptům a jiným aplikacím: výpis a stažení médií, nahrán�
 Jak galerii zapojit jako zdroj obrázků do jiné aplikace (podobně jako Pixabay), popisuje [Napojení jiné aplikace](napojeni-aplikaci).
 
 ## Klíč
-Klíč vytvoříte na stránce **API** (menu Správa). Celý klíč se ukáže jen jednou, aplikace si pamatuje jen jeho otisk.
+Klíč vytvoříte na stránce **API a MCP** (menu Správa). Celý klíč se ukáže jen jednou, aplikace si pamatuje jen jeho otisk.
 
 - **Čtení** smí jen požadavky GET (výpis, detail, stažení souboru).
 - **Čtení i zápis** smí vše, včetně nahrávání a mazání.

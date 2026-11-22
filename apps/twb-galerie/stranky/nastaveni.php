@@ -1,7 +1,8 @@
 <?php
 declare(strict_types=1);
 // Nastavení: zabezpečení (heslo, e-mail pro obnovu, odhlášení po nečinnosti, Google, Passkey) a systém. Proměnné: $app, $ui, $post, $relace.
-use MediaGalerie\{Ui, Chyba};
+use MediaGalerie\{Ui, Chyba, Vstup};
+use TWB\Obrazky\Obrazky;
 
 $n = $app->nastaveni();
 
@@ -29,6 +30,14 @@ if ($post) {
                 $n->uloz('idle_minutes', (string)$min);
                 $app->log('info', 'Odhlášení po nečinnosti: ' . ($min ? "{$min} min" : 'vypnuto') . '.');
                 break;
+            case 'komprese':
+                $n->uloz('img_auto', !empty($_POST['img_auto']) ? '1' : '0');
+                $n->uloz('img_max_w', (string)Vstup::cislo($_POST, 'img_max_w', 'Největší šířka', 320, 10000, true));
+                $n->uloz('img_max_h', (string)Vstup::cislo($_POST, 'img_max_h', 'Největší výška', 240, 10000, true));
+                $n->uloz('img_quality', (string)Vstup::cislo($_POST, 'img_quality', 'Kvalita JPEG', 30, 100, true));
+                $n->uloz('img_min_kb', (string)Vstup::cislo($_POST, 'img_min_kb', 'Komprimovat od', 0, 1048576, true));
+                $app->log('info', 'Nastavení komprese obrázků změněno (automaticky ' . (!empty($_POST['img_auto']) ? 'ano' : 'ne') . ').');
+                break;
             case 'google-odpojit':
                 $n->uloz('login_google_sub', null);
                 $n->uloz('login_google_email', null);
@@ -45,7 +54,7 @@ if ($post) {
         }
     })) {
         $ui->zprava('ok', $zprava);
-        $ui->presmeruj(Ui::odkaz('nastaveni') . '#zabezpeceni');
+        $ui->presmeruj(Ui::odkaz('nastaveni') . ($akce === 'komprese' ? '#komprese' : '#zabezpeceni'));
     }
 }
 
@@ -123,7 +132,25 @@ $resetEmail = $app->emailObnovy();
 </section>
 
 <section>
-  <h2 id="system" style="margin-top:0">Systém</h2>
+  <h2 id="komprese" style="margin-top:0">Komprese obrázků</h2>
+  <?php $o = Obrazky::nastaveni($n); ?>
+  <form method="post" class="formular karta">
+    <?= $ui->csrf() ?>
+    <input type="hidden" name="akce" value="komprese">
+    <label class="zaskrtavatko"><input type="checkbox" name="img_auto" value="1"<?= $o['auto'] ? ' checked' : '' ?>>
+      <span>Zmenšit velké obrázky hned po nahrání <small class="slabe">Originál se vždy uchová a jde k němu vrátit. Bez zaškrtnutí jde obrázek zkomprimovat ručně v jeho detailu.</small></span></label>
+    <div class="radek">
+      <?= Ui::pole('Největší šířka (px)', 'img_max_w', (string)$o['max_w'], ['type' => 'number', 'min' => 320, 'max' => 10000, 'required' => true]) ?>
+      <?= Ui::pole('Největší výška (px)', 'img_max_h', (string)$o['max_h'], ['type' => 'number', 'min' => 240, 'max' => 10000, 'required' => true]) ?>
+    </div>
+    <div class="radek">
+      <?= Ui::pole('Kvalita JPEG (30–100)', 'img_quality', (string)$o['quality'], ['type' => 'number', 'min' => 30, 'max' => 100, 'required' => true]) ?>
+      <?= Ui::pole('Komprimovat od (kB)', 'img_min_kb', (string)$o['min_kb'], ['type' => 'number', 'min' => 0, 'required' => true], 'Menší soubory s rozměrem v mezích se nechají.') ?>
+    </div>
+    <div><button type="submit">Uložit</button></div>
+  </form>
+
+  <h2 id="system">Systém</h2>
   <div class="karta">
     <dl class="udaje">
       <dt>Verze</dt><dd><?= Ui::h($app->verze) ?></dd>

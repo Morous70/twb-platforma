@@ -1,7 +1,37 @@
 {
   "sekce": [
-    { "id": "zaciname", "titulek": "Začínáme", "stranky": ["co-aplikace-umi"] },
-    { "id": "sprava", "titulek": "Správa", "stranky": ["prihlaseni", "zapomenute-heslo", "google"] }
+    {
+      "id": "zaciname",
+      "titulek": "Začínáme",
+      "stranky": [
+        "co-aplikace-umi"
+      ]
+    },
+    {
+      "id": "jak-na",
+      "titulek": "Jak na…",
+      "stranky": [
+        "nahravani",
+        "verejne-odkazy",
+        "kampane-a-tagy"
+      ]
+    },
+    {
+      "id": "sprava",
+      "titulek": "Správa",
+      "stranky": [
+        "prihlaseni",
+        "zapomenute-heslo",
+        "google"
+      ]
+    }
   ],
-  "kontext": { "prehled": "co-aplikace-umi", "galerie": "co-aplikace-umi", "nastaveni": "prihlaseni", "protokol": "prihlaseni" }
+  "kontext": {
+    "prehled": "co-aplikace-umi",
+    "galerie": "nahravani",
+    "nastaveni": "prihlaseni",
+    "protokol": "prihlaseni",
+    "medium": "verejne-odkazy",
+    "kampane": "kampane-a-tagy"
+  }
 }

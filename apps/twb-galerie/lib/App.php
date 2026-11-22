@@ -23,11 +23,15 @@ final class App
     /** Veřejný klíč Ed25519 TWB Update Serveru (veřejný, smí být v kódu). */
     public const UPDATE_KLIC = 'JTvTWDW+eSP/GtT9zG3t+3UraawTk82vKteb2Dci8Cg=';
     /** Tabulky v pořadí pro obnovu ze zálohy. Passkey a jednorázové tokeny se nezálohují (obnova by vrátila odebrané zařízení). */
-    public const TABULKY = ['module_versions', 'settings', 'log', 'media'];
+    public const TABULKY = ['module_versions', 'settings', 'log', 'campaigns', 'media'];
     /** Nastavení, která patří k instalaci a obnova zálohy je nepřepíše. */
     public const MISTNI = ['login_fails', 'login_last_fail', 'reset_last_sent', 'update_result', 'update_checked_at', 'update_available', 'update_health_key'];
     /** Výchozí odhlášení po nečinnosti v minutách (když není v nastavení ani v config.php). */
     public const NECINNOST_MIN = 120;
+    /** Největší nahrávaný soubor (skládá se po částech, limit PHP pro jeden požadavek nevadí). */
+    public const MAX_NAHRANI = 1024 * 1048576;
+    /** Velikost jedné části při nahrávání (pod běžným limitem upload_max_filesize). */
+    public const CAST_NAHRANI = 2 * 1048576;
 
     public readonly string $verze;
     public readonly string $data;
@@ -94,6 +98,8 @@ final class App
         $zmena = $m->spust('prihlaseni', \TWB\Prihlaseni\Migrace::class) || $zmena;
         $zmena = $m->spust('galerie', \TWB\Galerie\Migrace::class) || $zmena;
         $zmena = $m->spust(self::SLUG, Schema::class) || $zmena;
+        // podklady kampaní se nahrávají v plné kvalitě; kompresi jde zapnout v Nastavení nebo provést u jednoho obrázku
+        if ($this->nastaveni()->dej('img_auto', null) === null) $this->nastaveni()->uloz('img_auto', '0');
         if ((int)$this->nastaveni()->dej('schema_version', 0) !== Schema::verze()) $this->nastaveni()->uloz('schema_version', (string)Schema::verze());
         return $zmena;
     }
@@ -171,10 +177,13 @@ final class App
         return $this->sluzba('galerie', fn() => new Galerie($this->host, $this->data . '/media'));
     }
 
+    public function media(): Media { return $this->sluzba('media', fn() => new Media($this)); }
+    public function kampane(): Kampane { return $this->sluzba('kampane', fn() => new Kampane($this)); }
+
     public function zalohy(): Zalohy
     {
         return $this->sluzba('zalohy', fn() => new Zalohy($this->host, self::NAZEV, $this->verze, Schema::verze(), self::TABULKY,
-            povinne: ['settings', 'media'], mistni: self::MISTNI,
+            povinne: ['settings', 'campaigns', 'media'], mistni: self::MISTNI,
             skupiny: [new Skupina('media', $this->data . '/media', fn() => $this->galerie()->soubory(), bezKomprese: true)],
             prefix: 'twb-galerie-', kdeObnovit: 'Nastavení → Zálohy',
             poObnoveni: function (int $schema): void { $this->nastaveni()->obnov(); $this->migruj(); }));

@@ -36,6 +36,136 @@
     }, function () { if (el.select) el.select(); });
   });
 
+  // Kopírování textu z atributu (veřejný odkaz v mřížce galerie)
+  document.addEventListener('click', function (e) {
+    var b = e.target.closest('[data-kopirovat-text]');
+    if (!b) return;
+    e.preventDefault();
+    var text = b.dataset.kopirovatText;
+    (navigator.clipboard ? navigator.clipboard.writeText(text) : Promise.reject()).then(function () {
+      var p = b.textContent; b.textContent = 'Zkopírováno'; setTimeout(function () { b.textContent = p; }, 1500);
+    }, function () { window.prompt('Odkaz:', text); });
+  });
+
+  // ---------- Galerie: hromadný výběr ----------
+  var hromadne = document.getElementById('hromadne');
+  if (hromadne) {
+    var akce = hromadne.querySelector('[data-hromadna-akce]');
+    var odeslat = hromadne.querySelector('[data-hromadne-odeslat]');
+    var pocet = hromadne.querySelector('[data-pocet-vybranych]');
+    var vse = hromadne.querySelector('[data-vybrat-vse]');
+    var boxy = function () { return Array.prototype.slice.call(hromadne.querySelectorAll('input[name="ids[]"]')); };
+    var obnov = function () {
+      var n = boxy().filter(function (b) { return b.checked; }).length;
+      pocet.textContent = n ? 'Vybráno: ' + n : 'Nic nevybráno';
+      odeslat.disabled = !n || !akce.value;
+      hromadne.querySelectorAll('[data-pro]').forEach(function (el) {
+        el.hidden = el.dataset.pro.split(' ').indexOf(akce.value) < 0;
+      });
+      boxy().forEach(function (b) { b.closest('figure').classList.toggle('vybrano', b.checked); });
+      if (vse) vse.checked = n > 0 && n === boxy().length;
+    };
+    hromadne.addEventListener('change', function (e) {
+      if (e.target === vse) boxy().forEach(function (b) { b.checked = vse.checked; });
+      obnov();
+    });
+    hromadne.addEventListener('submit', function (e) {
+      var n = boxy().filter(function (b) { return b.checked; }).length;
+      if (akce.value === 'smazat' && !window.confirm('Smazat ' + n + ' vybraných souborů? Veřejné odkazy přestanou fungovat.')) e.preventDefault();
+    });
+    obnov();
+  }
+
+  // ---------- Nahrávání po částech (galerie, nahrazení souboru) ----------
+  var nahravani = document.getElementById('nahravani');
+  if (nahravani) {
+    var cast = parseInt(nahravani.dataset.cast, 10) || 2097152;
+    var max = parseInt(nahravani.dataset.max, 10) || 0;
+    var nahradit = nahravani.dataset.nahradit || '';
+    var seznam = nahravani.querySelector('[data-seznam]');
+    var plocha = nahravani.querySelector('[data-plocha]');
+    var vyber = nahravani.querySelector('[data-vyber]');
+    var fronta = [], bezi = false, chyb = 0, hotovych = 0;
+
+    var uid = function () {
+      var b = new Uint8Array(16); (window.crypto || window.msCrypto).getRandomValues(b);
+      return Array.prototype.map.call(b, function (x) { return ('0' + x.toString(16)).slice(-2); }).join('');
+    };
+    var mb = function (n) { return (n / 1048576).toFixed(n < 10485760 ? 1 : 0).replace('.', ',') + ' MB'; };
+    var posliCast = function (data, pokus) {
+      return fetch('nahrat.php', { method: 'POST', credentials: 'same-origin', headers: { 'X-CSRF': nahravani.dataset.csrf }, body: data })
+        .then(function (r) { return r.json().catch(function () { throw new Error('Server vrátil neplatnou odpověď (HTTP ' + r.status + ').'); }); })
+        .then(function (j) { if (!j.ok) { var e = new Error(j.error || 'Chyba'); e.trvala = true; throw e; } return j; })
+        .catch(function (e) {
+          if (e.trvala || pokus >= 3) throw e;
+          return new Promise(function (ok) { setTimeout(ok, 1500 * pokus); }).then(function () { return posliCast(data, pokus + 1); });
+        });
+    };
+    var nahraj = function (polozka) {
+      var f = polozka.soubor, id = uid(), celkem = Math.max(1, Math.ceil(f.size / cast)), i = 0;
+      var kampan = document.getElementById('f-nahrat_kampan'), tagy = document.getElementById('f-nahrat_tagy');
+      var dalsi = function () {
+        var fd = new FormData();
+        fd.append('uid', id); fd.append('index', String(i)); fd.append('celkem', String(celkem)); fd.append('nazev', f.name);
+        if (kampan && kampan.value) fd.append('kampan', kampan.value);
+        if (tagy && tagy.value) fd.append('tagy', tagy.value);
+        if (nahradit) fd.append('nahradit', nahradit);
+        fd.append('cast', f.slice(i * cast, Math.min(f.size, (i + 1) * cast)), 'cast');
+        return posliCast(fd, 1).then(function (j) {
+          i++;
+          polozka.pruh.value = Math.round(i / celkem * 100);
+          if (!j.hotovo && i < celkem) return dalsi();
+          return j;
+        });
+      };
+      return dalsi();
+    };
+    var spust = function () {
+      if (bezi) return;
+      var polozka = fronta.shift();
+      if (!polozka) {
+        if (hotovych && !chyb) location.reload();
+        else if (hotovych) { var r = document.createElement('li'); r.innerHTML = '<a href="">Načíst galerii znovu</a>'; seznam.appendChild(r); }
+        return;
+      }
+      bezi = true;
+      polozka.stav.textContent = 'nahrávám…';
+      nahraj(polozka).then(function (j) {
+        hotovych++;
+        polozka.stav.textContent = j.poznamka ? 'hotovo – ' + j.poznamka : 'hotovo';
+        polozka.li.classList.add('ok');
+      }, function (e) {
+        chyb++;
+        polozka.stav.textContent = e.message || 'chyba';
+        polozka.li.classList.add('chyba');
+      }).then(function () { bezi = false; spust(); });
+    };
+    var pridej = function (soubory) {
+      Array.prototype.forEach.call(soubory, function (f, k) {
+        if (nahradit && k > 0) return;
+        var li = document.createElement('li');
+        var nazev = document.createElement('span'); nazev.className = 'nazev'; nazev.textContent = f.name + ' (' + mb(f.size) + ')';
+        var pruh = document.createElement('progress'); pruh.max = 100; pruh.value = 0;
+        var stav = document.createElement('span'); stav.className = 'stav-nahravani slabe mala'; stav.textContent = 'čeká';
+        li.appendChild(nazev); li.appendChild(pruh); li.appendChild(stav);
+        seznam.appendChild(li);
+        if (max && f.size > max) { stav.textContent = 'soubor je větší než ' + mb(max); li.classList.add('chyba'); chyb++; return; }
+        if (f.size === 0) { stav.textContent = 'prázdný soubor'; li.classList.add('chyba'); chyb++; return; }
+        fronta.push({ soubor: f, li: li, pruh: pruh, stav: stav });
+      });
+      spust();
+    };
+    if (vyber) vyber.addEventListener('change', function () { pridej(vyber.files); vyber.value = ''; });
+    ['dragenter', 'dragover'].forEach(function (t) {
+      plocha.addEventListener(t, function (e) { e.preventDefault(); plocha.classList.add('nad'); });
+    });
+    ['dragleave', 'drop'].forEach(function (t) {
+      plocha.addEventListener(t, function (e) { e.preventDefault(); plocha.classList.remove('nad'); });
+    });
+    plocha.addEventListener('drop', function (e) { if (e.dataTransfer && e.dataTransfer.files.length) pridej(e.dataTransfer.files); });
+    window.addEventListener('beforeunload', function (e) { if (bezi || fronta.length) { e.preventDefault(); e.returnValue = ''; } });
+  }
+
   // Odhlášení po nečinnosti: po vypršení limitu načíst stránku znovu (zobrazí přihlášení)
   var main = document.querySelector('main[data-necinnost]');
   if (main) {

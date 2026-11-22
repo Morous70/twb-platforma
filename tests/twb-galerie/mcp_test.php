@@ -80,7 +80,7 @@ test('bez tokenu 401 s odkazem na metadata; metadata OAuth; GET 405, OPTIONS 204
 
 test('API klíč: initialize, nástroje podle oprávnění, notifikace 202, DELETE 204', function () use ($s, &$cteni, &$zapis) {
     $r = mcp($s, $zapis, ['jsonrpc' => '2.0', 'id' => 1, 'method' => 'initialize', 'params' => ['protocolVersion' => '2025-06-18', 'clientInfo' => ['name' => 'test']]]);
-    eq([200, '2025-06-18', 'twb-galerie', '0.7.0'], [$r['code'], $r['json']['result']['protocolVersion'], $r['json']['result']['serverInfo']['name'], $r['json']['result']['serverInfo']['version']]);
+    eq([200, '2025-06-18', 'twb-galerie', trim((string)file_get_contents(dirname(__DIR__, 2) . '/apps/twb-galerie/VERSION'))], [$r['code'], $r['json']['result']['protocolVersion'], $r['json']['result']['serverInfo']['name'], $r['json']['result']['serverInfo']['version']]);
     ok(str_contains($r['json']['result']['instructions'], 'nahraj_medium'));
     eq(202, mcp($s, $zapis, ['jsonrpc' => '2.0', 'method' => 'notifications/initialized'])['code']);
     $vse = array_column(mcp($s, $zapis, ['jsonrpc' => '2.0', 'id' => 2, 'method' => 'tools/list'])['json']['result']['tools'], 'name');
@@ -115,7 +115,10 @@ test('nahraj_medium: z adresy, bez přípony podle typu, chyby se nic neuloží'
     eq(['vygenerovano.png', '64×32', 'CC0 (volné dílo)', null], [$m['nazev'], $m['rozmer'], $m['licence'], $m['autor']]);
     $m = nastroj($s, $zapis, 'nahraj_medium', ['data_base64' => base64_encode(obrazek(20, 20))])['medium'];
     ok(preg_match('/^ai-\d{4}-\d\d-\d\d-\d{6}\.png$/', $m['nazev']) === 1, $m['nazev']);
-    $pred += 2;
+    // klient udá obecný typ a název bez přípony: rozhodne obsah
+    $m = nastroj($s, $zapis, 'nahraj_medium', ['data_base64' => base64_encode(obrazek(20, 20)), 'mime' => 'application/octet-stream', 'nazev' => 'Čelní pohled 30°'])['medium'];
+    eq('Čelní pohled 30°.png', $m['nazev']);
+    $pred += 3;
     foreach ([
         [[], 'právě jeden zdroj'],
         [['url' => 'https://example.com/a.png', 'data_base64' => 'AAAA'], 'právě jeden zdroj'],
@@ -136,7 +139,7 @@ test('nahraj_medium: z adresy, bez přípony podle typu, chyby se nic neuloží'
 test('hledej_media, detail_media (id i odkaz), uprav_medium, seznamy', function () use ($s, &$zapis, &$cteni) {
     $r = nastroj($s, $cteni, 'hledej_media', ['q' => 'mlhavy']);
     eq([1, 'Podzimní les.png'], [$r['celkem'], $r['media'][0]['nazev'] ?? null], 'hledání v promptu bez diakritiky');
-    eq(3, nastroj($s, $cteni, 'hledej_media')['celkem']);
+    eq(4, nastroj($s, $cteni, 'hledej_media')['celkem']);
     eq(1, nastroj($s, $cteni, 'hledej_media', ['kategorie' => 'AI obrázky', 'tagy' => ['les']])['celkem']);
     eq(2, nastroj($s, $cteni, 'hledej_media', ['na_stranku' => 2])['stran']);
     ok(isset(nastroj($s, $cteni, 'hledej_media', ['na_stranku' => 51])['_chyba']));

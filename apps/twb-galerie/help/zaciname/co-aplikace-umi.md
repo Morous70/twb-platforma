@@ -15,4 +15,6 @@ TWB Media galerie je soukromá galerie obrázků a videí pro vaše vlastní kam
 - **Kampaně** jsou složky, do kterých média roztřídíte.
 - **Nastavení** obsahuje zabezpečení: heslo, e-mail pro obnovu hesla, automatické odhlášení, Google a Passkey.
 
-Každý soubor má **veřejný odkaz** pro vložení na web. API a zálohy přibudou v dalších verzích.
+- **API** dovolí skriptům a jiným aplikacím média číst, nahrávat a upravovat.
+
+Každý soubor má **veřejný odkaz** pro vložení na web. Zálohy a aktualizace z Update Serveru přibudou v další verzi.

@@ -12,3 +12,7 @@ Options -Indexes
     Header always set X-Content-Type-Options "nosniff"
     Header always set Referrer-Policy "strict-origin-when-cross-origin"
 </IfModule>
+# API: hlavička Authorization se při běhu PHP přes CGI/FastCGI jinak ztratí (záloha: hlavička X-Api-Key)
+<IfModule mod_setenvif.c>
+    SetEnvIf Authorization "(.+)" HTTP_AUTHORIZATION=$1
+</IfModule>

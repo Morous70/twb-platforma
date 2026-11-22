@@ -10,7 +10,7 @@ Hosting Wedos NoLimit, PHP 8.5 (kód běží od 8.1), SQLite, bez Composeru.
 |---|---|---|
 | 0.1 | Kostra z modulů (jadro, prihlaseni, galerie, tagy, obrazky, zalohy, aktualizace, napoveda), instalace, přihlášení heslem / Google / Passkey, zámek pokusů, obnova zapomenutého hesla e-mailem, odhlášení po nečinnosti nastavitelné v aplikaci, vzhled administrace (jako TWB Reklamy), přehled, protokol, nápověda, kontrola zdraví | hotovo |
 | 0.2 | Galerie: nahrávání po částech (přetažením, až 1 GB), mřížka s náhledy, přehrání videa, detail, tagy, kampaně jako složky, hledání a filtry, stránkování, archiv, nahrazení souboru, komprese s uchováním originálu (ve výchozím stavu vypnutá), hromadné akce, veřejné neuhodnutelné odkazy na soubory (Range, ETag, CORS) | hotovo |
-| 0.3 | API pro čtení i zápis s API klíči (oprávnění čtení / zápis, uložené jen jako otisk), popis API v nápovědě | plán |
+| 0.3 | JSON API `api.php/v1` pro čtení i zápis: média (seznam s filtry, detail, stažení s Range, nahrání i po částech a z adresy, úpravy, nahrazení, odkaz, smazání), kampaně, tagy; API klíče s oprávněním čtení / zápis (jen otisk), zámek proti zkoušení klíčů, stránka API, popis v nápovědě | hotovo |
 | 0.4 | Zálohy (denní cronem, obnova v rozhraní), aktualizace z Update Serveru, cron, balíčky FULL a UPDATE | plán |
 
 ## Struktura
@@ -23,8 +23,9 @@ health.php       kontrola po aktualizaci (modul aktualizace)
 nahrat.php       nahrávání po částech (JSON, jen přihlášený, CSRF v hlavičce X-CSRF), i nahrazení souboru
 media.php        soubor v administraci (jen přihlášený): ?id=, &nahled=1, &original=1, &stahnout=1
 soubor.php       veřejný odkaz soubor.php/<klíč>/<název> (bez přihlášení, ?stahnout=1)
-lib/             App (služby a moduly), Schema, Media, Kampane, Vydej, Ui, Vstup, Http, ProtokolDb, Chyba, autoload, bootstrap
-stranky/         prehled, galerie, medium (detail), kampane, nastaveni, protokol, napoveda, prihlaseni
+api.php          JSON API api.php/v1/… (klíč v Authorization: Bearer nebo X-Api-Key), popis help/sprava/api.md
+lib/             App (služby a moduly), Schema, Media, Kampane, Vydej, Api, ApiKlice, ZAdresy, Ui, Vstup, Http, ProtokolDb, Chyba, autoload, bootstrap
+stranky/         prehled, galerie, medium (detail), kampane, api (klíče), nastaveni, protokol, napoveda, prihlaseni
 help/            nápověda v Markdownu (_obsah.json + sekce/stránka.md), vykresluje modul napoveda
 assets/          style.css, app.js, ikona.svg
 data/            databáze galerie.sqlite, média (media/), náhledy (nahledy/, dají se kdykoli vytvořit znovu), části nahrávání (tmp/),
@@ -52,6 +53,18 @@ data/            databáze galerie.sqlite, média (media/), náhledy (nahledy/, 
   Videa ukazuje prohlížeč z `media.php` (`preload="metadata"`), PDF ikonou.
 - **Komprese**: nastavení modulu obrazky (`img_auto`, `img_max_w`, `img_max_h`, `img_quality`, `img_min_kb`) v Nastavení. Aplikace při první migraci nastaví `img_auto = 0` –
   podklady kampaní se nahrávají v plné kvalitě.
+
+## API (0.3)
+- **Směrování** v `Api::smeruj` (cesty `/`, `/media`, `/media/{id}`, `/media/{id}/soubor`, `/media/{id}/odkaz`, `/kampane`, `/kampane/{id}`, `/tagy`). Test hlídá,
+  že každou cestu popisuje `help/sprava/api.md`. PATCH přijímá JSON; soubory jen POST (PHP multipart u PATCH/PUT nečte).
+- **Klíče** (`ApiKlice`, tabulka `api_keys`, schéma 3): `tgk_` + 40 hex, v databázi SHA-256 a prvních 12 znaků; ukáže se jednou (stránka API, bez přesměrování
+  a bez uložení do relace). Oprávnění `read` = jen GET/HEAD, `write` = vše. Tabulka se nezálohuje. Po 20 neplatných klíčích za 5 minut odpověď 429
+  (počítadlo `api_fails` / `api_fail_since` je místní nastavení).
+- **Úpravy** médií se nejdřív celé ověří a pak zapíšou v transakci (neplatný tag nezmění ani název). Neznámé pole = 400.
+- **Stažení z adresy** (`ZAdresy`): jen http(s) na portech 80/443, bez jména a hesla v adrese, všechny IP adresy hostitele musí být veřejné
+  (ne soukromé, rezervované, link-local, 100.64/10, IPv4 v IPv6), spojení přes `CURLOPT_RESOLVE` na ověřenou IP, přesměrování nejvýš 3 a každé se ověří,
+  velikost se hlídá během stahování (1 GB). `stahovani_http` v config.php nahradí stahování (jen testy).
+- **Apache** předává hlavičku Authorization přes `SetEnvIf` v `.htaccess` (PHP jako CGI/FastCGI ji jinak nevidí); záloha je hlavička `X-Api-Key`.
 
 ## Testy a vydání
 ```

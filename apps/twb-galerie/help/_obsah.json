@@ -22,7 +22,8 @@
       "stranky": [
         "prihlaseni",
         "zapomenute-heslo",
-        "google"
+        "google",
+        "api"
       ]
     }
   ],
@@ -32,6 +33,7 @@
     "nastaveni": "prihlaseni",
     "protokol": "prihlaseni",
     "medium": "verejne-odkazy",
-    "kampane": "kampane-a-tagy"
+    "kampane": "kampane-a-tagy",
+    "api": "api"
   }
 }

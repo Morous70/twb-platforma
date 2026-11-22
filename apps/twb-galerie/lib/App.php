@@ -22,10 +22,10 @@ final class App
     public const UPDATE_SERVER = 'https://updates.trafikabr.cz';
     /** Veřejný klíč Ed25519 TWB Update Serveru (veřejný, smí být v kódu). */
     public const UPDATE_KLIC = 'JTvTWDW+eSP/GtT9zG3t+3UraawTk82vKteb2Dci8Cg=';
-    /** Tabulky v pořadí pro obnovu ze zálohy. Passkey a jednorázové tokeny se nezálohují (obnova by vrátila odebrané zařízení). */
+    /** Tabulky v pořadí pro obnovu ze zálohy. Passkey, jednorázové tokeny a API klíče se nezálohují (obnova by vrátila odebrané zařízení nebo zrušený klíč). */
     public const TABULKY = ['module_versions', 'settings', 'log', 'campaigns', 'media'];
     /** Nastavení, která patří k instalaci a obnova zálohy je nepřepíše. */
-    public const MISTNI = ['login_fails', 'login_last_fail', 'reset_last_sent', 'update_result', 'update_checked_at', 'update_available', 'update_health_key'];
+    public const MISTNI = ['login_fails', 'login_last_fail', 'reset_last_sent', 'api_fails', 'api_fail_since', 'update_result', 'update_checked_at', 'update_available', 'update_health_key'];
     /** Výchozí odhlášení po nečinnosti v minutách (když není v nastavení ani v config.php). */
     public const NECINNOST_MIN = 120;
     /** Největší nahrávaný soubor (skládá se po částech, limit PHP pro jeden požadavek nevadí). */
@@ -179,6 +179,13 @@ final class App
 
     public function media(): Media { return $this->sluzba('media', fn() => new Media($this)); }
     public function kampane(): Kampane { return $this->sluzba('kampane', fn() => new Kampane($this)); }
+    public function apiKlice(): ApiKlice { return $this->sluzba('apiKlice', fn() => new ApiKlice($this)); }
+
+    /** Stahování souborů z adresy (API). Konfigurace `stahovani_http` (callable) nahradí stahování – jen pro testy. */
+    public function zAdresy(): ZAdresy
+    {
+        return $this->sluzba('zAdresy', fn() => new ZAdresy(self::MAX_NAHRANI, is_callable($this->cfg['stahovani_http'] ?? null) ? $this->cfg['stahovani_http'] : null));
+    }
 
     public function zalohy(): Zalohy
     {

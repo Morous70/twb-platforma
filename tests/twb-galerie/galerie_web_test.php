@@ -11,8 +11,6 @@ $b = new Prohlizec($s);
 $b->jdi('install.php');
 $b->jdi('install.php', ['heslo' => 'tajneheslo1', 'heslo2' => 'tajneheslo1']);
 
-/** Soubor MP4 (hlavička ftyp + výplň), který finfo pozná jako video/mp4 – náhodná data by občas poznal jako jiný typ. */
-function mp4(int $n): string { return "\x00\x00\x00\x18ftypmp42\x00\x00\x00\x00mp42isom" . str_repeat("\x07", max(0, $n - 24)); }
 
 function obrazek(int $w, int $h): string
 {

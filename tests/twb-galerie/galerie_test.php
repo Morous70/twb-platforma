@@ -9,8 +9,6 @@ use TWB\Jadro\Migrace;
 echo "Media galerie: galerie\n";
 
 /** Nahraje soubor do galerie aplikace jako po skončení nahrávání. */
-/** Soubor MP4 (hlavička ftyp + výplň), který finfo pozná jako video/mp4 – náhodná data by občas poznal jako jiný typ. */
-function mp4(int $n): string { return "\x00\x00\x00\x18ftypmp42\x00\x00\x00\x00mp42isom" . str_repeat("\x07", max(0, $n - 24)); }
 
 function nahraj(App $app, string $nazev, string $obsah, ?int $kampan = null, array $tagy = []): int
 {
@@ -28,7 +26,7 @@ function png(int $w, int $h): string
     ob_start(); imagepng($im); return (string)ob_get_clean();
 }
 
-test('schéma 2: převod z verze 1 doplní sloupce a veřejné klíče stávajícím médiím', function () {
+test('schéma: převod z verze 1 doplní sloupce, veřejné klíče stávajícím médiím a tabulku API klíčů', function () {
     $dir = docasna('stare');
     mkdir($dir, 0775, true);
     $app = new App(KOREN . '/apps/twb-galerie', ['data_dir' => $dir]);
@@ -38,7 +36,8 @@ test('schéma 2: převod z verze 1 doplní sloupce a veřejné klíče stávají
     $app->db->q("INSERT INTO module_versions (module, version) VALUES ('twb-galerie', 1)");
     $app->db->q("INSERT INTO media (filename, original_name, mime, kind, size, md5, created_at) VALUES ('a.png', 'a.png', 'image/png', 'image', 1, 'x', '2026-11-22 10:00:00')");
     $app->migruj();
-    eq(2, $m->verze('twb-galerie'));
+    eq(\MediaGalerie\Schema::verze(), $m->verze('twb-galerie'));
+    $app->db->q('SELECT COUNT(*) FROM api_keys')->fetchColumn();
     $r = $app->db->q('SELECT * FROM media')->fetch();
     ok(preg_match('/^[0-9a-f]{24}$/', (string)$r['public_key']) === 1, 'klíč doplněn');
     ok(array_key_exists('campaign_id', $r) && array_key_exists('note', $r));

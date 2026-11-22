@@ -12,7 +12,7 @@ use TWB\Jadro\{Db, ModulMigrace};
  */
 final class Schema implements ModulMigrace
 {
-    public static function verze(): int { return 2; }
+    public static function verze(): int { return 3; }
 
     /** Tabulky, které musí existovat dřív než cokoli jiného (nastavení a protokol). */
     public static function zakladniTabulky(Db $db): void
@@ -44,6 +44,17 @@ final class Schema implements ModulMigrace
             foreach ($db->q('SELECT id FROM media WHERE public_key IS NULL')->fetchAll(\PDO::FETCH_COLUMN) as $id) {
                 $db->q('UPDATE media SET public_key = ? WHERE id = ?', [Media::novyKlic(), $id]);
             }
+        }
+        if ($zVerze < 3) {
+            // API klíče: jen otisk SHA-256; tabulka se nezálohuje (obnova by vrátila zrušený klíč)
+            $db->q("CREATE TABLE IF NOT EXISTS api_keys (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name VARCHAR(100) NOT NULL,
+                prefix VARCHAR(12) NOT NULL,
+                key_hash CHAR(64) NOT NULL UNIQUE,
+                scope VARCHAR(10) NOT NULL DEFAULT 'read',
+                created_at INTEGER NOT NULL, last_used_at INTEGER NULL
+            )");
         }
     }
 }

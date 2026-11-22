@@ -1,0 +1,7 @@
+{
+  "name": "licence",
+  "version": "0.1.0",
+  "php": ">=8.1",
+  "popis": "Licence médií: společný číselník (shodný se Social Plannerem a Kvízy), odhad kódu z textu nebo odkazu, název a uvedení autora (text i HTML).",
+  "requires": { "jadro": ">=0.1.0" }
+}

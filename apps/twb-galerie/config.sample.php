@@ -21,6 +21,9 @@ return [
     // Tajný klíč pro cron: <base_url>/cron.php?key=...  (spouštět každých 5–15 minut)
     'cron_key' => 'ZMENTE-NA-DLOUHY-NAHODNY-RETEZEC',
 
+    // API: nejvýš požadavků na jeden klíč za minutu (0 = bez limitu)
+    'api_limit_za_minutu' => 300,
+
     // Odesílatel e-mailů aplikace (adresa na vaší doméně)
     'mail_from' => 'galerie@kazbo.eu',
 

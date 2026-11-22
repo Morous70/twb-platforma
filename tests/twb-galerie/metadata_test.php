@@ -143,7 +143,7 @@ test('schéma 5: sloupce autor a licence', function () {
     $app = novaApp();
     $sl = array_column($app->db->q('PRAGMA table_info(media)')->fetchAll(), 'name');
     ok(!array_diff(['author', 'license', 'license_url'], $sl));
-    eq(5, \MediaGalerie\Schema::verze());
+    ok(\MediaGalerie\Schema::verze() >= 5);
 });
 
 // ---------- web a API ----------

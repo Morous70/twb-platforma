@@ -411,3 +411,17 @@
     });
   }
 })();
+
+// Detail média: vysvětlivka k vybrané licenci a pole verze jen u CC BY, CC BY-SA a Jiné
+(function () {
+  const vyber = document.querySelector('select[data-licence]');
+  if (!vyber) return;
+  const verze = document.querySelector('[data-licence-verze]');
+  const sVerzi = ['cc-by', 'cc-by-sa', 'jine'];
+  const obnov = () => {
+    document.querySelectorAll('[data-licence-napoveda]').forEach((s) => { s.hidden = s.dataset.licenceNapoveda !== vyber.value; });
+    if (verze) verze.disabled = !sVerzi.includes(vyber.value);
+  };
+  vyber.addEventListener('change', obnov);
+  obnov();
+})();

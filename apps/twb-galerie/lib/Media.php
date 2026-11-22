@@ -2,6 +2,7 @@
 declare(strict_types=1);
 namespace MediaGalerie;
 
+use TWB\Licence\Licence;
 use TWB\Zalohy\Zalohy;
 
 /**
@@ -17,6 +18,11 @@ final class Media
     public const NAHLED_PX = 480;
     /** Větší obrázky se pro náhled nezmenšují (paměť GD), pošle se rovnou soubor. */
     public const NAHLED_MAX_PIXELU = 40_000_000;
+    /** Velikosti náhledů pro jiné aplikace (delší strana v px, API a veřejný odkaz). */
+    public const NAHLEDY = [150, 320, 640, 1280, 1920];
+    public const ORIENTACE = ['na_sirku' => 'Na šířku', 'na_vysku' => 'Na výšku', 'ctverec' => 'Čtverec'];
+    /** Podepsaná adresa náhledu platí 1–2 hodiny (zaokrouhleno na celé hodiny, aby se adresa mezi požadavky neměnila). */
+    public const PODPIS_HODIN = 2;
 
     public function __construct(private App $app) {}
 
@@ -37,6 +43,8 @@ final class Media
 
     /**
      * Seznam podle filtru. Filtr: q (text v názvu, poznámce a autorovi), druh, kategorie (id, 0 = bez kategorie), tag, archiv (bool), razeni, strana.
+     * Navíc (API): orientace, min_sirka, min_vyska, tagy (seznam) s tagy_vse (true = všechny, false = kterýkoli), id (seznam; pořadí
+     * se zachová, když razeni chybí), razeni „nahodne“ se semenem seme (stejné semeno = stejné pořadí, stránkování funguje).
      * @param array<string, mixed> $f
      * @return array{polozky: list<array<string, mixed>>, celkem: int, strana: int, stran: int}
      */
@@ -51,6 +59,15 @@ final class Media
             array_push($p, $vzor, $vzor, $vzor);
         }
         if (isset(self::DRUHY[$f['druh'] ?? ''])) { $kde[] = 'kind = ?'; $p[] = $f['druh']; }
+        $o = (string)($f['orientace'] ?? '');
+        if ($o !== '') $kde[] = 'width > 0 AND height > 0 AND ' . match ($o) {
+            'na_sirku' => 'width * 100 > height * 102', 'na_vysku' => 'height * 100 > width * 102', default => 'width * 100 <= height * 102 AND height * 100 <= width * 102',
+        };
+        foreach (['min_sirka' => 'width', 'min_vyska' => 'height'] as $k => $sl) {
+            if (!empty($f[$k])) { $kde[] = "$sl >= ?"; $p[] = (int)$f[$k]; }
+        }
+        $ids = array_values(array_unique(array_map('intval', (array)($f['id'] ?? []))));
+        if ($ids) { $kde[] = 'id IN (' . implode(',', array_fill(0, count($ids), '?')) . ')'; array_push($p, ...$ids); }
         if (isset($f['kategorie']) && $f['kategorie'] !== '' && $f['kategorie'] !== null) {
             if ((int)$f['kategorie'] === 0) $kde[] = 'category_id IS NULL';
             else { $kde[] = 'category_id = ?'; $p[] = (int)$f['kategorie']; }
@@ -59,10 +76,21 @@ final class Media
             'stare' => 'id ASC', 'nazev' => 'original_name COLLATE NOCASE ASC, id DESC', 'velikost' => 'size DESC, id DESC', default => 'id DESC',
         };
         $radky = $this->app->db->q('SELECT * FROM media WHERE ' . implode(' AND ', $kde) . " ORDER BY $poradi", $p)->fetchAll();
-        $tag = trim((string)($f['tag'] ?? ''));
-        if ($tag !== '') {
-            $k = \TWB\Tagy\Tagy::klic($tag);
-            $radky = array_values(array_filter($radky, fn($r) => in_array($k, array_map([\TWB\Tagy\Tagy::class, 'klic'], self::tagy($r)), true)));
+        $hledane = array_map([\TWB\Tagy\Tagy::class, 'klic'], array_values(array_filter(array_map('trim', array_merge([(string)($f['tag'] ?? '')], (array)($f['tagy'] ?? []))), 'strlen')));
+        if ($hledane) {
+            $vse = (bool)($f['tagy_vse'] ?? true);
+            $radky = array_values(array_filter($radky, function ($r) use ($hledane, $vse) {
+                $ma = array_map([\TWB\Tagy\Tagy::class, 'klic'], self::tagy($r));
+                $shoda = count(array_intersect($hledane, $ma));
+                return $vse ? $shoda === count(array_unique($hledane)) : $shoda > 0;
+            }));
+        }
+        if (($f['razeni'] ?? '') === 'nahodne') {
+            $seme = (string)($f['seme'] ?? '');
+            usort($radky, fn($a, $b) => strcmp(md5($seme . ':' . $a['id']), md5($seme . ':' . $b['id'])));
+        } elseif ($ids && empty($f['razeni'])) {
+            $poz = array_flip($ids);
+            usort($radky, fn($a, $b) => $poz[(int)$a['id']] <=> $poz[(int)$b['id']]);
         }
         $celkem = count($radky);
         $stran = max(1, (int)ceil($celkem / max(1, $naStranku)));
@@ -118,6 +146,8 @@ final class Media
         if ($md && ($md['autor'] !== null || $md['licence'] !== null || $md['licence_url'] !== null)) {
             $this->nastavAutora($v['id'], $md['autor'] !== null ? mb_substr($md['autor'], 0, 200) : null,
                 $md['licence'] !== null ? mb_substr($md['licence'], 0, 2000) : null, $md['licence_url'] !== null ? mb_substr($md['licence_url'], 0, 500) : null);
+            $o = Licence::odhad($md['licence'], $md['licence_url']);
+            if ($o['kod'] !== null) $this->nastavLicenci($v['id'], $o['kod'], $o['verze']);
         }
         return $v + ['nazev' => $nazev];
     }
@@ -232,6 +262,32 @@ final class Media
         $this->app->db->q('UPDATE media SET author = ?, license = ?, license_url = ? WHERE id = ?', [$autor, $licence, $licenceUrl, $id]);
     }
 
+    /** Licence ze společného číselníku (kód null = neuvedena); verze se ověří a zahodí, kde nedává smysl. */
+    public function nastavLicenci(int $id, ?string $kod, ?string $verze): void
+    {
+        $this->radek($id);
+        try { [$kod, $verze] = Licence::vycisti($kod, $verze); } catch (\InvalidArgumentException $e) { throw new Chyba($e->getMessage()); }
+        $this->app->db->q('UPDATE media SET license_code = ?, license_version = ? WHERE id = ?', [$kod, $verze, $id]);
+    }
+
+    /** Uvedení autora pro použití média jinde: text, HTML a zda je povinné (podle licence). @return array{text:string, html:string, povinne:bool} */
+    public static function uvedeni(array $r): array
+    {
+        $u = Licence::uvedeni(['autor' => $r['author'] ?? null, 'kod' => $r['license_code'] ?? null, 'verze' => $r['license_version'] ?? null, 'licence_url' => $r['license_url'] ?? null],
+            ($r['kind'] ?? 'image') === 'video' ? 'Video: ' : 'Foto: ');
+        return ['text' => $u['text'], 'html' => $u['html'], 'povinne' => $u['povinne']];
+    }
+
+    /** Orientace obrázku nebo videa (čtverec = strany se liší nejvýš o 2 %). Null = rozměr neznámý. */
+    public static function orientace(array $r): ?string
+    {
+        $w = (int)($r['width'] ?? 0); $h = (int)($r['height'] ?? 0);
+        if ($w <= 0 || $h <= 0) return null;
+        if ($w * 100 > $h * 102) return 'na_sirku';
+        if ($h * 100 > $w * 102) return 'na_vysku';
+        return 'ctverec';
+    }
+
     /** Po nahrání: kategorie, poznámka a veřejný odkaz (modul galerie tyto sloupce nezná). */
     public function poNahrani(int $id, ?int $kategorie): void
     {
@@ -283,38 +339,96 @@ final class Media
 
     // ---------- náhledy ----------
 
-    /** Cesta k náhledu obrázku (JPEG nebo PNG v data/nahledy, vytvoří se při prvním použití). Null = poslat původní soubor. */
-    public function nahled(array $r): ?string
+    /** Cesta k náhledu obrázku v administraci (JPEG v data/nahledy, vytvoří se při prvním použití). Null = poslat původní soubor. */
+    public function nahled(array $r): ?string { return $this->varianta($r, self::NAHLED_PX); }
+
+    /**
+     * Zmenšená varianta obrázku: delší strana nejvýš $px, JPEG (průhlednost na bílém podkladu). Vytvoří se jednou a uloží
+     * do data/nahledy/<id>-<md5>-<px>.jpg; po nahrazení souboru vznikne nová (jiné md5), staré smaže úklid.
+     * Null = není obrázek, je menší než $px, nebo je příliš velký pro GD – pošle se původní soubor.
+     */
+    public function varianta(array $r, int $px): ?string
     {
-        if ($r['kind'] !== 'image' || !function_exists('imagecreatefromstring')) return null;
+        if ($r['kind'] !== 'image' || !function_exists('imagecreatefromstring') || $px < 16) return null;
         $w = (int)$r['width']; $h = (int)$r['height'];
-        if ($w <= 0 || $h <= 0 || $w * $h > self::NAHLED_MAX_PIXELU || max($w, $h) <= self::NAHLED_PX) return null;
+        if ($w <= 0 || $h <= 0 || $w * $h > self::NAHLED_MAX_PIXELU || max($w, $h) <= $px) return null;
         $slozka = $this->app->data . '/nahledy';
-        $cil = $slozka . '/' . (int)$r['id'] . '-' . $r['md5'] . '.jpg';
+        $cil = $slozka . '/' . (int)$r['id'] . '-' . $r['md5'] . '-' . $px . '.jpg';
         if (is_file($cil)) return $cil;
         $zdroj = $this->app->data . '/media/' . basename((string)$r['filename']);
         $data = @file_get_contents($zdroj);
         $im = $data !== false ? @imagecreatefromstring($data) : false;
         if (!$im) return null;
-        $k = self::NAHLED_PX / max($w, $h);
+        $k = $px / max($w, $h);
         $nw = max(1, (int)round($w * $k)); $nh = max(1, (int)round($h * $k));
         $out = imagecreatetruecolor($nw, $nh);
         // průhlednost na šachovnici by v JPEG zčernala – podklad bílý
         imagefill($out, 0, 0, (int)imagecolorallocate($out, 255, 255, 255));
         imagecopyresampled($out, $im, 0, 0, 0, 0, $nw, $nh, $w, $h);
         if (!is_dir($slozka)) @mkdir($slozka, 0775, true);
-        foreach (glob($slozka . '/' . (int)$r['id'] . '-*.jpg') ?: [] as $stary) @unlink($stary);
-        return imagejpeg($out, $cil, 82) ? $cil : null;
+        // náhledy předchozího obsahu (jiné md5) pryč
+        foreach (glob($slozka . '/' . (int)$r['id'] . '-*.jpg') ?: [] as $stary) {
+            if (!str_starts_with(basename($stary), (int)$r['id'] . '-' . $r['md5'] . '-')) @unlink($stary);
+        }
+        $tmp = $cil . '.' . bin2hex(random_bytes(4));
+        if (!imagejpeg($out, $tmp, $px <= 320 ? 80 : 85)) { @unlink($tmp); return null; }
+        rename($tmp, $cil);
+        return $cil;
     }
 
     /** Smaže náhledy médií, která už neexistují nebo mají jiný obsah. */
     public function uklidNahledy(): int
     {
         $platne = [];
-        foreach ($this->app->db->q('SELECT id, md5 FROM media')->fetchAll() as $r) $platne[$r['id'] . '-' . $r['md5'] . '.jpg'] = true;
+        foreach ($this->app->db->q('SELECT id, md5 FROM media')->fetchAll() as $r) $platne[$r['id'] . '-' . $r['md5']] = true;
         $n = 0;
-        foreach (glob($this->app->data . '/nahledy/*.jpg') ?: [] as $f) if (!isset($platne[basename($f)]) && @unlink($f)) $n++;
+        foreach (glob($this->app->data . '/nahledy/*.jpg') ?: [] as $f) {
+            $k = preg_match('/^(\d+-[0-9a-f]{32})-\d+\.jpg$/', basename($f), $m) ? $m[1] : '';
+            if (!isset($platne[$k]) && @unlink($f)) $n++;
+        }
         return $n;
+    }
+
+    /** Tajemství pro podpis adres náhledů (vytvoří se při prvním použití; místní nastavení, obnova zálohy ho nepřepíše). */
+    private function tajemstvi(): string
+    {
+        $n = $this->app->nastaveni();
+        $t = (string)$n->dej('nahled_tajemstvi', '');
+        if (strlen($t) < 32) { $t = bin2hex(random_bytes(32)); $n->uloz('nahled_tajemstvi', $t); }
+        return $t;
+    }
+
+    /** Konec platnosti podepsaných adres vydaných teď (unix čas, celá hodina). */
+    public static function platnostPodpisu(?int $ted = null): int { return (intdiv($ted ?? time(), 3600) + self::PODPIS_HODIN) * 3600; }
+
+    public function podpis(int $id, int $px, int $do): string { return substr(hash_hmac('sha256', "$id/$px/$do", $this->tajemstvi()), 0, 32); }
+
+    /** Ověří podepsanou adresu náhledu (nahled.php/<id>/<px>/<platí do>/<podpis>). */
+    public function overPodpis(int $id, int $px, int $do, string $podpis, ?int $ted = null): bool
+    {
+        return in_array($px, self::NAHLEDY, true) && $do >= ($ted ?? time()) && $do <= ($ted ?? time()) + self::PODPIS_HODIN * 3600
+            && hash_equals($this->podpis($id, $px, $do), $podpis);
+    }
+
+    /**
+     * Adresy náhledů pro jiné aplikace (klíč = delší strana v px). Médium s veřejným odkazem má trvalé adresy
+     * (soubor.php/<klíč>/w<px>/<název>?v=<md5>), ostatní podepsané s omezenou platností. Jen obrázky; jinak null.
+     * @return ?array{adresy: array<string, string>, plati_do: ?int}
+     */
+    public function adresyNahledu(array $r): ?array
+    {
+        if ($r['kind'] !== 'image') return null;
+        $nazev = trim((string)preg_replace('/[^\p{L}\p{N}._-]+/u', '-', pathinfo((string)$r['original_name'], PATHINFO_FILENAME)), '-') ?: 'nahled';
+        $out = [];
+        if (!empty($r['public_key'])) {
+            foreach (self::NAHLEDY as $px) $out[(string)$px] = $this->app->url('soubor.php/' . $r['public_key'] . '/w' . $px . '/' . rawurlencode($nazev) . '.jpg?v=' . substr((string)$r['md5'], 0, 10));
+            return ['adresy' => $out, 'plati_do' => null];
+        }
+        $do = self::platnostPodpisu();
+        foreach (self::NAHLEDY as $px) {
+            $out[(string)$px] = $this->app->url('nahled.php/' . (int)$r['id'] . '/' . $px . '/' . $do . '/' . $this->podpis((int)$r['id'], $px, $do) . '/' . rawurlencode($nazev) . '.jpg');
+        }
+        return ['adresy' => $out, 'plati_do' => $do];
     }
 
     /** Popis velikosti a rozměru pro seznamy. */

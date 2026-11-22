@@ -13,6 +13,8 @@ final class ApiKlice
     /** Po tolika neplatných klíčích za 5 minut API odpovídá 429 (ochrana proti zkoušení klíčů). */
     public const MAX_CHYB = 20;
     public const OKNO_SEKUND = 300;
+    /** Výchozí limit požadavků na jeden klíč za minutu (config.php: api_limit_za_minutu, 0 = bez limitu). */
+    public const LIMIT_ZA_MINUTU = 300;
 
     public function __construct(private App $app) {}
 
@@ -50,6 +52,26 @@ final class ApiKlice
         if (!$r) return null;
         if ((int)$r['last_used_at'] < time() - 60) $this->app->db->q('UPDATE api_keys SET last_used_at = ? WHERE id = ?', [time(), $r['id']]);
         return $r;
+    }
+
+    public function limit(): int { return max(0, (int)$this->app->cfg('api_limit_za_minutu', self::LIMIT_ZA_MINUTU)); }
+
+    /**
+     * Započítá požadavek klíče do okna aktuální minuty. Vrací [zbývá požadavků, za kolik sekund to zkusit znovu (0 = povoleno)].
+     * Bez limitu vrací [-1, 0].
+     * @return array{0:int, 1:int}
+     */
+    public function pocitej(array $klic, ?int $ted = null): array
+    {
+        $limit = $this->limit();
+        if ($limit === 0) return [-1, 0];
+        $ted ??= time();
+        $okno = intdiv($ted, 60) * 60;
+        $r = $this->app->db->q('SELECT rate_window, rate_count FROM api_keys WHERE id = ?', [$klic['id']])->fetch();
+        $pocet = $r && (int)$r['rate_window'] === $okno ? (int)$r['rate_count'] : 0;
+        if ($pocet >= $limit) return [0, $okno + 60 - $ted];
+        $this->app->db->q('UPDATE api_keys SET rate_window = ?, rate_count = ? WHERE id = ?', [$okno, $pocet + 1, $klic['id']]);
+        return [$limit - $pocet - 1, 0];
     }
 
     /** Zbývající sekundy zámku po mnoha neplatných klíčích (0 = volno). */

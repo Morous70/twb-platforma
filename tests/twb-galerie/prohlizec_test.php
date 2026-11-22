@@ -1,6 +1,7 @@
 <?php
 declare(strict_types=1);
-// TWB Media galerie 0.5.1 ve skutečném prohlížeči (Playwright): tagy jako štítky, výběr médií tažením myši, nahrání s tagy.
+// TWB Media galerie 0.5.1 ve skutečném prohlížeči (Playwright): tagy jako štítky, výběr médií tažením myši, nahrání s tagy;
+// 0.6.2 zobrazení galerie (mřížka, seznam, jen média) a větší náhled v okně.
 require __DIR__ . '/pomocne.php';
 require __DIR__ . '/server.php';
 
@@ -79,7 +80,7 @@ JS);
     ok(str_contains($v['dlouhy'][1], '30 znaků'));
 });
 
-test('výběr tažením myši z prázdného místa; Ctrl přidá; klik bez tažení otevře detail; hromadná akce s výběrem', function () use ($pw, $s) {
+test('výběr tažením myši z prázdného místa; Ctrl přidá; klik na název otevře detail; hromadná akce s výběrem', function () use ($pw, $s) {
     if (!$pw) { echo "      (přeskočeno: chybí node nebo playwright)\n"; return; }
     $v = prohlizec($s->url, <<<'JS'
   await p.goto(u + 'index.php?p=galerie');
@@ -112,8 +113,8 @@ test('výběr tažením myši z prázdného místa; Ctrl přidá; klik bez taže
   await p.selectOption('[data-hromadna-akce]', 'tag-pridat');
   await p.fill('#hromadne input[name=tag]', 'vybrane');
   await Promise.all([p.waitForNavigation(), p.click('[data-hromadne-odeslat]')]);
-  // obyčejný klik na náhled otevře detail
-  await Promise.all([p.waitForNavigation(), p.click('.galerie figure >> nth=1 >> .nahled-medium')]);
+  // klik na název otevře detail (klik na náhled otevře okno, viz další test)
+  await Promise.all([p.waitForNavigation(), p.click('.galerie figure >> nth=1 >> figcaption a')]);
   v.detail = p.url();
 JS);
     eq(1, $v['obdelnik'], 'obdélník při tažení');
@@ -127,6 +128,88 @@ JS);
     ok(str_contains($v['detail'], 'p=medium&id='), $v['detail']);
     $s2 = $s->db()->query("SELECT original_name FROM media WHERE tags LIKE '%vybrane%' ORDER BY original_name")->fetchAll(PDO::FETCH_COLUMN);
     eq(['obrazek-3.jpg', 'obrazek-4.jpg', 'obrazek-6.jpg'], $s2, 'tag jen u vybraných (mřížka je od nejnovějšího)');
+});
+
+test('0.6.2: přepínač zobrazení se pamatuje; seznam, jen média; výběr tažením i v nich', function () use ($pw, $s) {
+    if (!$pw) { echo "      (přeskočeno: chybí node nebo playwright)\n"; return; }
+    $v = prohlizec($s->url, <<<'JS'
+  await p.goto(u + 'index.php?p=galerie');
+  const trida = () => p.$eval('.galerie', e => e.className);
+  v.vychozi = await trida();
+  v.prepinac = await p.$$eval('.prepinac-zobrazeni a', e => e.map(x => x.textContent + (x.classList.contains('aktivni') ? '*' : '')));
+  await Promise.all([p.waitForNavigation(), p.click('.prepinac-zobrazeni a >> text=Seznam')]);
+  v.seznam = await trida();
+  v.seznamRadek = await p.$$eval('.galerie figure', e => { const a = e[0].getBoundingClientRect(), b = e[1].getBoundingClientRect(); return [Math.round(a.left) === Math.round(b.left), b.top > a.top]; });
+  v.seznamDatum = await p.$eval('.galerie figure .jen-seznam', e => getComputedStyle(e).display);
+  await p.goto(u + 'index.php?p=galerie');
+  v.zapamatovano = await trida();
+  await Promise.all([p.waitForNavigation(), p.click('.prepinac-zobrazeni a >> text=Jen média')]);
+  v.media = await trida();
+  v.popisek = await p.$eval('.galerie figcaption', e => getComputedStyle(e).display);
+  // tažení vybírá i bez popisků
+  const f = await p.$$eval('.galerie figure', els => els.map(e => { const r = e.getBoundingClientRect(); return [r.left, r.top, r.width, r.height]; }));
+  await p.mouse.move(f[0][0] - 4, f[0][1] - 4); await p.mouse.down();
+  await p.mouse.move(f[1][0] + f[1][2] / 2, f[1][1] + f[1][3] / 2, { steps: 8 }); await p.mouse.up();
+  v.vybrane = await p.$$eval('input[name="ids[]"]', els => els.map(e => e.checked ? 1 : 0).join(''));
+  v.oknoPoTazeni = await p.$$eval('.okno-nahled:not([hidden])', e => e.length);
+  await Promise.all([p.waitForNavigation(), p.click('.prepinac-zobrazeni a >> text=Mřížka')]);
+  v.zpet = await trida();
+JS);
+    eq('galerie zobrazeni-mrizka', $v['vychozi']);
+    eq(['Mřížka*', 'Seznam', 'Jen média'], $v['prepinac']);
+    eq('galerie zobrazeni-seznam', $v['seznam']);
+    eq([true, true], $v['seznamRadek'], 'v seznamu jsou položky pod sebou');
+    eq('inline', $v['seznamDatum']);
+    eq('galerie zobrazeni-seznam', $v['zapamatovano'], 'zobrazení se pamatuje');
+    eq('galerie zobrazeni-media', $v['media']);
+    eq('none', $v['popisek'], 'jen média: bez popisků');
+    eq('110000', $v['vybrane']);
+    eq(0, $v['oknoPoTazeni'], 'tažení neotevře okno');
+    eq('galerie zobrazeni-mrizka', $v['zpet']);
+    eq('mrizka', (string)$s->db()->query("SELECT v FROM settings WHERE k = 'galerie_zobrazeni'")->fetchColumn());
+});
+
+test('0.6.2: klik na náhled otevře větší obrázek v okně; šipky listují; Esc zavře; Ctrl+klik vede na detail', function () use ($pw, $s) {
+    if (!$pw) { echo "      (přeskočeno: chybí node nebo playwright)\n"; return; }
+    $v = prohlizec($s->url, <<<'JS'
+  await p.goto(u + 'index.php?p=galerie');
+  await p.click('.galerie figure >> nth=1 >> .nahled-medium');
+  await p.waitForSelector('.okno-nahled:not([hidden]) img');
+  const stav = () => p.evaluate(() => ({ src: document.querySelector('.okno-nahled img').getAttribute('src'),
+    titulek: document.querySelector('[data-okno-titulek]').textContent, udaje: document.querySelector('[data-okno-udaje]').textContent }));
+  v.otevreno = await stav();
+  v.adresa = p.url();
+  v.detail = await p.getAttribute('.okno-nahled [data-okno-detail]', 'href');
+  v.original = await p.getAttribute('.okno-nahled [data-okno-original]', 'href');
+  v.obrazek = await p.evaluate(async src => (await fetch(src)).headers.get('content-type'), v.otevreno.src);
+  await p.keyboard.press('ArrowRight'); v.dalsi = (await stav()).titulek;
+  await p.keyboard.press('ArrowLeft'); await p.keyboard.press('ArrowLeft'); v.predchozi = (await stav()).titulek;
+  await p.click('.okno-dalsi'); v.tlacitko = (await stav()).titulek;
+  v.posun = await p.evaluate(() => getComputedStyle(document.body).overflow);
+  await p.keyboard.press('Escape');
+  v.zavreno = await p.$$eval('.okno-nahled[hidden]', e => e.length);
+  v.vyber = await p.$$eval('input[name="ids[]"]:checked', e => e.length);
+  await p.click('.galerie figure >> nth=0 >> .nahled-medium');
+  await p.click('.okno-plocha', { position: { x: 5, y: 5 } });
+  v.klikVedle = await p.$$eval('.okno-nahled[hidden]', e => e.length);
+  const [nova] = await Promise.all([p.context().waitForEvent('page'), p.click('.galerie figure >> nth=0 >> .nahled-medium', { modifiers: ['Control'] })]);
+  await nova.waitForLoadState(); v.ctrl = nova.url();
+JS);
+    ok(str_contains($v['otevreno']['src'], 'nahled=1920'), $v['otevreno']['src']);
+    eq('obrazek-5.jpg', $v['otevreno']['titulek'], 'mřížka je od nejnovějšího');
+    ok(str_contains($v['otevreno']['udaje'], '2 / 6'), $v['otevreno']['udaje']);
+    ok(str_ends_with($v['adresa'], 'p=galerie'), 'okno neopustí galerii');
+    ok(str_contains($v['detail'], 'p=medium&id='));
+    ok(!str_contains($v['original'], 'nahled='), $v['original']);
+    eq('image/jpeg', $v['obrazek']);
+    eq('obrazek-4.jpg', $v['dalsi']);
+    eq('obrazek-6.jpg', $v['predchozi']);
+    eq('obrazek-5.jpg', $v['tlacitko']);
+    eq('hidden', $v['posun'], 'stránka pod oknem se neposouvá');
+    eq(1, $v['zavreno']);
+    eq(0, $v['vyber'], 'klik na náhled nic nevybere');
+    eq(1, $v['klikVedle'], 'klik mimo obrázek okno zavře');
+    ok(str_contains($v['ctrl'], 'p=medium&id='), $v['ctrl']);
 });
 
 test('detail: štítky se uloží, rozepsaný tag se při uložení přidá', function () use ($pw, $s) {

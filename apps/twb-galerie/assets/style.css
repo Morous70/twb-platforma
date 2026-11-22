@@ -229,6 +229,64 @@ body.samostatna { min-height: 100vh; display: flex; align-items: center; justify
 .galerie .znacka { position: absolute; left: .5rem; bottom: .5rem; background: rgba(0, 0, 0, .65); color: #fff; font-size: .7rem; padding: .1rem .4rem; border-radius: var(--polomer); }
 .galerie .pdf-ikona { font-weight: 700; font-size: 1.4rem; color: var(--chyba); border: 2px solid currentColor; border-radius: var(--polomer); padding: .6rem .8rem; }
 .galerie .vyber-medium { position: absolute; top: .4rem; left: .4rem; z-index: 2; background: var(--plocha); border-radius: var(--polomer); padding: .2rem .35rem; line-height: 1; box-shadow: var(--stin); cursor: pointer; }
+/* zobrazení galerie: mřížka (výchozí), seznam, jen média */
+.galerie-lista { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .5rem 1rem; margin: 0 0 1rem; }
+.galerie-lista p { margin: 0; }
+.prepinac-zobrazeni { display: inline-flex; gap: 0; }
+.prepinac-zobrazeni .tlacitko { border-radius: 0; margin: 0; }
+.prepinac-zobrazeni .tlacitko + .tlacitko { margin-left: -1px; }
+.prepinac-zobrazeni .tlacitko:first-child { border-radius: var(--polomer) 0 0 var(--polomer); }
+.prepinac-zobrazeni .tlacitko:last-child { border-radius: 0 var(--polomer) var(--polomer) 0; }
+.prepinac-zobrazeni .aktivni { background: var(--hlavni); border-color: var(--hlavni); color: #fff; position: relative; }
+.galerie .jen-seznam { display: none; }
+.galerie.zobrazeni-seznam { grid-template-columns: 1fr; gap: .5rem; }
+.galerie.zobrazeni-seznam figure { display: grid; grid-template-columns: 2.2rem 96px minmax(0, 1fr); align-items: center; }
+.galerie.zobrazeni-seznam .vyber-medium { position: static; box-shadow: none; background: transparent; justify-self: center; }
+.galerie.zobrazeni-seznam .nahled-medium, .galerie.zobrazeni-seznam .nahled-medium img, .galerie.zobrazeni-seznam .nahled-medium video { height: 64px; }
+.galerie.zobrazeni-seznam .pdf-ikona { font-size: .9rem; padding: .25rem .4rem; }
+.galerie.zobrazeni-seznam .znacka { font-size: .65rem; left: .25rem; bottom: .25rem; }
+.galerie.zobrazeni-seznam figcaption { display: flex; flex-wrap: wrap; align-items: center; gap: .3rem 1rem; padding: .5rem .9rem; }
+.galerie.zobrazeni-seznam figcaption > a { flex: 1 1 14rem; min-width: 0; }
+.galerie.zobrazeni-seznam figcaption strong { word-break: normal; overflow-wrap: anywhere; }
+.galerie.zobrazeni-seznam .jen-seznam { display: inline; }
+.galerie.zobrazeni-media { grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: .5rem; }
+.galerie.zobrazeni-media figcaption { display: none; }
+.galerie.zobrazeni-media figure { box-shadow: none; }
+.galerie.zobrazeni-media .nahled-medium, .galerie.zobrazeni-media .nahled-medium img, .galerie.zobrazeni-media .nahled-medium video { height: 170px; }
+.galerie.zobrazeni-media .nahled-medium img, .galerie.zobrazeni-media .nahled-medium video { object-fit: cover; }
+.galerie.zobrazeni-media .vyber-medium { opacity: 0; transition: opacity .12s; }
+.galerie.zobrazeni-media figure:hover .vyber-medium, .galerie.zobrazeni-media figure.vybrano .vyber-medium,
+.galerie.zobrazeni-media .vyber-medium:focus-within, .galerie.zobrazeni-media.neco-vybrano .vyber-medium { opacity: 1; }
+@media (hover: none) { .galerie.zobrazeni-media .vyber-medium { opacity: 1; } }
+.galerie [data-otevrit-okno] { cursor: zoom-in; }
+
+/* větší náhled v modálním okně */
+body.okno-otevrene { overflow: hidden; }
+.okno-nahled { position: fixed; inset: 0; z-index: 100; background: rgba(10, 14, 20, .92); display: grid; grid-template-rows: minmax(0, 1fr) auto; color: #eef1f5; }
+.okno-nahled[hidden] { display: none; }
+.okno-plocha { display: flex; align-items: center; justify-content: center; padding: 3rem 4rem 1rem; min-height: 0; }
+.okno-plocha img, .okno-plocha video { max-width: 100%; max-height: 100%; object-fit: contain; display: block; box-shadow: 0 0 2rem rgba(0, 0, 0, .5); background: #fff; }
+.okno-plocha video { background: #000; }
+.okno-nahled.nacita .okno-plocha img { opacity: .35; }
+.okno-popis { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: .5rem 1rem; padding: .75rem 1.25rem 1rem; font-size: .9rem; }
+.okno-popis strong { color: #fff; overflow-wrap: anywhere; }
+.okno-udaje { color: rgba(238, 241, 245, .65); margin-left: .5rem; }
+.okno-akce { display: flex; gap: .4rem; flex-wrap: wrap; }
+.okno-sipka, .okno-zavrit { position: absolute; border: 0; background: rgba(255, 255, 255, .1); color: #fff; cursor: pointer; line-height: 1; min-height: 0; border-radius: var(--polomer); }
+.okno-sipka:hover, .okno-zavrit:hover, .okno-sipka:focus-visible, .okno-zavrit:focus-visible { background: rgba(255, 255, 255, .25); }
+.okno-sipka { top: 50%; transform: translateY(-50%); font-size: 2.4rem; width: 3rem; height: 4.5rem; }
+.okno-predchozi { left: .5rem; }
+.okno-dalsi { right: .5rem; }
+.okno-sipka[hidden] { display: none; }
+.okno-zavrit { top: .6rem; right: .6rem; font-size: 1.8rem; width: 2.6rem; height: 2.6rem; }
+@media (max-width: 600px) {
+  .okno-plocha { padding: 3.2rem .5rem .5rem; }
+  .okno-sipka { top: auto; bottom: 4.5rem; transform: none; height: 3rem; width: 2.6rem; }
+  .galerie.zobrazeni-media { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .25rem; }
+  .galerie.zobrazeni-media .nahled-medium, .galerie.zobrazeni-media .nahled-medium img, .galerie.zobrazeni-media .nahled-medium video { height: 110px; }
+  .galerie.zobrazeni-seznam figure { grid-template-columns: 2rem 64px minmax(0, 1fr); }
+  .galerie.zobrazeni-seznam .nahled-medium, .galerie.zobrazeni-seznam .nahled-medium img, .galerie.zobrazeni-seznam .nahled-medium video { height: 48px; }
+}
 .galerie-mala { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; }
 .galerie-mala .nahled-medium, .galerie-mala .nahled-medium img, .galerie-mala .nahled-medium video { height: 100px; }
 .galerie-mala figcaption strong { font-size: .8rem; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; word-break: normal; }

@@ -20,6 +20,11 @@ final class Media
     public const NAHLED_MAX_PIXELU = 40_000_000;
     /** Velikosti náhledů pro jiné aplikace (delší strana v px, API a veřejný odkaz). */
     public const NAHLEDY = [150, 320, 640, 1280, 1920];
+    /** Náhled v okně galerie (delší strana v px, jedna z NAHLEDY). */
+    public const NAHLED_VELKY_PX = 1920;
+    /** Zobrazení galerie v administraci (pamatuje se v místním nastavení galerie_zobrazeni). */
+    public const ZOBRAZENI = ['mrizka' => 'Mřížka', 'seznam' => 'Seznam', 'media' => 'Jen média'];
+    public const DRUH_JEDNOTNE = ['image' => 'Obrázek', 'video' => 'Video', 'pdf' => 'PDF'];
     public const ORIENTACE = ['na_sirku' => 'Na šířku', 'na_vysku' => 'Na výšku', 'ctverec' => 'Čtverec'];
     /** Podepsaná adresa náhledu platí 1–2 hodiny (zaokrouhleno na celé hodiny, aby se adresa mezi požadavky neměnila). */
     public const PODPIS_HODIN = 2;

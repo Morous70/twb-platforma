@@ -1,5 +1,5 @@
 // TWB Media galerie – drobnosti administrace: potvrzení akcí, menu, kopírování do schránky, nahrávání, tagy jako štítky,
-// výběr tažením myši, Passkey, odhlášení po nečinnosti.
+// výběr tažením myši, větší náhled v okně, Passkey, odhlášení po nečinnosti.
 (function () {
   'use strict';
 
@@ -65,6 +65,8 @@
       });
       boxy().forEach(function (b) { b.closest('figure').classList.toggle('vybrano', b.checked); });
       if (vse) vse.checked = n > 0 && n === boxy().length;
+      var g = hromadne.querySelector('.galerie');
+      if (g) g.classList.toggle('neco-vybrano', n > 0);
     };
     hromadne.addEventListener('change', function (e) {
       if (e.target === vse) boxy().forEach(function (b) { b.checked = vse.checked; });
@@ -75,6 +77,98 @@
       if (akce.value === 'smazat' && !window.confirm('Smazat ' + n + ' vybraných souborů? Veřejné odkazy přestanou fungovat.')) e.preventDefault();
     });
     obnov();
+  }
+
+  // ---------- Galerie: větší náhled v modálním okně (obrázek, video). Šipky listují, Esc zavře. ----------
+  // Odkaz náhledu vede dál na detail, takže Ctrl/prostřední klik ho otevře v nové kartě.
+  var mrizkaOkno = hromadne && hromadne.querySelector('.galerie');
+  if (mrizkaOkno) {
+    var okno = null, aktualni = -1, predOknem = null;
+    var polozky = function () { return Array.prototype.slice.call(mrizkaOkno.querySelectorAll('figure[data-okno="image"], figure[data-okno="video"]')); };
+    var prvek = function (tag, trida, text) { var el = document.createElement(tag); if (trida) el.className = trida; if (text) el.textContent = text; return el; };
+    var vytvor = function () {
+      okno = prvek('div', 'okno-nahled');
+      okno.hidden = true;
+      okno.setAttribute('role', 'dialog'); okno.setAttribute('aria-modal', 'true'); okno.setAttribute('aria-label', 'Náhled média');
+      okno.innerHTML = '<div class="okno-plocha" data-okno-plocha></div>'
+        + '<button type="button" class="okno-sipka okno-predchozi" data-okno-krok="-1" aria-label="Předchozí" title="Předchozí (←)">‹</button>'
+        + '<button type="button" class="okno-sipka okno-dalsi" data-okno-krok="1" aria-label="Další" title="Další (→)">›</button>'
+        + '<button type="button" class="okno-zavrit" data-okno-zavrit aria-label="Zavřít" title="Zavřít (Esc)">×</button>'
+        + '<div class="okno-popis"><div><strong data-okno-titulek></strong> <span class="okno-udaje" data-okno-udaje></span></div>'
+        + '<div class="okno-akce"><a class="tlacitko maly" data-okno-detail>Detail</a> <a class="tlacitko maly" data-okno-original target="_blank" rel="noopener">Původní soubor</a>'
+        + ' <button type="button" class="maly" data-okno-kopirovat hidden>Kopírovat odkaz</button></div></div>';
+      document.body.appendChild(okno);
+      okno.addEventListener('click', function (e) {
+        var t = e.target;
+        if (t.closest('[data-okno-krok]')) ukaz(aktualni + parseInt(t.closest('[data-okno-krok]').dataset.oknoKrok, 10));
+        else if (t.closest('[data-okno-zavrit]') || t === okno || t.hasAttribute('data-okno-plocha')) zavri();
+      });
+      okno.querySelector('[data-okno-kopirovat]').addEventListener('click', function () {
+        var b = this, text = b.dataset.text;
+        (navigator.clipboard ? navigator.clipboard.writeText(text) : Promise.reject()).then(function () {
+          b.textContent = 'Zkopírováno'; setTimeout(function () { b.textContent = 'Kopírovat odkaz'; }, 1500);
+        }, function () { window.prompt('Odkaz:', text); });
+      });
+    };
+    var ukaz = function (i) {
+      var p = polozky();
+      if (!p.length) return zavri();
+      aktualni = (i + p.length) % p.length;
+      var f = p[aktualni], d = f.dataset, plocha = okno.querySelector('[data-okno-plocha]');
+      plocha.textContent = '';
+      var m;
+      if (d.okno === 'video') { m = prvek('video'); m.controls = true; m.autoplay = true; m.playsInline = true; }
+      else { m = prvek('img'); m.alt = d.oknoNazev; okno.classList.add('nacita'); m.onload = m.onerror = function () { okno.classList.remove('nacita'); }; }
+      m.src = d.oknoSrc;
+      plocha.appendChild(m);
+      okno.querySelector('[data-okno-titulek]').textContent = d.oknoNazev;
+      okno.querySelector('[data-okno-udaje]').textContent = d.oknoPopis + ' · ' + (aktualni + 1) + ' / ' + p.length;
+      okno.querySelector('[data-okno-detail]').href = d.oknoDetail;
+      okno.querySelector('[data-okno-original]').href = d.oknoSrc.replace(/&nahled=\d+/, '');
+      var k = okno.querySelector('[data-okno-kopirovat]');
+      k.hidden = !d.oknoOdkaz; k.dataset.text = d.oknoOdkaz || '';
+      okno.querySelectorAll('.okno-sipka').forEach(function (b) { b.hidden = p.length < 2; });
+      // sousední obrázky dopředu, ať listování nečeká
+      [aktualni - 1, aktualni + 1].forEach(function (j) {
+        var s = p[(j + p.length) % p.length];
+        if (s && s.dataset.okno === 'image') (new Image()).src = s.dataset.oknoSrc;
+      });
+    };
+    var otevri = function (f) {
+      if (!okno) vytvor();
+      predOknem = document.activeElement;
+      okno.hidden = false;
+      document.body.classList.add('okno-otevrene');
+      ukaz(polozky().indexOf(f));
+      okno.querySelector('[data-okno-zavrit]').focus();
+    };
+    var zavri = function () {
+      if (!okno || okno.hidden) return;
+      okno.hidden = true;
+      okno.querySelector('[data-okno-plocha]').textContent = '';   // zastaví video
+      document.body.classList.remove('okno-otevrene');
+      if (predOknem && predOknem.focus) predOknem.focus();
+    };
+    mrizkaOkno.addEventListener('click', function (e) {
+      var a = e.target.closest('[data-otevrit-okno]');
+      if (!a || e.button !== 0 || e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return;
+      e.preventDefault();
+      otevri(a.closest('figure'));
+    });
+    document.addEventListener('keydown', function (e) {
+      if (!okno || okno.hidden) return;
+      if (e.key === 'Escape') { e.preventDefault(); zavri(); }
+      else if (e.key === 'ArrowLeft' && e.target.tagName !== 'VIDEO') ukaz(aktualni - 1);
+      else if (e.key === 'ArrowRight' && e.target.tagName !== 'VIDEO') ukaz(aktualni + 1);
+      else if (e.key === 'Tab') {
+        // fokus zůstává v okně
+        var t = Array.prototype.filter.call(okno.querySelectorAll('button, a[href], video'), function (x) { return !x.hidden; });
+        if (!t.length) return;
+        var i = t.indexOf(document.activeElement);
+        if (e.shiftKey && i <= 0) { e.preventDefault(); t[t.length - 1].focus(); }
+        else if (!e.shiftKey && i === t.length - 1) { e.preventDefault(); t[0].focus(); }
+      }
+    });
   }
 
   // ---------- Nahrávání po částech (galerie, nahrazení souboru) ----------

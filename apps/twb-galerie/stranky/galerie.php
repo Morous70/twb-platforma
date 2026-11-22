@@ -65,15 +65,16 @@ $titulek = $f['archiv'] ? 'Archiv' : 'Galerie';
 ?>
 <?php if (!$f['archiv']): ?>
 <div class="karta nahravani" id="nahravani" data-csrf="<?= Ui::h($app->relace()->csrfToken()) ?>" data-cast="<?= App::CAST_NAHRANI ?>" data-max="<?= App::MAX_NAHRANI ?>">
-  <div class="nahravani-plocha" data-plocha>
-    <p><strong>Přetáhněte sem soubory</strong> nebo <label class="odkaz-tlacitko">vyberte z počítače<input type="file" multiple hidden data-vyber
-      accept="<?= Ui::h(implode(',', array_map(fn($p) => '.' . $p, [...array_keys(TWB\Galerie\Galerie::POVOLENE), 'zip']))) ?>"></label></p>
-    <p class="slabe mala">Obrázky (JPG, PNG, GIF, WebP, BMP), videa (MP4, MOV, WebM, AVI, MKV) a PDF, jeden soubor nejvýš <?= (int)(App::MAX_NAHRANI / 1048576) ?> MB.
-      ZIP s obrázky se rozbalí – každý obrázek bude samostatné médium. Název, štítky, autor a licence se načtou z metadat obrázku (jinak název souboru).</p>
-  </div>
-  <div class="radek">
-    <?= Ui::vyber('Nahrát do kategorie', 'nahrat_kategorie', ['' => '— bez kategorie —'] + $kategorie, $f['kategorie'] !== '0' ? $f['kategorie'] : '') ?>
-    <?= Ui::pole('Tagy nových souborů', 'nahrat_tagy', '', ['placeholder' => 'oddělte čárkou', 'list' => 'seznam-tagu']) ?>
+  <div class="nahravani-sloupce">
+    <div class="nahravani-plocha" data-plocha>
+      <p><strong>Přetáhněte sem soubory</strong> nebo <label class="odkaz-tlacitko">vyberte z počítače<input type="file" multiple hidden data-vyber
+        accept="<?= Ui::h(implode(',', array_map(fn($p) => '.' . $p, [...array_keys(TWB\Galerie\Galerie::POVOLENE), 'zip']))) ?>"></label></p>
+      <p class="slabe mala" title="Obrázky JPG, PNG, GIF, WebP, BMP; videa MP4, MOV, WebM, AVI, MKV; PDF. ZIP s obrázky se rozbalí, každý obrázek bude samostatné médium. Název, štítky, autor a licence se načtou z metadat obrázku.">Obrázky, videa, PDF a ZIP s obrázky, nejvýš <?= (int)(App::MAX_NAHRANI / 1048576) ?> MB na soubor.</p>
+    </div>
+    <div class="nahravani-volby">
+      <?= Ui::vyber('Nahrát do kategorie', 'nahrat_kategorie', ['' => '— bez kategorie —'] + $kategorie, $f['kategorie'] !== '0' ? $f['kategorie'] : '') ?>
+      <?= Ui::pole('Tagy nových souborů', 'nahrat_tagy', '', ['placeholder' => 'Napište tag a stiskněte Enter', 'list' => 'seznam-tagu', 'data-stitky' => '']) ?>
+    </div>
   </div>
   <ul class="nahravani-seznam" data-seznam></ul>
 </div>
@@ -117,7 +118,8 @@ $titulek = $f['archiv'] ? 'Archiv' : 'Galerie';
     <input name="tag" list="seznam-tagu" placeholder="Tag" aria-label="Tag" data-pro="tag-pridat tag-odebrat" hidden>
     <button type="submit" class="hlavni" data-hromadne-odeslat disabled>Provést</button>
   </div>
-  <p class="slabe mala"><?= Ui::cislo($vysledek['celkem']) ?> <?= $vysledek['celkem'] === 1 ? 'položka' : ($vysledek['celkem'] >= 2 && $vysledek['celkem'] <= 4 ? 'položky' : 'položek') ?></p>
+  <p class="slabe mala"><?= Ui::cislo($vysledek['celkem']) ?> <?= $vysledek['celkem'] === 1 ? 'položka' : ($vysledek['celkem'] >= 2 && $vysledek['celkem'] <= 4 ? 'položky' : 'položek') ?>
+    · více souborů vyberete tažením myši (s Ctrl nebo Shift přidáte k výběru)</p>
   <div class="galerie">
     <?php foreach ($vysledek['polozky'] as $m): $id = (int)$m['id']; $url = $media->verejnaAdresa($m); ?>
     <figure>

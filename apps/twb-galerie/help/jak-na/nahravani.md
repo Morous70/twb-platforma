@@ -12,7 +12,7 @@ Na stránce **Galerie** soubory přetáhněte do rámečku nebo klikněte na **v
 
 - Povolené jsou obrázky (JPG, PNG, GIF, WebP, BMP), videa (MP4, MOV, WebM, AVI, MKV) a PDF. Jeden soubor může mít až 1 GB.
 - Soubor se posílá po částech, takže velké video projde i na hostingu s malým limitem. Krátký výpadek spojení se třikrát zkusí znovu.
-- Před nahráním můžete vybrat **Nahrát do kategorie** a vyplnit **Tagy nových souborů** – uplatní se u všech souborů v dávce.
+- Vpravo od rámečku můžete před nahráním vybrat **Nahrát do kategorie** a zadat **Tagy nových souborů** (každý tag potvrďte Enterem) – uplatní se u všech souborů v dávce.
 - Aplikace kontroluje skutečný obsah souboru, ne jen příponu.
 - U obrázku se z metadat souboru načte **název**, **štítky**, **autor** a **licence** (viz [Autor, licence a metadata](autor-a-licence)). Když název v metadatech není, použije se název souboru.
 

@@ -134,7 +134,7 @@ $src = 'media.php?id=' . $id . '&v=' . substr((string)$m['md5'], 0, 8);
     <input type="hidden" name="akce" value="ulozit">
     <?= Ui::pole('Název', 'nazev', $m['original_name'], ['required' => true, 'maxlength' => 200]) ?>
     <?= Ui::vyber('Kategorie', 'kategorie', ['' => '— bez kategorie —'] + $kategorie, (string)($m['category_id'] ?? '')) ?>
-    <?= Ui::pole('Tagy', 'tagy', implode(', ', Media::tagy($m)), ['list' => 'seznam-tagu', 'placeholder' => 'oddělte čárkou'], 'Nejvýš 10 tagů po 30 znacích.') ?>
+    <?= Ui::pole('Tagy', 'tagy', implode(', ', Media::tagy($m)), ['list' => 'seznam-tagu', 'placeholder' => 'Napište tag a stiskněte Enter', 'data-stitky' => ''], 'Nejvýš 10 tagů po 30 znacích.') ?>
     <datalist id="seznam-tagu"><?php foreach ($tagy as $t): ?><option value="<?= Ui::h($t['name']) ?>"><?php endforeach; ?></datalist>
     <?= Ui::oblast('Poznámka', 'note', $m['note'], ['rows' => 3]) ?>
     <?= Ui::pole('Autor', 'author', $m['author'], ['maxlength' => 200, 'placeholder' => 'např. Jan Novák']) ?>

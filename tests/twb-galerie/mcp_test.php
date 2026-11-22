@@ -109,6 +109,31 @@ test('nahraj_medium: base64 s údaji o AI (licence ai, autor = model, prompt v p
     ok(str_contains((string)$s->db()->query("SELECT message FROM log WHERE message LIKE 'MCP (klíč Claude Code): nahraj_medium%'")->fetchColumn(), 'nahraj_medium'), 'protokol s klientem');
 });
 
+test('nahraj_medium: ZIP – každý obrázek zvlášť, autor, licence a údaje o AI pro všechny', function () use ($s, &$zapis) {
+    $zip = sys_get_temp_dir() . '/twb-mcp-' . bin2hex(random_bytes(4)) . '.zip';
+    $z = new ZipArchive(); $z->open($zip, ZipArchive::CREATE);
+    $z->addFromString('Zepredu.png', obrazek(40, 30)); $z->addFromString('Zboku.png', obrazek(30, 40)); $z->addFromString('popis.txt', 'x');
+    $z->close();
+    $data = base64_encode((string)file_get_contents($zip)); @unlink($zip);
+    $pred = (int)$s->db()->query('SELECT COUNT(*) FROM media')->fetchColumn();
+    $r = nastroj($s, $zapis, 'nahraj_medium', ['data_base64' => $data, 'nazev' => 'Model', 'tagy' => ['model'], 'ai_model' => 'Imagen 4', 'ai_prompt' => 'Model z několika úhlů']);
+    ok(!empty($r['zip']), json_encode($r, JSON_UNESCAPED_UNICODE));
+    eq([2, ['popis.txt'], []], [count($r['media']), $r['preskoceno'], $r['chyby']]);
+    foreach ($r['media'] as $m) {
+        eq(['Imagen 4', 'Vygenerováno AI', ['model']], [$m['autor'] ?? null, $m['licence'] ?? null, $m['tagy'] ?? null], json_encode($m, JSON_UNESCAPED_UNICODE));
+        $radek = $s->db()->query('SELECT * FROM media WHERE id = ' . (int)$m['id'])->fetch(PDO::FETCH_ASSOC);
+        ok(str_contains(json_encode($radek, JSON_UNESCAPED_UNICODE), 'Prompt: Model z několika úhlů'), 'prompt v poznámce');
+    }
+    eq($pred + 2, (int)$s->db()->query('SELECT COUNT(*) FROM media')->fetchColumn());
+    // bez přípony v názvu: rozhodne obsah ZIP
+    $z = new ZipArchive(); $zip = sys_get_temp_dir() . '/twb-mcp-' . bin2hex(random_bytes(4)) . '.zip'; $z->open($zip, ZipArchive::CREATE);
+    $z->addFromString('a.png', obrazek(20, 20)); $z->close();
+    $r = nastroj($s, $zapis, 'nahraj_medium', ['data_base64' => base64_encode((string)file_get_contents($zip)), 'licence_kod' => 'cc0']); @unlink($zip);
+    eq([true, 1, 'CC0 (volné dílo)'], [!empty($r['zip']), count($r['media'] ?? []), $r['media'][0]['licence'] ?? null], json_encode($r, JSON_UNESCAPED_UNICODE));
+    foreach ($r['media'] as $m) $s->db()->exec('DELETE FROM media WHERE id = ' . (int)$m['id']);
+    foreach (nastroj($s, $zapis, 'hledej_media', ['q' => 'Imagen'])['media'] as $m) $s->db()->exec('DELETE FROM media WHERE id = ' . (int)$m['id']);
+});
+
 test('nahraj_medium: z adresy, bez přípony podle typu, chyby se nic neuloží', function () use ($s, &$zapis) {
     $pred = (int)$s->db()->query('SELECT COUNT(*) FROM media')->fetchColumn();
     $m = nastroj($s, $zapis, 'nahraj_medium', ['url' => 'https://example.com/obrazky/vygenerovano', 'licence_kod' => 'cc0'])['medium'];

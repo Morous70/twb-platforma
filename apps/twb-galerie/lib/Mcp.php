@@ -57,6 +57,8 @@ final class Mcp
             new Nastroj('nahraj_medium', 'Nahrát médium do galerie',
                 'Uloží do galerie nový obrázek, video nebo PDF – typicky médium vytvořené AI. Zdroj: url (veřejná adresa http/https, galerie si soubor stáhne, až 1 GB) '
                 . 'nebo data_base64 (obsah souboru v base64, do 20 MB; pak zadej i nazev s příponou nebo mime). Typ se ověří podle obsahu. '
+                . 'Víc obrázků najednou: pošli ZIP (nazev nebo adresa končí na .zip, u data_base64 stačí obsah ZIP) – každý obrázek se uloží zvlášť '
+                . 'a tagy, kategorie, poznámka, autor, licence i údaje o AI platí pro všechny; vrací media, preskoceno a chyby. '
                 . 'Údaje: nazev, tagy, kategorie, poznamka, autor a licence. U obsahu z AI vyplň ai_model a ai_prompt: licence bude „Vygenerováno AI“, '
                 . 'autor název modelu a model s promptem se uloží do poznámky (jde podle nich hledat). Vrací uložené médium s odkazy.',
                 ['type' => 'object', 'properties' => [
@@ -180,7 +182,18 @@ final class Mcp
             if ($docasny !== null && is_file($docasny)) @unlink($docasny);
         }
         if (!empty($r['zip'])) {
-            return ['zip' => true, 'media' => array_map(fn($m) => $this->kratce($m), $r['media']), 'preskoceno' => $r['preskoceno'], 'chyby' => $r['chyby']];
+            // ZIP: autor, licence a údaje o AI platí pro každý rozbalený obrázek (mají přednost před metadaty obrázku)
+            $media = [];
+            $chyby = $r['chyby'];
+            foreach ($r['media'] as $m) {
+                if ($upravy) {
+                    try { $m = $this->api('PATCH', 'media/' . $m['id'], [], $upravy)['medium']; }
+                    catch (\RuntimeException $e) { $chyby[] = "{$m['nazev']}: autora a licenci se nepodařilo zapsat – " . $e->getMessage(); }
+                }
+                $media[] = $this->kratce($m);
+            }
+            $this->app->log('info', 'MCP: ZIP, nahráno ' . count($media) . ' obrázků' . ($ai ? ' (AI)' : '') . '.');
+            return ['zip' => true, 'media' => $media, 'preskoceno' => $r['preskoceno'], 'chyby' => $chyby];
         }
         $m = $r['medium'];
         if ($upravy) $m = $this->api('PATCH', 'media/' . $m['id'], [], $upravy)['medium'];

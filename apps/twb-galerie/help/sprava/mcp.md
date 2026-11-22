@@ -49,7 +49,10 @@ Když AI u `nahraj_medium` vyplní `ai_model` nebo `ai_prompt`, galerie:
 - jako autora uvede název modelu (jde přepsat polem `autor`),
 - do poznámky připíše „Vytvořeno AI (model).“ a prompt – podle obojího pak jde médium najít hledáním.
 
-Typ souboru galerie ověří podle obsahu stejně jako při běžném nahrání; ZIP s obrázky se rozbalí na samostatná média.
+Typ souboru galerie ověří podle obsahu stejně jako při běžném nahrání.
+
+## ZIP s obrázky
+Víc obrázků najednou pošle AI jako ZIP: `nazev` nebo adresa končí na `.zip`, u `data_base64` stačí, že obsah je ZIP. Každý obrázek se uloží jako samostatné médium a tagy, kategorie, poznámka, autor, licence i údaje o AI (`ai_model`, `ai_prompt`) platí pro všechny – mají přednost před metadaty obrázků. Jiné soubory v ZIPu se přeskočí. Odpověď vrátí seznam `media`, přeskočené soubory `preskoceno` a `chyby`.
 Soubor z adresy se stahuje jen z veřejných adres (ne z vnitřní sítě). Větší soubory než 20 MB posílejte přes adresu.
 
 ## Zabezpečení

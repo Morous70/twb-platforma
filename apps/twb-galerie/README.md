@@ -18,6 +18,7 @@ Hosting Wedos NoLimit, PHP 8.5 (kód běží od 8.1), SQLite, bez Composeru.
 | 0.5.1 | Galerie: nahrávání ve dvou sloupcích (soubory vlevo, kategorie a tagy vpravo), tagy jako štítky s našeptáváním (galerie i detail), výběr médií tažením myši (Ctrl/Shift přidá, Esc zruší, posun u okraje) | hotovo |
 | 0.6.1 | Hledání `q` jako fulltext: každé slovo v názvu, tazích, autorovi i poznámce, bez diakritiky a velikosti písmen, fráze v uvozovkách, řazení podle relevance (`razeni=relevance`, výchozí s `q`, pole `relevance`), `q_rezim` všechna / kterékoli slovo, aliasy `all` / `any` u `q_rezim` i `tagy_rezim`; totéž hledání v galerii v administraci | hotovo |
 | 0.6.2 | Galerie v administraci: přepínač zobrazení **Mřížka / Seznam / Jen média** (zapamatuje se), větší náhled obrázku (1920 px) nebo přehrání videa v modálním okně s listováním šipkami; `media.php?nahled=<px>` | hotovo |
+| 0.6.3 | Okno náhledu jednotně v celé aplikaci (galerie, přehled, detail včetně originálu, PDF a veřejného odkazu); nic se neotevírá v nové kartě, Ctrl i prostřední klik otevřou okno; v okně Stáhnout místo Původní soubor | hotovo |
 | 0.6 | Galerie jako zdroj médií pro jiné aplikace (podobně jako Pixabay nebo Wikimedia Commons): náhledy 150–1920 px (trvalé u veřejného odkazu, jinak podepsané na 1–2 h), stažení v dané velikosti, licence jako kód ze společného modulu `licence` (shodný se Social Plannerem) s verzí a hotovou atribucí, orientace, trvalá adresa média, rozpoznání vloženého odkazu (`/media/odkaz`), filtry orientace, min. rozměry, více tagů, kategorie podle názvu, výběr podle id, náhodné pořadí se semenem, číselník `/licence`, ETag/304, limit požadavků na klíč; nápověda „Napojení jiné aplikace“ | hotovo |
 
 ## Struktura
@@ -117,10 +118,14 @@ data/            databáze galerie.sqlite, média (media/), náhledy (nahledy/, 
   `Jen média` (jen obrázky bez popisků, oříznuté do čtverců, zaškrtávátko se ukáže po najetí myší nebo když je něco vybráno). Volby jsou `Media::ZOBRAZENI`.
   Odkaz `?p=galerie&zobrazeni=<mrizka|seznam|media>` zobrazení přepne a uloží do nastavení `galerie_zobrazeni` (místní, obnova zálohy ho nemění);
   další stránky, filtry a hromadné akce už parametr nepotřebují. Všechna zobrazení mají stejné `<figure>`, takže hromadné akce i výběr tažením fungují ve všech.
-- **Okno náhledu** (`assets/app.js`): klik na náhled obrázku nebo videa otevře modální okno místo detailu. Obrázek je náhled 1920 px
-  (`Media::NAHLED_VELKY_PX`, `media.php?id=&nahled=1920`; menší obrázek se pošle celý), video se přehraje. Šipky ← → (i tlačítka) listují médii na stránce,
-  sousední obrázky se načtou dopředu; Esc, křížek nebo klik vedle obrázku okno zavře. Dole název, rozměry, pořadí a tlačítka Detail, Původní soubor
-  a Kopírovat odkaz (když má médium veřejný odkaz). PDF se otevře v detailu jako dřív; Ctrl/Cmd nebo prostřední klik otevře detail v nové kartě, název vede na detail.
+- **Okno náhledu** (0.6.3 jednotné pro celou aplikaci, `assets/app.js` + `Ui::okno`): prvek s `data-otevrit-okno` uvnitř skupiny `data-okno-skupina`
+  otevře médium v modálním okně; položky skupiny nesou atributy z `Ui::okno($m, $verejna, $src, $detail, $popis)` (`data-okno` druh, `data-okno-src`,
+  název, popis, odkaz na detail, stažení, veřejný odkaz). Obrázek je náhled 1920 px (`Media::NAHLED_VELKY_PX`, `media.php?id=&nahled=1920`; menší obrázek
+  se pošle celý), video se přehraje, PDF se ukáže v rámu. Šipky ← → (i tlačítka) listují skupinou, sousední obrázky se načtou dopředu; Esc, křížek nebo klik
+  vedle okno zavře. Dole název, rozměry, pořadí a tlačítka Detail (ve stejné kartě, v detailu se skryje), Stáhnout a Kopírovat odkaz.
+  Skupiny: mřížka galerie, Naposledy nahrané v přehledu, obrázek / PDF v detailu, „zobrazit“ u originálu před kompresí, „Otevřít“ u veřejného odkazu.
+  **Nic se neotevírá v nové kartě**: klik s Ctrl/Shift/Cmd i prostřední tlačítko otevřou také okno; na detail vede název média (a tlačítko Detail v okně).
+  V nové kartě zůstává jen externí odkaz „podmínky licence“.
 - `media.php?nahled=<px>` vydá variantu `Media::varianta` pro px z `Media::NAHLEDY` (ETag obsahuje velikost); `nahled=1` zůstává 480 px pro mřížku.
 
 ## Zálohy, aktualizace a cron (0.4)

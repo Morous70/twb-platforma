@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 // TWB Media galerie 0.5.1 ve skutečném prohlížeči (Playwright): tagy jako štítky, výběr médií tažením myši, nahrání s tagy;
-// 0.6.2 zobrazení galerie (mřížka, seznam, jen média) a větší náhled v okně.
+// 0.6.2 zobrazení galerie (mřížka, seznam, jen média) a větší náhled v okně; 0.6.3 okno i v detailu a přehledu, nic v nové kartě.
 require __DIR__ . '/pomocne.php';
 require __DIR__ . '/server.php';
 
@@ -169,7 +169,7 @@ JS);
     eq('mrizka', (string)$s->db()->query("SELECT v FROM settings WHERE k = 'galerie_zobrazeni'")->fetchColumn());
 });
 
-test('0.6.2: klik na náhled otevře větší obrázek v okně; šipky listují; Esc zavře; Ctrl+klik vede na detail', function () use ($pw, $s) {
+test('0.6.2: klik na náhled otevře větší obrázek v okně; šipky listují; Esc zavře; Ctrl+klik i prostřední klik také okno, žádná nová karta', function () use ($pw, $s) {
     if (!$pw) { echo "      (přeskočeno: chybí node nebo playwright)\n"; return; }
     $v = prohlizec($s->url, <<<'JS'
   await p.goto(u + 'index.php?p=galerie');
@@ -179,8 +179,9 @@ test('0.6.2: klik na náhled otevře větší obrázek v okně; šipky listují;
     titulek: document.querySelector('[data-okno-titulek]').textContent, udaje: document.querySelector('[data-okno-udaje]').textContent }));
   v.otevreno = await stav();
   v.adresa = p.url();
-  v.detail = await p.getAttribute('.okno-nahled [data-okno-detail]', 'href');
-  v.original = await p.getAttribute('.okno-nahled [data-okno-original]', 'href');
+  v.detail = await p.getAttribute('.okno-nahled [data-okno-na-detail]', 'href');
+  v.original = await p.getAttribute('.okno-nahled [data-okno-na-stazeni]', 'href');
+  v.detailTarget = await p.getAttribute('.okno-nahled [data-okno-na-detail]', 'target');
   v.obrazek = await p.evaluate(async src => (await fetch(src)).headers.get('content-type'), v.otevreno.src);
   await p.keyboard.press('ArrowRight'); v.dalsi = (await stav()).titulek;
   await p.keyboard.press('ArrowLeft'); await p.keyboard.press('ArrowLeft'); v.predchozi = (await stav()).titulek;
@@ -192,15 +193,23 @@ test('0.6.2: klik na náhled otevře větší obrázek v okně; šipky listují;
   await p.click('.galerie figure >> nth=0 >> .nahled-medium');
   await p.click('.okno-plocha', { position: { x: 5, y: 5 } });
   v.klikVedle = await p.$$eval('.okno-nahled[hidden]', e => e.length);
-  const [nova] = await Promise.all([p.context().waitForEvent('page'), p.click('.galerie figure >> nth=0 >> .nahled-medium', { modifiers: ['Control'] })]);
-  await nova.waitForLoadState(); v.ctrl = nova.url();
+  let stranek = 0; p.context().on('page', () => stranek++);
+  await p.click('.galerie figure >> nth=0 >> .nahled-medium', { modifiers: ['Control'] });
+  await p.waitForTimeout(300);
+  v.ctrl = [await p.$$eval('.okno-nahled:not([hidden])', e => e.length), p.url().endsWith('p=galerie')];
+  await p.keyboard.press('Escape');
+  await p.click('.galerie figure >> nth=0 >> .nahled-medium', { button: 'middle' });
+  await p.waitForTimeout(300);
+  v.prostredni = await p.$$eval('.okno-nahled:not([hidden])', e => e.length);
+  v.noveStranky = stranek;
 JS);
     ok(str_contains($v['otevreno']['src'], 'nahled=1920'), $v['otevreno']['src']);
     eq('obrazek-5.jpg', $v['otevreno']['titulek'], 'mřížka je od nejnovějšího');
     ok(str_contains($v['otevreno']['udaje'], '2 / 6'), $v['otevreno']['udaje']);
     ok(str_ends_with($v['adresa'], 'p=galerie'), 'okno neopustí galerii');
     ok(str_contains($v['detail'], 'p=medium&id='));
-    ok(!str_contains($v['original'], 'nahled='), $v['original']);
+    ok(str_contains($v['original'], 'stahnout=1') && !str_contains($v['original'], 'nahled='), $v['original']);
+    eq(null, $v['detailTarget'], 'detail ve stejné kartě');
     eq('image/jpeg', $v['obrazek']);
     eq('obrazek-4.jpg', $v['dalsi']);
     eq('obrazek-6.jpg', $v['predchozi']);
@@ -209,7 +218,43 @@ JS);
     eq(1, $v['zavreno']);
     eq(0, $v['vyber'], 'klik na náhled nic nevybere');
     eq(1, $v['klikVedle'], 'klik mimo obrázek okno zavře');
-    ok(str_contains($v['ctrl'], 'p=medium&id='), $v['ctrl']);
+    eq([1, true], $v['ctrl'], 'Ctrl+klik otevře okno, ne novou kartu');
+    eq(1, $v['prostredni'], 'prostřední klik otevře okno');
+    eq(0, $v['noveStranky'], 'žádná nová karta');
+});
+
+test('0.6.3: v detailu a přehledu klik na obrázek otevře stejné okno, ne novou kartu', function () use ($pw, $s) {
+    if (!$pw) { echo "      (přeskočeno: chybí node nebo playwright)\n"; return; }
+    $id = (int)$s->db()->query("SELECT id FROM media WHERE original_name = 'obrazek-2.jpg'")->fetchColumn();
+    $v = prohlizec($s->url, <<<JS
+  let stranek = 0; p.context().on('page', () => stranek++);
+  await p.goto(u + 'index.php?p=medium&id=$id');
+  v.target = await p.\$\$eval('.nahled-detail a', e => e.map(x => x.target));
+  await p.click('.nahled-detail img');
+  await p.waitForSelector('.okno-nahled:not([hidden]) img');
+  v.detail = await p.evaluate(() => ({ src: document.querySelector('.okno-nahled img').getAttribute('src'), titulek: document.querySelector('[data-okno-titulek]').textContent,
+    naDetail: document.querySelector('[data-okno-na-detail]').hidden, sipky: document.querySelector('.okno-dalsi').hidden }));
+  v.adresa = p.url();
+  await p.keyboard.press('Escape');
+  await p.click('.nahled-detail img', { modifiers: ['Control'] });
+  v.ctrl = await p.\$\$eval('.okno-nahled:not([hidden])', e => e.length);
+  await p.keyboard.press('Escape');
+  await p.goto(u + 'index.php?p=prehled');
+  await p.click('.galerie-mala figure >> nth=0 >> .nahled-medium');
+  v.prehled = await p.\$\$eval('.okno-nahled:not([hidden]) img', e => e.length);
+  v.prehledAdresa = p.url();
+  v.stranek = stranek;
+JS);
+    eq(['', ], array_slice($v['target'], 0, 1), 'odkaz obrázku bez target=_blank');
+    ok(str_contains($v['detail']['src'], "id=$id"), $v['detail']['src']);
+    eq('obrazek-2.jpg', $v['detail']['titulek']);
+    eq(true, $v['detail']['naDetail'], 'v detailu tlačítko Detail chybí');
+    eq(true, $v['detail']['sipky'], 'jedno médium: bez šipek');
+    ok(str_contains($v['adresa'], 'p=medium'), $v['adresa']);
+    eq(1, $v['ctrl']);
+    eq(1, $v['prehled'], 'přehled: okno');
+    ok(str_contains($v['prehledAdresa'], 'p=prehled'), $v['prehledAdresa']);
+    eq(0, $v['stranek'], 'žádná nová karta');
 });
 
 test('detail: štítky se uloží, rozepsaný tag se při uložení přidá', function () use ($pw, $s) {

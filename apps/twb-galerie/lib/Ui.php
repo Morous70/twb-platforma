@@ -58,6 +58,26 @@ final class Ui
 
     public static function h(mixed $s): string { return htmlspecialchars((string)$s, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'); }
 
+    /**
+     * Atributy položky okna náhledu (assets/app.js): klik na prvek s data-otevrit-okno uvnitř skupiny data-okno-skupina
+     * otevře médium v modálním okně a šipky listují položkami skupiny. Obrázek se ukáže jako náhled 1920 px, video a PDF celé.
+     * $verejna = veřejný odkaz (tlačítko Kopírovat odkaz), $src = jiný soubor (originál před kompresí), $detail = tlačítko Detail v okně.
+     */
+    public static function okno(array $m, ?string $verejna = null, ?string $src = null, bool $detail = true, string $popis = ''): string
+    {
+        $id = (int)$m['id'];
+        $v = substr((string)$m['md5'], 0, 8);
+        $soubor = "media.php?id={$id}&v={$v}";
+        $src ??= $m['kind'] === 'image' ? "media.php?id={$id}&nahled=" . Media::NAHLED_VELKY_PX . "&v={$v}" : $soubor;
+        $a = ['data-okno' => (string)$m['kind'], 'data-okno-src' => $src, 'data-okno-nazev' => (string)$m['original_name'],
+            'data-okno-popis' => $popis !== '' ? $popis : Media::popis($m), 'data-okno-stahnout' => $soubor . '&stahnout=1'];
+        if ($detail) $a['data-okno-detail'] = self::odkaz('medium', ['id' => $id]);
+        if ($verejna) $a['data-okno-odkaz'] = $verejna;
+        $out = '';
+        foreach ($a as $k => $h) $out .= ' ' . $k . '="' . self::h($h) . '"';
+        return $out;
+    }
+
     /** Odkaz na stránku administrace. @param array<string, scalar|null> $parametry */
     public static function odkaz(string $stranka, array $parametry = []): string
     {

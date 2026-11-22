@@ -11,7 +11,7 @@ klicova: přehled, galerie, média, kategorie
 TWB Media galerie je soukromé odkladiště obrázků, videí a PDF, které si vytvoříte a zatím je nepoužijete ve svých aplikacích – aby nic nezapadlo a šlo to kdykoli najít. Používá ji jeden správce.
 
 - **Přehled** ukazuje, kolik máte obrázků a videí a kolik místa zabírají.
-- **Galerie** je místo, kam média nahrajete (i velká videa) a kde je spravujete: tagy, archiv, nahrazení souboru, komprese. Vpravo nad médii přepnete zobrazení **Mřížka**, **Seznam** nebo **Jen média** (aplikace si ho pamatuje); klik na náhled otevře větší obrázek v okně, šipkami ← → v něm listujete a Esc ho zavře.
+- **Galerie** je místo, kam média nahrajete (i velká videa) a kde je spravujete: tagy, archiv, nahrazení souboru, komprese. Vpravo nad médii přepnete zobrazení **Mřížka**, **Seznam** nebo **Jen média** (aplikace si ho pamatuje); klik na náhled (v galerii, v přehledu i v detailu média) otevře větší obrázek v okně, šipkami ← → v něm listujete a Esc ho zavře. Na detail média se dostanete kliknutím na jeho název nebo tlačítkem Detail v okně.
 - **Kategorie** jsou složky, do kterých média roztřídíte.
 - **Nastavení** obsahuje zabezpečení: heslo, e-mail pro obnovu hesla, automatické odhlášení, Google a Passkey.
 

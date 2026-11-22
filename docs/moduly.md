@@ -89,7 +89,7 @@ php tests/run.php tagy       # jeden modul
 ## Sestavení balíčků (`tools/sestavit.php`)
 
 ```
-php tools/sestavit.php <aplikace>              # dist/twb-<app>-<verze>-full.zip a -update.zip
+php tools/sestavit.php <aplikace>              # dist/twb-<app>-<verze>-full.zip a -update.zip (slug twb-… bez zdvojení předpony)
 php tools/sestavit.php <aplikace> --kontrola   # jen ověří modules.lock a vypíše počty souborů
 php tools/sestavit.php <aplikace> --zamek      # přepíše modules.lock podle verzí z module.json
 php tools/sestavit.php <aplikace> --bez-lintu --cil=složka

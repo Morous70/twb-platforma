@@ -1,0 +1,5 @@
+{
+    "koren": "twb-galerie/",
+    "povinne": ["index.php", "health.php", "lib/bootstrap.php"],
+    "jen_full": ["install.php", "config.sample.php", "data"]
+}

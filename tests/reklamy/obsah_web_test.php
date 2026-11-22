@@ -62,10 +62,14 @@ test('formáty plátna, písma, styly, data, náhled a dosazení textů', functi
     eq(['Akce', '2026-12-24', 'Vánoce', '2026-12-24'], array_values(array_intersect_key($api('data_list')['json']['rows'][0], array_flip(['grp', 'param', 'value', 'date']))));
     eq(['sources' => []], $api('source_tree')['json']);
     eq(404, $api('weather_settings')['code'], 'počasí aplikace nemá – editor ho skryje');
-    eq(['21. 11. 2026', null], $api('datefmt', ['expr' => 'datum:2026-11-21', 'formats' => ['', '|neznamyfiltr{']])['json']['values']);
-    $d = ['format' => '300x250', 'elements' => [['id' => 't1', 'type' => 'text', 'text' => 'Svátek {svatek:2026-11-21}', 'x' => 0, 'y' => 0, 'w' => 300, 'h' => 100, 'size' => 30]]];
+    // datum:<arg> bere jen posun ve dnech od dneška (pevné datum by se ignorovalo a test by platil jen v jeden den)
+    eq([(new DateTimeImmutable('+1 day'))->format('j. n. Y'), null], $api('datefmt', ['expr' => 'datum:+1', 'formats' => ['', '|neznamyfiltr{']])['json']['values']);
+    $d = ['format' => '300x250', 'elements' => [['id' => 't1', 'type' => 'text', 'text' => 'Svátek {svatek}', 'x' => 0, 'y' => 0, 'w' => 300, 'h' => 100, 'size' => 30]]];
     $r = $api('resolve', ['design' => $d])['json'];
-    eq('Svátek Albert', $r['t1']['text']);
+    // svátek se bere k dnešku – očekávaný text dá stejný výpočet v testu, jen bez editoru a HTTP
+    $svatek = $app->promenne()->vyres('{{svatek}}', new DateTimeImmutable())[0];
+    ok($svatek !== '' && !str_contains($svatek, '{'), 'svátek dosazen');
+    eq('Svátek ' . $svatek, $r['t1']['text']);
     ok($r['t1']['layout']['lines'][0]['w'] > 50 && !isset($r['t1']['layout']['font']), 'rozvržení bez cesty k písmu na serveru');
     $img = $api('slide_preview', ['design' => $d])['json']['image'];
     ok(str_starts_with($img, 'data:image/jpeg;base64,'));

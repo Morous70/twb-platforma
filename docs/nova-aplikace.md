@@ -41,4 +41,4 @@ apps/<slug>/
 - Nový společný kus: nový modul (`module.json`, `src/`, `tests/<modul>/`, řádek v tabulce `docs/moduly.md`).
 
 ## 5. Vydání
-`php tools/sestavit.php <slug>` → `dist/twb-<slug>-<verze>-full.zip` (první instalace přes FTP) a `-update.zip` (Update Server). SHA-256 a velikost se vypíšou.
+`php tools/sestavit.php <slug>` → `dist/twb-<slug>-<verze>-full.zip` (první instalace přes FTP; slug, který už začíná `twb-`, předponu nezdvojí) a `-update.zip` (Update Server). SHA-256 a velikost se vypíšou.

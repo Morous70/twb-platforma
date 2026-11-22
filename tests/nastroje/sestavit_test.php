@@ -90,6 +90,11 @@ test('FULL: soubory aplikace, moduly bez testů, BUILD.json; bez config.php a da
     smazStrom($k);
 });
 
+test('název balíčku: předpona twb- se nezdvojí', function () {
+    eq('twb-reklamy-0.8.0-full.zip', Sestavovac::nazevBalicku('reklamy', '0.8.0', 'full'));
+    eq('twb-galerie-0.4.0-update.zip', Sestavovac::nazevBalicku('twb-galerie', '0.4.0', 'update'));
+});
+
 test('UPDATE: bez instalátoru, vzorové konfigurace a složky data', function () {
     $k = uloziste();
     $r = (new Sestavovac($k, fn() => 1700000000))->sestav('x', "$k/dist");

@@ -190,10 +190,16 @@ final class Sestavovac
             if ($this->lint) $this->zkontrolujPhp($soubory);
             if (($soubory['VERSION'] ?? null) === null) throw new RuntimeException('V balíčku chybí VERSION.');
             @mkdir($cil, 0775, true);
-            $zip = "$cil/twb-$app-{$a['verze']}-$druh.zip";
+            $zip = $cil . '/' . self::nazevBalicku($app, $a['verze'], $druh);
             $out[$druh] = $this->zapis($zip, $a, $soubory, $druh);
         }
         return $out;
+    }
+
+    /** Název ZIPu: twb-<aplikace>-<verze>-<druh>.zip; aplikace se jménem twb-… předponu nezdvojí (twb-galerie → twb-galerie-0.4.0-full.zip). */
+    public static function nazevBalicku(string $app, string $verze, string $druh): string
+    {
+        return (str_starts_with($app, 'twb-') ? $app : "twb-$app") . "-$verze-$druh.zip";
     }
 
     /** @param array<string,string> $soubory */

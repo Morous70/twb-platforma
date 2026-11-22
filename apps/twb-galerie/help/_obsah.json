@@ -1,0 +1,42 @@
+{
+  "sekce": [
+    {
+      "id": "zaciname",
+      "titulek": "Začínáme",
+      "stranky": [
+        "co-aplikace-umi"
+      ]
+    },
+    {
+      "id": "jak-na",
+      "titulek": "Jak na…",
+      "stranky": [
+        "nahravani",
+        "verejne-odkazy",
+        "kategorie-a-tagy"
+      ]
+    },
+    {
+      "id": "sprava",
+      "titulek": "Správa",
+      "stranky": [
+        "prihlaseni",
+        "zapomenute-heslo",
+        "google",
+        "api",
+        "zalohy",
+        "aktualizace",
+        "cron"
+      ]
+    }
+  ],
+  "kontext": {
+    "prehled": "co-aplikace-umi",
+    "galerie": "nahravani",
+    "nastaveni": "prihlaseni",
+    "protokol": "prihlaseni",
+    "medium": "verejne-odkazy",
+    "kategorie": "kategorie-a-tagy",
+    "api": "api"
+  }
+}

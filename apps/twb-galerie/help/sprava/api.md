@@ -100,11 +100,13 @@ POST `/media` jako `multipart/form-data`:
 |---|---|
 | `soubor` | soubor (obrázek, video, PDF) nebo ZIP s obrázky |
 | `url` | místo souboru: veřejná adresa http(s), ze které se soubor stáhne |
-| `nazev` | název (výchozí = název z metadat obrázku, jinak název souboru) |
+| `nazev` | název (výchozí = název z metadat obrázku, jinak název souboru). Bez přípony (např. jen „Čelní pohled 30°“) se přípona doplní z názvu poslaného souboru, a když ani ten ji nemá, podle obsahu souboru |
 | `kategorie` | id kategorie |
 | `tagy` | tagy oddělené čárkou |
 | `poznamka` | poznámka |
 | `uid`, `index`, `celkem` | velký soubor po částech: stejné `uid` (32 hex znaků), `index` od 0, `celkem` = počet částí |
+
+Typ souboru se ověřuje podle obsahu, ne podle hlavičky `Content-Type` ani přípony: soubor poslaný jako `application/octet-stream` nebo bez přípony projde, když je to obrázek, video nebo PDF. Chybová hláška u nepovoleného typu uvádí, co soubor skutečně obsahuje.
 
 Adresa (`url`) musí být veřejná: vnitřní síť a místní adresy se odmítnou, přesměrování nejvýš 3. Soubor může mít až 1 GB.
 Při nahrávání po částech vrací každá část kromě poslední `{"ok": true, "hotovo": false}`; poslední vrátí médium. Části musí jít popořadě.

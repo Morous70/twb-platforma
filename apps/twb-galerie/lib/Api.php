@@ -344,7 +344,9 @@ final class Api
                     throw new Chyba('Soubor se nepodařilo uložit.');
                 }
             }
-            if ($nazev === '') $nazev = (string)($f['name'] ?? 'soubor');
+            $puvodni = (string)($f['name'] ?? '');
+            if ($nazev === '') $nazev = $puvodni !== '' ? $puvodni : 'soubor';
+            elseif (pathinfo($nazev, PATHINFO_EXTENSION) === '' && pathinfo($puvodni, PATHINFO_EXTENSION) !== '') $nazev .= '.' . pathinfo($puvodni, PATHINFO_EXTENSION);
         } elseif (isset($v['url']) && is_string($v['url'])) {
             $cesta = $tmp . '/url-' . bin2hex(random_bytes(8));
             $zAdresy = $this->app->zAdresy()->stahni(trim($v['url']), $cesta);

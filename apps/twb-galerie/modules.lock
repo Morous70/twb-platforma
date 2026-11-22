@@ -2,7 +2,7 @@
     "app": "twb-galerie",
     "moduly": {
         "aktualizace": "0.1.0",
-        "galerie": "0.1.0",
+        "galerie": "0.1.1",
         "jadro": "0.1.0",
         "licence": "0.1.0",
         "mcp": "0.1.0",

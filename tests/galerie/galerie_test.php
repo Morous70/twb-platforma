@@ -39,12 +39,34 @@ test('nahraný obrázek se uloží s rozměry, druhem a náhodným názvem soubo
 });
 test('nepovolená přípona, podvržený obsah a falešné PDF se odmítnou a dočasný soubor zmizí', function () {
     [$h, $g] = galerie();
-    foreach ([[text('<?php echo 1;', 'php'), 'x.php', 'Nepodporovaný'], [text('jen text', 'jpg'), 'x.jpg', 'není obrázek'], [text('jen text', 'pdf'), 'x.pdf', 'není platné PDF'], [pdf(), 'bez-pripony', 'Nepodporovaný']] as [$p, $n, $msg]) {
+    foreach ([[text('<?php echo 1;', 'php'), 'x.php', 'Nepodporovaný'], [text('jen text', 'jpg'), 'x.jpg', 'není obrázek'], [text('jen text', 'pdf'), 'x.pdf', 'není platné PDF'], [text('jen text', 'txt'), 'bez-pripony', 'Nepodporovaný typ souboru bez přípony (obsah: text/plain)']] as [$p, $n, $msg]) {
         throws(fn() => $g->uloz($p, $n), $msg);
         ok(!is_file($p), 'dočasný soubor smazán');
     }
     eq([], soubory($h->datovaSlozka . '/media'));
     eq(0, (int)$h->db->q('SELECT COUNT(*) FROM media')->fetchColumn());
+});
+test('název bez přípony (jen titulek): přípona se doplní podle obsahu, jen z povolených typů', function () {
+    [$h, $g] = galerie(['img_auto' => '0']);
+    $m = $g->radek($g->uloz(obrazek(120, 80), 'Čelní pohled 30°')['id']);
+    eq(['Čelní pohled 30°.jpg', 'image/jpeg', 'image', 120], [$m['nazev'], $m['mime'], $m['druh'], (int)$m['sirka']]);
+    ok(str_ends_with($m['soubor'], '.jpg'));
+    $m = $g->radek($g->uloz(obrazek(50, 40, 'png'), 'Boční pohled v1.5')['id']);
+    eq(['Boční pohled v1.5.png', 'image/png'], [$m['nazev'], $m['mime']]);
+    eq('Sken.pdf', $g->radek($g->uloz(pdf(), 'Sken.')['id'])['nazev']);
+    // podvržený obsah se bez přípony nepřijme a chyba řekne, co soubor obsahuje
+    throws(fn() => $g->uloz(text('<?php echo 1;', 'bin'), 'skript'), 'obsah: text/x-php');
+    throws(fn() => $g->uloz(text('<?php echo 1;', 'bin'), 'x.php'), 'Nepodporovaný typ souboru .php (obsah: text/x-php)');
+    eq(3, (int)$h->db->q('SELECT COUNT(*) FROM media')->fetchColumn());
+});
+test('typ podle obsahu: přípona pro zjištěný typ a rozpoznání podle prvních bajtů', function () {
+    [, $g] = galerie();
+    eq('jpg', $g->priponaProMime('image/jpeg')); eq('bmp', $g->priponaProMime('image/x-ms-bmp')); eq('mp4', $g->priponaProMime('video/mp4'));
+    eq(null, $g->priponaProMime('image/svg+xml')); eq(null, $g->priponaProMime('application/zip')); eq(null, $g->priponaProMime(null));
+    eq('a.jpg', $g->nazevSPriponou('a.jpg', 'image/png'), 'povolená přípona se nemění');
+    eq('a.exe', $g->nazevSPriponou('a.exe', 'application/x-dosexec'));
+    eq('image/png', Galerie::zjistiMime(obrazek(10, 10, 'png')));
+    eq('application/pdf', Galerie::zjistiMime(pdf()));
 });
 test('lomítka v názvu se nahradí; PDF a video se uloží jako svůj druh', function () {
     [$h, $g] = galerie();

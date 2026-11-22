@@ -153,6 +153,55 @@ final class Galerie
 
     private function ted(): string|int { $t = ($this->cas)(); return $this->casFormat === 'unix' ? $t : date('Y-m-d H:i:s', $t); }
 
+    /** Odchylné názvy typů z libmagic → přípona. */
+    private const ALIASY = ['image/x-ms-bmp' => 'bmp', 'image/x-bmp' => 'bmp', 'video/x-m4v' => 'm4v', 'image/jpg' => 'jpg', 'image/pjpeg' => 'jpg'];
+
+    /**
+     * Typ souboru podle obsahu: finfo, bez něj podle prvních bajtů (JPEG, PNG, GIF, WebP, BMP, PDF, MP4/MOV, WebM/MKV, AVI).
+     * null = typ nejde zjistit (bez finfo a neznámé bajty).
+     */
+    public static function zjistiMime(string $cesta): ?string
+    {
+        if (function_exists('finfo_open')) {
+            $f = finfo_open(FILEINFO_MIME_TYPE);
+            $t = $f ? finfo_file($f, $cesta) : false;
+            if (is_string($t) && $t !== '') return strtolower($t);
+        }
+        $b = (string)@file_get_contents($cesta, false, null, 0, 16);
+        return match (true) {
+            str_starts_with($b, "\xFF\xD8\xFF") => 'image/jpeg',
+            str_starts_with($b, "\x89PNG\r\n\x1A\n") => 'image/png',
+            str_starts_with($b, 'GIF87a'), str_starts_with($b, 'GIF89a') => 'image/gif',
+            str_starts_with($b, 'RIFF') && substr($b, 8, 4) === 'WEBP' => 'image/webp',
+            str_starts_with($b, 'RIFF') && substr($b, 8, 4) === 'AVI ' => 'video/x-msvideo',
+            str_starts_with($b, 'BM') => 'image/bmp',
+            str_starts_with($b, '%PDF-') => 'application/pdf',
+            substr($b, 4, 4) === 'ftyp' => substr($b, 8, 2) === 'qt' ? 'video/quicktime' : 'video/mp4',
+            str_starts_with($b, "\x1A\x45\xDF\xA3") => 'video/webm',
+            default => null,
+        };
+    }
+
+    /** Povolená přípona pro typ zjištěný z obsahu, nebo null. */
+    public function priponaProMime(?string $mime): ?string
+    {
+        if ($mime === null) return null;
+        if (isset(self::ALIASY[$mime]) && isset($this->povolene[self::ALIASY[$mime]])) return self::ALIASY[$mime];
+        $p = array_search($mime, $this->povolene, true);
+        return is_string($p) ? $p : null;
+    }
+
+    /**
+     * Název s příponou: když název nemá povolenou příponu (klient poslal třeba jen titulek „Čelní pohled 30°“),
+     * doplní se přípona podle obsahu souboru – jen z povolených typů. Jinak se název nemění.
+     */
+    public function nazevSPriponou(string $nazev, ?string $mime): string
+    {
+        if (isset($this->povolene[strtolower(pathinfo($nazev, PATHINFO_EXTENSION))])) return $nazev;
+        $p = $this->priponaProMime($mime);
+        return $p !== null ? rtrim($nazev, '.') . ".{$p}" : $nazev;
+    }
+
     /**
      * Uloží nahraný soubor do galerie (soubor $cesta se přesune). $nahradId = „Nahradit soubor“: stejná položka, nový soubor.
      * @param list<string> $tagy tagy nové položky (u nahrazení se neuplatní)
@@ -161,15 +210,19 @@ final class Galerie
     public function uloz(string $cesta, string $nazev, array $tagy = [], ?int $nahradId = null): array
     {
         $nazev = trim(str_replace(['/', '\\', "\0"], '_', $nazev));
-        $pripona = strtolower(pathinfo($nazev, PATHINFO_EXTENSION));
         try {
-            if ($nazev === '' || !isset($this->povolene[$pripona])) throw new RuntimeException("Nepodporovaný typ souboru .$pripona – povoleny jsou obrázky, videa a PDF.");
+            $zjisten = self::zjistiMime($cesta);
+            if ($nazev !== '') $nazev = $this->nazevSPriponou($nazev, $zjisten);
+            $pripona = strtolower(pathinfo($nazev, PATHINFO_EXTENSION));
+            if ($nazev === '' || !isset($this->povolene[$pripona])) {
+                throw new RuntimeException('Nepodporovaný typ souboru ' . ($pripona !== '' ? ".{$pripona}" : 'bez přípony')
+                    . ($zjisten !== null ? " (obsah: {$zjisten})" : '') . ' – povoleny jsou obrázky, videa a PDF.');
+            }
             $mime = $this->povolene[$pripona];
-            if (function_exists('finfo_open')) {
-                $zjisten = finfo_file(finfo_open(FILEINFO_MIME_TYPE), $cesta) ?: '';
+            if ($zjisten !== null) {
                 $ok = $pripona === 'pdf' ? $zjisten === 'application/pdf'
                     : (str_starts_with($zjisten, 'image/') || str_starts_with($zjisten, 'video/') || $zjisten === 'application/octet-stream');
-                if (!$ok) throw new RuntimeException($pripona === 'pdf' ? "Soubor $nazev není platné PDF." : "Soubor $nazev není obrázek ani video.");
+                if (!$ok) throw new RuntimeException($pripona === 'pdf' ? "Soubor {$nazev} není platné PDF." : "Soubor {$nazev} není obrázek ani video (obsah: {$zjisten}).");
                 if (str_starts_with($zjisten, 'image/') || str_starts_with($zjisten, 'video/')) $mime = $zjisten;
             }
             $druh = self::druhZMime($mime);

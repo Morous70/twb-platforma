@@ -147,6 +147,8 @@ final class Media
     public function nahraj(string $cesta, string $nazev, array $tagy = [], ?int $kategorie = null, ?int $nahradit = null, bool $nazevPevny = false): array
     {
         $md = null;
+        // název bez přípony (např. jen titulek z jiné aplikace): přípona podle obsahu souboru
+        $nazev = $this->app->galerie()->nazevSPriponou($nazev, \TWB\Galerie\Galerie::zjistiMime($cesta));
         $pripona = strtolower(pathinfo($nazev, PATHINFO_EXTENSION));
         if ($nahradit === null && in_array($pripona, self::ZIP_PRIPONY, true)) {
             try { $md = Metadata::cti($cesta); } catch (\Throwable $e) { $this->app->log('warn', "Metadata souboru {$nazev} nejdou přečíst: " . $e->getMessage()); }

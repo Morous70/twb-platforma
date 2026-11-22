@@ -1,6 +1,6 @@
 {
   "name": "galerie",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "php": ">=8.1",
   "popis": "Galerie médií: nahrávání po částech, kontrola typu, nahrazení souboru, komprese s návratem k originálu, archiv, tagy, mazání.",
   "requires": { "jadro": ">=0.1.0", "tagy": ">=0.1.0", "obrazky": ">=0.1.0" }

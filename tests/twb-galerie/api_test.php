@@ -97,11 +97,11 @@ function api(TestServer $s, string $metoda, string $cesta, ?string $klic, ?array
     return ['code' => (int)curl_getinfo($ch, CURLINFO_HTTP_CODE), 'json' => json_decode($body, true), 'body' => $body, 'type' => $type];
 }
 
-function soubor(string $obsah): CURLFile
+function soubor(string $obsah, string $mime = '', string $jmeno = ''): CURLFile
 {
     $f = docasna('api');
     file_put_contents($f, $obsah);
-    return new CURLFile($f);
+    return new CURLFile($f, $mime, $jmeno);
 }
 
 $cteni = $zapis = '';
@@ -168,9 +168,22 @@ test('API: nahrání souboru s kategorií, tagy a poznámkou; nepovolený typ', 
     $r = api($s, 'POST', '/media', $zapis, ['soubor' => soubor('<?php phpinfo();'), 'nazev' => 'x.php']);
     eq(400, $r['code']);
     ok(str_contains($r['json']['chyba'], 'Nepodporovaný typ'));
+    // jiná aplikace pošle jako název jen titulek a soubor bez přípony (application/octet-stream)
+    $r = api($s, 'POST', '/media', $zapis, ['soubor' => soubor($png, 'application/octet-stream', 'blob'), 'nazev' => 'Čelní pohled 30°']);
+    eq(201, $r['code'], $r['body']);
+    eq(['Čelní pohled 30°.png', 'image'], [$r['json']['medium']['nazev'], $r['json']['medium']['druh']]);
+    $docasna = [$r['json']['medium']['id']];
+    $r = api($s, 'POST', '/media', $zapis, ['soubor' => soubor($png, 'image/png', 'Pohled.png'), 'nazev' => 'Pohled z boku']);
+    eq(201, $r['code'], $r['body']);
+    eq('Pohled z boku.png', $r['json']['medium']['nazev'], 'přípona z názvu poslaného souboru');
+    $docasna[] = $r['json']['medium']['id'];
+    $r = api($s, 'POST', '/media', $zapis, ['soubor' => soubor('<?php phpinfo();'), 'nazev' => 'Titulek']);
+    eq(400, $r['code']);
+    ok(str_contains($r['json']['chyba'], 'obsah: text/x-php'), $r['body']);
     eq(400, api($s, 'POST', '/media', $zapis, ['nazev' => 'nic'])['code'], 'bez souboru i adresy');
     eq(404, api($s, 'POST', '/media', $zapis, ['soubor' => soubor($png), 'kategorie' => '999'])['code']);
-    eq(1, (int)$s->db()->query('SELECT COUNT(*) FROM media')->fetchColumn());
+    eq(3, (int)$s->db()->query('SELECT COUNT(*) FROM media')->fetchColumn());
+    foreach ($docasna as $id) eq(200, api($s, 'DELETE', '/media/' . $id, $zapis)['code']);
 });
 
 test('API: nahrání po částech a z adresy', function () use ($s, &$zapis) {

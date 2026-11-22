@@ -206,9 +206,10 @@ final class Mcp
         if (@file_put_contents($cesta, $obsah) === false) throw new \RuntimeException('Dočasný soubor se nepodařilo uložit.');
         $nazev = (string)($v['nazev'] ?? '');
         if (pathinfo($nazev, PATHINFO_EXTENSION) === '') {
-            $typ = $mime !== '' ? $mime : (string)(new \finfo(FILEINFO_MIME_TYPE))->file($cesta);
-            $pripona = ['image/jpeg' => 'jpg', 'image/png' => 'png', 'image/webp' => 'webp', 'image/gif' => 'gif', 'image/avif' => 'avif', 'image/svg+xml' => 'svg',
-                'video/mp4' => 'mp4', 'video/webm' => 'webm', 'video/quicktime' => 'mov', 'application/pdf' => 'pdf', 'application/zip' => 'zip'][strtolower($typ)] ?? null;
+            // typ podle obsahu má přednost před deklarovaným (klient často pošle application/octet-stream)
+            $zjisten = \TWB\Galerie\Galerie::zjistiMime($cesta);
+            $typ = $zjisten !== null && $zjisten !== 'application/octet-stream' ? $zjisten : ($mime !== '' ? strtolower($mime) : (string)$zjisten);
+            $pripona = $typ === 'application/zip' ? 'zip' : $this->app->galerie()->priponaProMime($typ);
             if ($pripona === null) { @unlink($cesta); throw new ChybaNastroje("Nepodporovaný typ souboru ({$typ}). Galerie přijímá obrázky, videa a PDF."); }
             $v['nazev'] = ($nazev !== '' ? $nazev : 'ai-' . date('Y-m-d-His')) . '.' . $pripona;
         }

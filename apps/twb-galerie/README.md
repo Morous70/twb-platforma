@@ -17,6 +17,7 @@ Hosting Wedos NoLimit, PHP 8.5 (kód běží od 8.1), SQLite, bez Composeru.
 | 0.5 | Nahrání ZIPu s obrázky (galerie i API), název, štítky, autor a licence z metadat obrázku (XMP, IPTC, EXIF), autor a licence u média (detail, API, hledání), nápověda „Autor, licence a metadata“ | hotovo |
 | 0.5.1 | Galerie: nahrávání ve dvou sloupcích (soubory vlevo, kategorie a tagy vpravo), tagy jako štítky s našeptáváním (galerie i detail), výběr médií tažením myši (Ctrl/Shift přidá, Esc zruší, posun u okraje) | hotovo |
 | 0.6.1 | Hledání `q` jako fulltext: každé slovo v názvu, tazích, autorovi i poznámce, bez diakritiky a velikosti písmen, fráze v uvozovkách, řazení podle relevance (`razeni=relevance`, výchozí s `q`, pole `relevance`), `q_rezim` všechna / kterékoli slovo, aliasy `all` / `any` u `q_rezim` i `tagy_rezim`; totéž hledání v galerii v administraci | hotovo |
+| 0.6.2 | Galerie v administraci: přepínač zobrazení **Mřížka / Seznam / Jen média** (zapamatuje se), větší náhled obrázku (1920 px) nebo přehrání videa v modálním okně s listováním šipkami; `media.php?nahled=<px>` | hotovo |
 | 0.6 | Galerie jako zdroj médií pro jiné aplikace (podobně jako Pixabay nebo Wikimedia Commons): náhledy 150–1920 px (trvalé u veřejného odkazu, jinak podepsané na 1–2 h), stažení v dané velikosti, licence jako kód ze společného modulu `licence` (shodný se Social Plannerem) s verzí a hotovou atribucí, orientace, trvalá adresa média, rozpoznání vloženého odkazu (`/media/odkaz`), filtry orientace, min. rozměry, více tagů, kategorie podle názvu, výběr podle id, náhodné pořadí se semenem, číselník `/licence`, ETag/304, limit požadavků na klíč; nápověda „Napojení jiné aplikace“ | hotovo |
 
 ## Struktura
@@ -27,7 +28,7 @@ google.php       přihlášení / propojení Google účtu (OpenID Connect)
 passkey.php      JSON rozhraní Passkey (WebAuthn) pro assets/app.js
 health.php       kontrola po aktualizaci (modul aktualizace)
 nahrat.php       nahrávání po částech (JSON, jen přihlášený, CSRF v hlavičce X-CSRF), i nahrazení souboru
-media.php        soubor v administraci (jen přihlášený): ?id=, &nahled=1, &original=1, &stahnout=1
+media.php        soubor v administraci (jen přihlášený): ?id=, &nahled=1 (480 px) nebo &nahled=<px> (150–1920), &original=1, &stahnout=1
 soubor.php       veřejný odkaz soubor.php/<klíč>/<název> (bez přihlášení, ?stahnout=1), náhled soubor.php/<klíč>/w<px>/<název>
 nahled.php       podepsaný náhled nahled.php/<id>/<px>/<platí do>/<podpis>/<název> pro média bez veřejného odkazu (adresy vydává API)
 cron.php         pravidelné úlohy: cron.php?key=<cron_key> – denní záloha, kontrola aktualizací, úklid nahrávání, náhledů a protokolu
@@ -35,7 +36,7 @@ api.php          JSON API api.php/v1/… (klíč v Authorization: Bearer nebo X-
 lib/             App (služby a moduly), Schema, Media (i náhledy a podpisy), Hledani, Metadata, Kategorie, Vydej, Api, ApiKlice, ZAdresy, Ui, Vstup, Http, ProtokolDb, Chyba, autoload, bootstrap
 stranky/         prehled, galerie, medium (detail), kategorie, api (klíče), nastaveni, protokol, napoveda, prihlaseni
 help/            nápověda v Markdownu (_obsah.json + sekce/stránka.md), vykresluje modul napoveda
-assets/          style.css, app.js (nahrávání, štítky tagů `input[data-stitky]`, výběr tažením, Passkey…), ikona.svg
+assets/          style.css, app.js (nahrávání, štítky tagů `input[data-stitky]`, výběr tažením, okno náhledu, Passkey…), ikona.svg
 data/            databáze galerie.sqlite, média (media/), náhledy (nahledy/, dají se kdykoli vytvořit znovu), části nahrávání (tmp/),
                  zálohy (backups/) – chráněno .htaccess
 ```
@@ -110,6 +111,17 @@ data/            databáze galerie.sqlite, média (media/), náhledy (nahledy/, 
 - `Hledani` (lib/Hledani.php): normalizace (malá písmena, bez diakritiky přes `Normalizer` NFD a záložní mapu pro hosting bez intl), výrazy z dotazu
   (slova, fráze v uvozovkách, nejvýš 10), skóre podle polí (`Hledani::VAHY`). `Media::seznam` nejdřív zúží řádky SQL filtry, pak hledá v PHP
   (bez FTS5: na hostingu nemusí být a diakritiku neumí; galerie jednoho uživatele má tisíce, ne miliony položek). Skóre jde k řádku jako `_skore`.
+
+## Zobrazení galerie a okno náhledu (0.6.2)
+- **Přepínač** nad mřížkou: `Mřížka` (náhled s názvem, rozměry, kategorií, tagy a odkazem), `Seznam` (řádek s malým náhledem, druhem a datem nahrání),
+  `Jen média` (jen obrázky bez popisků, oříznuté do čtverců, zaškrtávátko se ukáže po najetí myší nebo když je něco vybráno). Volby jsou `Media::ZOBRAZENI`.
+  Odkaz `?p=galerie&zobrazeni=<mrizka|seznam|media>` zobrazení přepne a uloží do nastavení `galerie_zobrazeni` (místní, obnova zálohy ho nemění);
+  další stránky, filtry a hromadné akce už parametr nepotřebují. Všechna zobrazení mají stejné `<figure>`, takže hromadné akce i výběr tažením fungují ve všech.
+- **Okno náhledu** (`assets/app.js`): klik na náhled obrázku nebo videa otevře modální okno místo detailu. Obrázek je náhled 1920 px
+  (`Media::NAHLED_VELKY_PX`, `media.php?id=&nahled=1920`; menší obrázek se pošle celý), video se přehraje. Šipky ← → (i tlačítka) listují médii na stránce,
+  sousední obrázky se načtou dopředu; Esc, křížek nebo klik vedle obrázku okno zavře. Dole název, rozměry, pořadí a tlačítka Detail, Původní soubor
+  a Kopírovat odkaz (když má médium veřejný odkaz). PDF se otevře v detailu jako dřív; Ctrl/Cmd nebo prostřední klik otevře detail v nové kartě, název vede na detail.
+- `media.php?nahled=<px>` vydá variantu `Media::varianta` pro px z `Media::NAHLEDY` (ETag obsahuje velikost); `nahled=1` zůstává 480 px pro mřížku.
 
 ## Zálohy, aktualizace a cron (0.4)
 - **Zálohy** (modul zalohy, `App::zalohy`): šifrovaný ZIP `twb-galerie-…zip` v `data/backups/` s tabulkami `App::TABULKY` a skupinou souborů `media`

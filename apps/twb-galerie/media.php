@@ -1,6 +1,7 @@
 <?php
 declare(strict_types=1);
-// Soubor z galerie v administraci (jen přihlášený): ?id= soubor, &nahled=1 zmenšený náhled obrázku, &original=1 původní soubor
+// Soubor z galerie v administraci (jen přihlášený): ?id= soubor, &nahled=1 zmenšený náhled obrázku pro mřížku (480 px),
+// &nahled=<px> náhled v dané velikosti (Media::NAHLEDY, např. 1920 pro okno galerie), &original=1 původní soubor
 // před kompresí, &stahnout=1 stažení.
 use MediaGalerie\{App, Media, Vydej};
 
@@ -12,9 +13,11 @@ $media = new Media($app);
 try {
     $r = $media->radek((int)($_GET['id'] ?? 0));
     $original = !empty($_GET['original']) && !empty($r['orig_filename']);
-    $nahled = !empty($_GET['nahled']) && !$original ? $media->nahled($r) : null;
+    $px = (int)($_GET['nahled'] ?? 0);
+    $px = $px === 1 ? Media::NAHLED_PX : (in_array($px, Media::NAHLEDY, true) ? $px : 0);
+    $nahled = $px && !$original ? $media->varianta($r, $px) : null;
     if ($nahled !== null) {
-        Vydej::posli($nahled, 'image/jpeg', pathinfo((string)$r['original_name'], PATHINFO_FILENAME) . '-nahled.jpg', 'n' . $r['md5'], 'private, max-age=86400');
+        Vydej::posli($nahled, 'image/jpeg', pathinfo((string)$r['original_name'], PATHINFO_FILENAME) . '-nahled.jpg', 'n' . $px . $r['md5'], 'private, max-age=86400');
     }
     $f = $app->galerie()->soubor((int)$r['id'], $original);
 } catch (RuntimeException) {

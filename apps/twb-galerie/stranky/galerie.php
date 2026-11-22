@@ -1,6 +1,7 @@
 <?php
 declare(strict_types=1);
-// Galerie: nahrávání (po částech, přetažením), filtry, mřížka s náhledy, hromadné akce. Proměnné: $app, $ui, $post.
+// Galerie: nahrávání (po částech, přetažením), filtry, zobrazení mřížka / seznam / jen média, větší náhled v okně, hromadné akce.
+// Proměnné: $app, $ui, $post.
 use MediaGalerie\{App, Ui, Chyba, Media};
 
 $galerie = $app->galerie();
@@ -17,6 +18,11 @@ $f = [
     'razeni' => isset(Media::RAZENI[$_GET['razeni'] ?? '']) ? (string)$_GET['razeni'] : 'nove',
     'strana' => max(1, (int)($_GET['strana'] ?? 1)),
 ];
+// zobrazení: ?zobrazeni= ho přepne a zapamatuje (místní nastavení), jinak platí naposledy zvolené
+$zobrazeni = (string)($_GET['zobrazeni'] ?? '');
+if (isset(Media::ZOBRAZENI[$zobrazeni])) $app->nastaveni()->uloz('galerie_zobrazeni', $zobrazeni);
+else $zobrazeni = (string)$app->nastaveni()->dej('galerie_zobrazeni', 'mrizka');
+if (!isset(Media::ZOBRAZENI[$zobrazeni])) $zobrazeni = 'mrizka';
 $zpet = Ui::odkaz('galerie', array_filter($f, fn($v) => $v !== '' && $v !== 'nove' && $v !== 1));
 
 if ($post) {
@@ -118,20 +124,26 @@ $titulek = $f['archiv'] ? 'Archiv' : 'Galerie';
     <input name="tag" list="seznam-tagu" placeholder="Tag" aria-label="Tag" data-pro="tag-pridat tag-odebrat" hidden>
     <button type="submit" class="hlavni" data-hromadne-odeslat disabled>Provést</button>
   </div>
-  <p class="slabe mala"><?= Ui::cislo($vysledek['celkem']) ?> <?= $vysledek['celkem'] === 1 ? 'položka' : ($vysledek['celkem'] >= 2 && $vysledek['celkem'] <= 4 ? 'položky' : 'položek') ?>
-    · více souborů vyberete tažením myši (s Ctrl nebo Shift přidáte k výběru)</p>
-  <div class="galerie">
-    <?php foreach ($vysledek['polozky'] as $m): $id = (int)$m['id']; $url = $media->verejnaAdresa($m); ?>
-    <figure>
+  <div class="galerie-lista">
+    <p class="slabe mala"><?= Ui::cislo($vysledek['celkem']) ?> <?= $vysledek['celkem'] === 1 ? 'položka' : ($vysledek['celkem'] >= 2 && $vysledek['celkem'] <= 4 ? 'položky' : 'položek') ?>
+      · více souborů vyberete tažením myši (s Ctrl nebo Shift přidáte k výběru) · kliknutím na náhled ho zvětšíte</p>
+    <nav class="prepinac-zobrazeni" aria-label="Zobrazení">
+      <?php foreach (Media::ZOBRAZENI as $k => $t): ?><a class="tlacitko maly<?= $zobrazeni === $k ? ' aktivni' : '' ?>" href="<?= $odkazFiltru(['zobrazeni' => $k]) ?>"<?= $zobrazeni === $k ? ' aria-current="true"' : '' ?> title="<?= Ui::h($t) ?>"><?= Ui::h($t) ?></a><?php endforeach; ?>
+    </nav>
+  </div>
+  <div class="galerie zobrazeni-<?= $zobrazeni ?>" data-zobrazeni="<?= $zobrazeni ?>">
+    <?php foreach ($vysledek['polozky'] as $m): $id = (int)$m['id']; $url = $media->verejnaAdresa($m); $v = Ui::h(substr((string)$m['md5'], 0, 8)); ?>
+    <figure data-okno="<?= Ui::h($m['kind']) ?>" data-okno-src="<?= Ui::h($m['kind'] === 'image' ? "media.php?id={$id}&nahled=" . Media::NAHLED_VELKY_PX . '&v=' . substr((string)$m['md5'], 0, 8) : "media.php?id={$id}") ?>"
+      data-okno-nazev="<?= Ui::h($m['original_name']) ?>" data-okno-popis="<?= Ui::h(Media::popis($m)) ?>" data-okno-detail="<?= Ui::h(Ui::odkaz('medium', ['id' => $id])) ?>"<?= $url ? ' data-okno-odkaz="' . Ui::h($url) . '"' : '' ?>>
       <label class="vyber-medium" title="Vybrat"><input type="checkbox" name="ids[]" value="<?= $id ?>" aria-label="Vybrat <?= Ui::h($m['original_name']) ?>"></label>
-      <a class="nahled-medium" href="<?= Ui::h(Ui::odkaz('medium', ['id' => $id])) ?>">
-        <?php if ($m['kind'] === 'image'): ?><img src="media.php?id=<?= $id ?>&amp;nahled=1&amp;v=<?= Ui::h(substr((string)$m['md5'], 0, 8)) ?>" alt="" loading="lazy">
+      <a class="nahled-medium" href="<?= Ui::h(Ui::odkaz('medium', ['id' => $id])) ?>"<?= $m['kind'] !== 'pdf' ? ' data-otevrit-okno' : '' ?> title="<?= Ui::h($m['original_name']) ?>">
+        <?php if ($m['kind'] === 'image'): ?><img src="media.php?id=<?= $id ?>&amp;nahled=1&amp;v=<?= $v ?>" alt="" loading="lazy">
         <?php elseif ($m['kind'] === 'video'): ?><video src="media.php?id=<?= $id ?>#t=0.5" preload="metadata" muted playsinline></video><span class="znacka">Video</span>
         <?php else: ?><span class="pdf-ikona">PDF</span><?php endif; ?>
       </a>
       <figcaption>
         <a href="<?= Ui::h(Ui::odkaz('medium', ['id' => $id])) ?>"><strong><?= Ui::h($m['original_name']) ?></strong></a>
-        <span class="slabe"><?= Ui::h(Media::popis($m)) ?></span>
+        <span class="slabe"><?= Ui::h(Media::popis($m)) ?><span class="jen-seznam"> · <?= Ui::h(Media::DRUH_JEDNOTNE[$m['kind']] ?? $m['kind']) ?> · <?= Ui::h(date('j. n. Y', (int)strtotime((string)$m['created_at']))) ?></span></span>
         <?php if ($m['category_id'] && isset($nazvyKategorii[(int)$m['category_id']])): ?>
           <span><a class="stitek stitek-kategorie" href="<?= $odkazFiltru(['kategorie' => (string)$m['category_id'], 'strana' => 1]) ?>"><?= Ui::h($nazvyKategorii[(int)$m['category_id']]) ?></a></span>
         <?php endif; ?>

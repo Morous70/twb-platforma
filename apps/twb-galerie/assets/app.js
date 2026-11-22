@@ -1,4 +1,5 @@
-// TWB Media galerie – drobnosti administrace: potvrzení akcí, menu, kopírování do schránky, Passkey, odhlášení po nečinnosti.
+// TWB Media galerie – drobnosti administrace: potvrzení akcí, menu, kopírování do schránky, nahrávání, tagy jako štítky,
+// výběr tažením myši, Passkey, odhlášení po nečinnosti.
 (function () {
   'use strict';
 
@@ -108,7 +109,7 @@
         var fd = new FormData();
         fd.append('uid', id); fd.append('index', String(i)); fd.append('celkem', String(celkem)); fd.append('nazev', f.name);
         if (kategorie && kategorie.value) fd.append('kategorie', kategorie.value);
-        if (tagy && tagy.value) fd.append('tagy', tagy.value);
+        if (tagy) { tagy.dispatchEvent(new Event('stitky-potvrdit')); if (tagy.value) fd.append('tagy', tagy.value); }
         if (nahradit) fd.append('nahradit', nahradit);
         fd.append('cast', f.slice(i * cast, Math.min(f.size, (i + 1) * cast)), 'cast');
         return posliCast(fd, 1).then(function (j) {
@@ -164,6 +165,177 @@
     });
     plocha.addEventListener('drop', function (e) { if (e.dataTransfer && e.dataTransfer.files.length) pridej(e.dataTransfer.files); });
     window.addEventListener('beforeunload', function (e) { if (bezi || fronta.length) { e.preventDefault(); e.returnValue = ''; } });
+  }
+
+  // ---------- Tagy jako štítky: Enter, Tab nebo čárka vytvoří štítek, × ho odebere, Backspace v prázdném poli smaže poslední ----------
+  // Původní pole zůstane (skryté) a nese tagy oddělené čárkou – server i nahrávání s ním pracují beze změny.
+  var MAX_TAGU = 10, MAX_DELKA = 30;
+  document.querySelectorAll('input[data-stitky]').forEach(function (puvodni) {
+    var obal = document.createElement('div');
+    obal.className = 'stitky-pole';
+    var vstup = document.createElement('input');
+    vstup.type = 'text';
+    vstup.placeholder = puvodni.placeholder || '';
+    vstup.setAttribute('aria-label', 'Nový tag');
+    vstup.autocomplete = 'off';
+    if (puvodni.getAttribute('list')) vstup.setAttribute('list', puvodni.getAttribute('list'));
+    var hlaska = document.createElement('small');
+    hlaska.className = 'stitky-hlaska';
+    var tagy = [];
+    var volby = function () {
+      var dl = puvodni.getAttribute('list') && document.getElementById(puvodni.getAttribute('list'));
+      return dl ? Array.prototype.map.call(dl.options, function (o) { return o.value; }) : [];
+    };
+    var uloz = function () {
+      puvodni.value = tagy.join(', ');
+      puvodni.dispatchEvent(new Event('change', { bubbles: true }));
+    };
+    var vykresli = function () {
+      obal.querySelectorAll('.stitek-upravitelny').forEach(function (el) { el.remove(); });
+      tagy.forEach(function (t, i) {
+        var el = document.createElement('span');
+        el.className = 'stitek stitek-upravitelny';
+        el.textContent = t;
+        var x = document.createElement('button');
+        x.type = 'button';
+        x.className = 'stitek-zrusit';
+        x.setAttribute('aria-label', 'Odebrat tag ' + t);
+        x.textContent = '×';
+        x.addEventListener('click', function () { tagy.splice(i, 1); vykresli(); uloz(); vstup.focus(); });
+        el.appendChild(x);
+        obal.insertBefore(el, vstup);
+      });
+      vstup.placeholder = tagy.length ? '' : (puvodni.placeholder || '');
+      vstup.disabled = false;
+    };
+    var pridej = function (text) {
+      var zmena = false;
+      text.split(/[,;\n]+/).forEach(function (t) {
+        t = t.replace(/\s+/g, ' ').trim();
+        if (!t) return;
+        if (t.length > MAX_DELKA) { hlaska.textContent = 'Tag může mít nejvýš ' + MAX_DELKA + ' znaků.'; return; }
+        if (tagy.some(function (x) { return x.toLowerCase() === t.toLowerCase(); })) return;
+        if (tagy.length >= MAX_TAGU) { hlaska.textContent = 'Nejvýš ' + MAX_TAGU + ' tagů.'; return; }
+        // zápis podle už existujícího tagu (stejná velikost písmen jako jinde v galerii)
+        var znamy = volby().filter(function (v) { return v.toLowerCase() === t.toLowerCase(); })[0];
+        tagy.push(znamy || t);
+        zmena = true;
+      });
+      vstup.value = '';
+      if (zmena) { hlaska.textContent = ''; vykresli(); uloz(); }
+    };
+    tagy = puvodni.value.split(',').map(function (t) { return t.trim(); }).filter(Boolean);
+    puvodni.type = 'hidden';
+    puvodni.removeAttribute('data-stitky');
+    puvodni.parentNode.insertBefore(obal, puvodni);
+    obal.appendChild(vstup);
+    obal.parentNode.insertBefore(hlaska, obal.nextSibling);
+    // kliknutí na popisek pole přenese kurzor do nového vstupu
+    if (puvodni.id) { vstup.id = puvodni.id + '-novy'; var lbl = obal.closest('label'); if (lbl) lbl.setAttribute('for', vstup.id); }
+    vykresli();
+    obal.addEventListener('click', function (e) { if (e.target === obal) vstup.focus(); });
+    vstup.addEventListener('keydown', function (e) {
+      if ((e.key === 'Enter' || e.key === ',' || e.key === ';' || (e.key === 'Tab' && vstup.value.trim())) && !e.isComposing) {
+        if (e.key === 'Enter' || vstup.value.trim()) e.preventDefault();
+        pridej(vstup.value);
+      } else if (e.key === 'Backspace' && vstup.value === '' && tagy.length) {
+        tagy.pop(); vykresli(); uloz();
+      }
+    });
+    // výběr z našeptávače (datalist) vytvoří štítek hned; vložení textu s čárkami rozdělí na víc štítků
+    vstup.addEventListener('input', function (e) {
+      if (!e.inputType || e.inputType === 'insertReplacementText') {
+        if (volby().indexOf(vstup.value) >= 0) pridej(vstup.value);
+      } else if (/[,;\n]/.test(vstup.value)) {
+        pridej(vstup.value);
+      }
+    });
+    // rozepsaný tag (bez Enteru) se přidá při odeslání formuláře nebo před nahráním souborů – ne při opuštění pole,
+    // protože nový štítek by posunul tlačítko, na které uživatel právě kliká
+    puvodni.addEventListener('stitky-potvrdit', function () { if (vstup.value.trim()) pridej(vstup.value); });
+    // formulář odešle i rozepsaný tag
+    var form = puvodni.form;
+    if (form) form.addEventListener('submit', function () { if (vstup.value.trim()) pridej(vstup.value); }, true);
+  });
+
+  // ---------- Galerie: výběr tažením myši (obdélník). Bez klávesy nahradí výběr, s Ctrl/Cmd/Shift přidá. Esc zruší. ----------
+  var mrizka = hromadne && hromadne.querySelector('.galerie');
+  if (mrizka) {
+    var zacatek = null, obdelnik = null, tahne = false, puvodniVyber = [], predTazenim = [], posun = 0, pozice = null;
+    var figury = function () { return Array.prototype.slice.call(mrizka.querySelectorAll('figure')); };
+    var box = function (f) { return f.querySelector('input[name="ids[]"]'); };
+    var stranka = function (e) { return { x: e.clientX + window.scrollX, y: e.clientY + window.scrollY }; };
+    var oznac = function () {
+      var a = zacatek, b = stranka(pozice);
+      var r = { l: Math.min(a.x, b.x), t: Math.min(a.y, b.y), r: Math.max(a.x, b.x), b: Math.max(a.y, b.y) };
+      obdelnik.style.left = r.l + 'px'; obdelnik.style.top = r.t + 'px';
+      obdelnik.style.width = (r.r - r.l) + 'px'; obdelnik.style.height = (r.b - r.t) + 'px';
+      figury().forEach(function (f, i) {
+        var o = f.getBoundingClientRect();
+        var x1 = o.left + window.scrollX, y1 = o.top + window.scrollY;
+        var uvnitr = x1 < r.r && x1 + o.width > r.l && y1 < r.b && y1 + o.height > r.t;
+        box(f).checked = uvnitr || puvodniVyber[i];
+      });
+      hromadne.dispatchEvent(new Event('change', { bubbles: true }));
+    };
+    // u okraje okna se stránka posouvá, aby šlo označit i to, co není vidět
+    var krok = function () {
+      if (!tahne) return;
+      var y = pozice.clientY, rychlost = 0;
+      if (y < 60) rychlost = -Math.ceil((60 - y) / 4); else if (y > window.innerHeight - 60) rychlost = Math.ceil((y - window.innerHeight + 60) / 4);
+      if (rychlost) { window.scrollBy(0, rychlost); oznac(); }
+      posun = requestAnimationFrame(krok);
+    };
+    var konec = function (zrusit) {
+      document.removeEventListener('pointermove', pohyb);
+      document.removeEventListener('pointerup', pusteni);
+      cancelAnimationFrame(posun);
+      if (zrusit && tahne) {
+        figury().forEach(function (f, i) { box(f).checked = predTazenim[i]; });
+        hromadne.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+      if (obdelnik) { obdelnik.remove(); obdelnik = null; }
+      document.body.classList.remove('vybirani');
+      if (tahne) {
+        // klik po tažení neotevře detail ani nepřepne zaškrtávátko
+        var zahod = function (e) { e.preventDefault(); e.stopPropagation(); };
+        document.addEventListener('click', zahod, true);
+        setTimeout(function () { document.removeEventListener('click', zahod, true); }, 0);
+      }
+      zacatek = null; tahne = false;
+    };
+    var pohyb = function (e) {
+      pozice = e;
+      if (!tahne) {
+        var p = stranka(e);
+        if (Math.abs(p.x - zacatek.x) < 6 && Math.abs(p.y - zacatek.y) < 6) return;
+        tahne = true;
+        obdelnik = document.createElement('div');
+        obdelnik.className = 'vyber-obdelnik';
+        document.body.appendChild(obdelnik);
+        document.body.classList.add('vybirani');
+        posun = requestAnimationFrame(krok);
+      }
+      e.preventDefault();
+      oznac();
+    };
+    var pusteni = function () { konec(false); };
+    // začít jde v mřížce i v prázdném místě kolem ní (okraj stránky), ne v ovládacích prvcích
+    document.addEventListener('pointerdown', function (e) {
+      if (e.pointerType !== 'mouse' || e.button !== 0) return;
+      var t = e.target;
+      if (!(t instanceof Element) || !(hromadne.contains(t) || t.contains(hromadne))) return;
+      if (t.closest('.hromadne, input, select, textarea, button, .vyber-medium, .strankovani')) return;
+      var pridat = e.ctrlKey || e.metaKey || e.shiftKey;
+      predTazenim = figury().map(function (f) { return box(f).checked; });
+      puvodniVyber = predTazenim.map(function (x) { return pridat && x; });
+      zacatek = stranka(e); pozice = e;
+      e.preventDefault();   // bez označení textu a bez tažení obrázku
+      document.addEventListener('pointermove', pohyb);
+      document.addEventListener('pointerup', pusteni);
+    });
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && zacatek) konec(true); });
+    mrizka.querySelectorAll('a, img').forEach(function (el) { el.setAttribute('draggable', 'false'); });
   }
 
   // Odhlášení po nečinnosti: po vypršení limitu načíst stránku znovu (zobrazí přihlášení)

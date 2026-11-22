@@ -321,7 +321,23 @@ h1 .pomoc:hover { color: #fff; background: var(--hlavni); border-color: var(--hl
 .napoveda-text .sousedni { margin-top: 1rem; }
 .napoveda-text .vysledek { margin: .8rem 0; }
 @media (max-width: 860px) { .napoveda { grid-template-columns: 1fr; } .napoveda-obsah { position: static; max-height: none; } }
-.nahravani .radek { margin-top: 1rem; }
+.nahravani-sloupce { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 1.25rem; align-items: stretch; }
+.nahravani-sloupce .nahravani-plocha { display: flex; flex-direction: column; justify-content: center; padding: 1rem; }
+.nahravani-volby { display: grid; gap: .6rem; align-content: start; }
+.nahravani-volby .pole { margin: 0; }
+@media (max-width: 760px) { .nahravani-sloupce { grid-template-columns: 1fr; } }
+.stitky-pole { display: flex; flex-wrap: wrap; align-items: center; gap: .3rem; min-height: 2.4rem; padding: .25rem .4rem; border: 1px solid var(--okraj-pole);
+  border-radius: var(--polomer-pole); background: var(--plocha); cursor: text; }
+.stitky-pole:focus-within { border-color: var(--hlavni); box-shadow: 0 0 0 3px var(--hlavni-svetla); }
+.stitky-pole input { flex: 1 1 8rem; min-width: 6rem; border: 0; padding: .3rem .2rem; background: transparent; box-shadow: none; outline: 0; width: auto; }
+.stitky-pole input:focus { box-shadow: none; border: 0; }
+.stitek-upravitelny { display: inline-flex; align-items: center; gap: .2rem; font-size: .8rem; padding: .1rem .2rem .1rem .55rem; }
+.stitek-zrusit { border: 0; background: transparent; color: var(--slaby); padding: 0 .3rem; font-size: 1rem; line-height: 1; min-height: 0; cursor: pointer; border-radius: 1rem; }
+.stitek-zrusit:hover { color: var(--chyba-text); background: var(--okraj); }
+.stitky-hlaska { color: var(--chyba-text); }
+.stitky-hlaska:empty { display: none; }
+.vyber-obdelnik { position: absolute; z-index: 50; border: 1px solid var(--hlavni); background: color-mix(in srgb, var(--hlavni) 15%, transparent); pointer-events: none; border-radius: 2px; }
+body.vybirani, body.vybirani * { user-select: none; cursor: crosshair; }
 @media (max-width: 600px) {
   .galerie { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .75rem; }
   .galerie .nahled-medium, .galerie .nahled-medium img, .galerie .nahled-medium video { height: 120px; }

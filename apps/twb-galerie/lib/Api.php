@@ -154,6 +154,9 @@ final class Api
             'kategorie' => $kid !== null ? ['id' => $kid, 'nazev' => $kategorie[$kid] ?? null] : null,
             'tagy' => Media::tagy($r),
             'poznamka' => $r['note'],
+            'autor' => $r['author'],
+            'licence' => $r['license'],
+            'licence_url' => $r['license_url'],
             'archivovano' => $r['archived_at'] ? date('c', (int)strtotime((string)$r['archived_at'])) : null,
             'vytvoreno' => date('c', (int)strtotime((string)$r['created_at'])),
             'komprimovano' => !empty($r['orig_filename']) ? ['velikost' => (int)$r['orig_size'], 'sirka' => (int)$r['orig_w'], 'vyska' => (int)$r['orig_h']] : null,
@@ -192,6 +195,7 @@ final class Api
         $tmp = $this->app->data . '/tmp';
         if (!is_dir($tmp)) @mkdir($tmp, 0775, true);
         $nazev = mb_substr(trim((string)($v['nazev'] ?? '')), 0, 200);
+        $nazevPevny = $nazev !== '';   // název zadaný v požadavku má přednost před titulkem z metadat
 
         $f = $soubory['soubor'] ?? null;
         if (is_array($f)) {
@@ -220,27 +224,40 @@ final class Api
         } else {
             throw new Chyba('Pošlete soubor v poli „soubor“ (multipart/form-data), nebo adresu v poli „url“.');
         }
-        $vysledek = $this->app->galerie()->uloz($cesta, $nazev, $tagy, $nahradit);
+        if ($nahradit === null && strtolower(pathinfo($nazev, PATHINFO_EXTENSION)) === 'zip') {
+            // ZIP s obrázky: každý obrázek jako samostatné médium
+            $r = $this->app->media()->nahrajZip($cesta, $tagy, $kategorie);
+            if ($poznamka !== null) foreach ($r['media'] as $id) $this->app->media()->nastavPoznamku($id, $poznamka);
+            $this->app->log('info', 'API (ZIP): ' . $nazev . ', obrázků ' . count($r['media']));
+            return ['hotovo' => true, 'zip' => true, 'media' => array_map(fn($id) => $this->medium($this->app->media()->radek($id)), $r['media']),
+                'preskoceno' => $r['preskoceno'], 'chyby' => $r['chyby']];
+        }
+        $vysledek = $this->app->media()->nahraj($cesta, $nazev, $tagy, $kategorie, $nahradit, $nazevPevny);
         $id = $vysledek['id'];
-        $this->app->media()->poNahrani($id, $nahradit === null ? $kategorie : null);
         if ($nahradit === null && $poznamka !== null) $this->app->media()->nastavPoznamku($id, $poznamka);
-        $this->app->log('info', 'API (' . ($nahradit ? 'nahrazení' : 'nahrání') . "): {$nazev}");
+        $this->app->log('info', 'API (' . ($nahradit ? 'nahrazení' : 'nahrání') . "): {$vysledek['nazev']}");
         return ['hotovo' => true, 'medium' => $this->medium($this->app->media()->radek($id)), 'poznamka_komprese' => $vysledek['poznamka']];
     }
 
-    /** Úprava údajů: nazev, poznamka, kategorie (id nebo null), tagy (pole nebo text s čárkami), archiv (bool). Vše se ověří před zápisem. */
+    /** Úprava údajů: nazev, poznamka, kategorie (id nebo null), tagy (pole nebo text s čárkami), archiv (bool), autor, licence, licence_url. Vše se ověří před zápisem. */
     private function uprav(int $id, array $v): array
     {
         $r = $this->app->media()->radek($id);
-        $znama = ['nazev', 'poznamka', 'kategorie', 'tagy', 'archiv'];
+        $znama = ['nazev', 'poznamka', 'kategorie', 'tagy', 'archiv', 'autor', 'licence', 'licence_url'];
         if ($nezname = array_diff(array_keys($v), $znama)) throw new Chyba('Neznámé pole: ' . implode(', ', $nezname) . '. Povolená: ' . implode(', ', $znama) . '.');
         $nazev = array_key_exists('nazev', $v) ? Vstup::text($v, 'nazev', 'nazev', 200) : null;
         $pozn = array_key_exists('poznamka', $v) ? Vstup::text($v, 'poznamka', 'poznamka', 5000, false) : null;
         $kategorie = array_key_exists('kategorie', $v) ? ($v['kategorie'] === null || $v['kategorie'] === '' ? null : (int)$v['kategorie']) : false;
         if (is_int($kategorie)) $this->app->kategorie()->radek($kategorie);
         $tagy = array_key_exists('tagy', $v) ? $this->tagy($v['tagy']) : null;
+        $autor = array_key_exists('autor', $v) ? Vstup::text($v, 'autor', 'autor', 200, false) : $r['author'];
+        $licence = array_key_exists('licence', $v) ? Vstup::text($v, 'licence', 'licence', 2000, false) : $r['license'];
+        $licenceUrl = array_key_exists('licence_url', $v) ? Vstup::text($v, 'licence_url', 'licence_url', 500, false) : $r['license_url'];
+        if ($licenceUrl !== null && $licenceUrl !== '' && !preg_match('~^https?://\S+$~i', $licenceUrl)) throw new Chyba('licence_url musí začínat http:// nebo https://.');
+        $zmenaAutora = array_intersect(['autor', 'licence', 'licence_url'], array_keys($v)) !== [];
         $g = $this->app->galerie();
-        $this->app->db->transakce(function () use ($g, $id, $r, $v, $nazev, $pozn, $kategorie, $tagy) {
+        $this->app->db->transakce(function () use ($g, $id, $r, $v, $nazev, $pozn, $kategorie, $tagy, $zmenaAutora, $autor, $licence, $licenceUrl) {
+            if ($zmenaAutora) $this->app->media()->nastavAutora($id, $autor ?: null, $licence ?: null, $licenceUrl ?: null);
             if ($nazev !== null && $nazev !== $r['original_name']) $g->prejmenuj($id, $nazev);
             if (array_key_exists('poznamka', $v)) $this->app->media()->nastavPoznamku($id, $pozn);
             if ($kategorie !== false) $this->app->media()->nastavKategorii([$id], $kategorie);

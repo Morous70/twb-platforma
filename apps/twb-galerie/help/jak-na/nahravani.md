@@ -3,8 +3,8 @@ titulek: Nahrávání souborů
 sekce: jak-na
 admin: ne
 kontext: galerie
-souvisi: verejne-odkazy, kategorie-a-tagy
-klicova: nahrát, upload, video, velikost, komprese
+souvisi: verejne-odkazy, kategorie-a-tagy, autor-a-licence
+klicova: nahrát, upload, video, velikost, komprese, zip, metadata
 ---
 # Nahrávání souborů
 
@@ -14,6 +14,15 @@ Na stránce **Galerie** soubory přetáhněte do rámečku nebo klikněte na **v
 - Soubor se posílá po částech, takže velké video projde i na hostingu s malým limitem. Krátký výpadek spojení se třikrát zkusí znovu.
 - Před nahráním můžete vybrat **Nahrát do kategorie** a vyplnit **Tagy nových souborů** – uplatní se u všech souborů v dávce.
 - Aplikace kontroluje skutečný obsah souboru, ne jen příponu.
+- U obrázku se z metadat souboru načte **název**, **štítky**, **autor** a **licence** (viz [Autor, licence a metadata](autor-a-licence)). Když název v metadatech není, použije se název souboru.
+
+## ZIP s obrázky
+Nahrajte ZIP stejně jako jiný soubor. Aplikace ho rozbalí a každý obrázek (JPG, PNG, GIF, WebP, BMP) uloží jako samostatné médium – i z podsložek.
+
+- Kategorie a tagy vybrané před nahráním platí pro všechny obrázky ze ZIPu; štítky z metadat se k nim přidají.
+- Jiné soubory (texty, videa, PDF) a systémové soubory (__MACOSX, Thumbs.db) se přeskočí. Po nahrání u ZIPu uvidíte, kolik obrázků se uložilo a co se přeskočilo.
+- Obrázek, který nejde přečíst, se vynechá a nahlásí; ostatní se uloží.
+- ZIP může mít nejvýš 2 000 souborů a rozbalený nejvýš 1 GB. Zaheslovaný ZIP nejde.
 
 ## Komprese obrázků
 Obrázky se ve výchozím stavu nahrávají beze změny. V **Nastavení → Komprese obrázků** můžete zapnout zmenšení velkých obrázků hned po nahrání.

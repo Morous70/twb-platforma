@@ -14,6 +14,7 @@ Hosting Wedos NoLimit, PHP 8.5 (kód běží od 8.1), SQLite, bez Composeru.
 | 0.3 | JSON API `api.php/v1` pro čtení i zápis: média (seznam s filtry, detail, stažení s Range, nahrání i po částech a z adresy, úpravy, nahrazení, odkaz, smazání), kategorie, tagy; API klíče s oprávněním čtení / zápis (jen otisk), zámek proti zkoušení klíčů, stránka API, popis v nápovědě | hotovo |
 | 0.4 | Zálohy (denní cronem, ruční, stažení, obnova v rozhraní s náhledem obsahu a pojistnou zálohou), aktualizace z Update Serveru (`twb-galerie`), cron s úklidem, upozornění v přehledu, nápověda, balíčky FULL a UPDATE | hotovo |
 | 0.4.1 | Kampaně přejmenované na **kategorie** (rozhraní, nápověda, API `/kategorie` a pole `kategorie`, tabulka `categories`, sloupec `media.category_id`; schéma 4 převede starší instalace) a upřesněný účel: odkladiště vlastních médií, která zatím nejsou použitá v aplikacích | hotovo |
+| 0.5 | Nahrání ZIPu s obrázky (galerie i API), název, štítky, autor a licence z metadat obrázku (XMP, IPTC, EXIF), autor a licence u média (detail, API, hledání), nápověda „Autor, licence a metadata“ | hotovo |
 
 ## Struktura
 ```
@@ -27,7 +28,7 @@ media.php        soubor v administraci (jen přihlášený): ?id=, &nahled=1, &o
 soubor.php       veřejný odkaz soubor.php/<klíč>/<název> (bez přihlášení, ?stahnout=1)
 cron.php         pravidelné úlohy: cron.php?key=<cron_key> – denní záloha, kontrola aktualizací, úklid nahrávání, náhledů a protokolu
 api.php          JSON API api.php/v1/… (klíč v Authorization: Bearer nebo X-Api-Key), popis help/sprava/api.md
-lib/             App (služby a moduly), Schema, Media, Kategorie, Vydej, Api, ApiKlice, ZAdresy, Ui, Vstup, Http, ProtokolDb, Chyba, autoload, bootstrap
+lib/             App (služby a moduly), Schema, Media, Metadata, Kategorie, Vydej, Api, ApiKlice, ZAdresy, Ui, Vstup, Http, ProtokolDb, Chyba, autoload, bootstrap
 stranky/         prehled, galerie, medium (detail), kategorie, api (klíče), nastaveni, protokol, napoveda, prihlaseni
 help/            nápověda v Markdownu (_obsah.json + sekce/stránka.md), vykresluje modul napoveda
 assets/          style.css, app.js, ikona.svg
@@ -56,6 +57,18 @@ data/            databáze galerie.sqlite, média (media/), náhledy (nahledy/, 
   Videa ukazuje prohlížeč z `media.php` (`preload="metadata"`), PDF ikonou.
 - **Komprese**: nastavení modulu obrazky (`img_auto`, `img_max_w`, `img_max_h`, `img_quality`, `img_min_kb`) v Nastavení. Aplikace při první migraci nastaví `img_auto = 0` –
   odložená média se ukládají v plné kvalitě.
+
+## ZIP a metadata (0.5)
+- **Metadata** (`Metadata::cti`): bez knihoven. XMP = textový blok `<x:xmpmeta>` v prvních 4 MB souboru (JPEG, PNG, WebP, TIFF), čte se DOM bez sítě
+  a s DOCTYPE se odmítne (XXE); IPTC přes `getimagesize` + `iptcparse` (UTF-8 podle 1:90, jinak Windows-1250); EXIF přes `exif_read_data`
+  s `exif.encode_unicode = UTF-8` (Windows XP… pole). Přednost: XMP → IPTC → EXIF, štítky ze všech zdrojů bez opakování.
+- **Nahrání** (`Media::nahraj`): společné pro `nahrat.php`, API i ZIP. Metadata se čtou z dočasného souboru ještě před `Galerie::uloz`
+  (před kompresí); název = titulek + přípona (`Media::nazevZTitulku`), když ho nezadal klient API; štítky se přidají k zadaným tagům
+  (`Media::spojTagy`, jen platné a nejvýš 10). Nahrazení souboru metadata nečte.
+- **Autor a licence**: sloupce `media.author`, `license`, `license_url` (schéma 5), `Media::nastavAutora`; odkaz jen http(s).
+- **ZIP** (`Media::nahrajZip`): jen obrázky (`Media::ZIP_PRIPONY`), i z podsložek; přeskočí složky, skryté soubory, `__MACOSX`, `Thumbs.db`
+  a jiné typy (vrátí je v `preskoceno`); nejvýš 2 000 položek a 1 GB rozbaleně; každá položka se rozbaluje po 1 MB a nesmí být větší, než ZIP uvádí
+  (zip bomba); zaheslované položky se odmítnou; jména z Windows v CP852 se převedou. Chybný obrázek se nahlásí v `chyby`, ostatní se uloží.
 
 ## API (0.3)
 - **Směrování** v `Api::smeruj` (cesty `/`, `/media`, `/media/{id}`, `/media/{id}/soubor`, `/media/{id}/odkaz`, `/kategorie`, `/kategorie/{id}`, `/tagy`). Test hlídá,

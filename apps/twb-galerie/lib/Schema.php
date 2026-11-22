@@ -8,11 +8,11 @@ use TWB\Jadro\{Db, ModulMigrace};
  * Databázové schéma aplikace (SQLite). Verze se ukládá v module_versions pod „twb-galerie“
  * a do nastavení schema_version (podle ní moduly zalohy a aktualizace poznají starší data).
  * Tabulku media zakládá modul galerie, tabulky auth_tokens a passkeys modul prihlaseni.
- * Aplikace k media přidává kategorii, poznámku a klíč veřejného odkazu (sloupce, které modul nezná a nečte).
+ * Aplikace k media přidává kategorii, poznámku, autora, licenci a klíč veřejného odkazu (sloupce, které modul nezná a nečte).
  */
 final class Schema implements ModulMigrace
 {
-    public static function verze(): int { return 4; }
+    public static function verze(): int { return 5; }
 
     /** Tabulky, které musí existovat dřív než cokoli jiného (nastavení a protokol). */
     public static function zakladniTabulky(Db $db): void
@@ -65,6 +65,13 @@ final class Schema implements ModulMigrace
                 $db->q('DROP INDEX IF EXISTS media_campaign');
                 $db->q('ALTER TABLE media RENAME COLUMN campaign_id TO category_id');
                 $db->q('CREATE INDEX IF NOT EXISTS media_category ON media (category_id)');
+            }
+        }
+        if ($zVerze < 5) {
+            // autor a licence (0.5): ručně nebo z metadat obrázku (XMP, IPTC, EXIF)
+            $sloupce = array_column($db->q('PRAGMA table_info(media)')->fetchAll(), 'name');
+            foreach (['author' => 'VARCHAR(200)', 'license' => 'TEXT', 'license_url' => 'VARCHAR(500)'] as $sl => $typ) {
+                if (!in_array($sl, $sloupce, true)) $db->q("ALTER TABLE media ADD COLUMN $sl $typ NULL");
             }
         }
     }

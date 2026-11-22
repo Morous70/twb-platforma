@@ -10,7 +10,7 @@ final class Ui
         'galerie' => 'Galerie',
         'kategorie' => 'Kategorie',
         'nastaveni' => 'Nastavení',
-        'api' => 'API',
+        'api' => 'API a MCP',
     ];
 
     /** Skupiny postranního menu (nadpis => stránky). Nápověda je v menu navíc, nemá vlastní titulek v MENU. */

@@ -1,0 +1,7 @@
+{
+  "name": "mcp",
+  "version": "0.1.0",
+  "php": ">=8.1",
+  "popis": "MCP server (Model Context Protocol, Streamable HTTP bez trvalého spojení) pro Claude, ChatGPT a další AI klienty: JSON-RPC, nástroje dodané aplikací, oprávnění; OAuth 2.1 autorizační server (dynamická registrace klientů, PKCE S256, rotace refresh tokenů, metadata RFC 8414 a RFC 9728). Vzorem je MCP Social Planneru.",
+  "requires": { "jadro": ">=0.1.0" }
+}

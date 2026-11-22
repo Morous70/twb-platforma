@@ -20,6 +20,7 @@ Hosting Wedos NoLimit, PHP 8.5 (kód běží od 8.1), SQLite, bez Composeru.
 | 0.6.2 | Galerie v administraci: přepínač zobrazení **Mřížka / Seznam / Jen média** (zapamatuje se), větší náhled obrázku (1920 px) nebo přehrání videa v modálním okně s listováním šipkami; `media.php?nahled=<px>` | hotovo |
 | 0.6.3 | Okno náhledu jednotně v celé aplikaci (galerie, přehled, detail včetně originálu, PDF a veřejného odkazu); nic se neotevírá v nové kartě, Ctrl i prostřední klik otevřou okno; v okně Stáhnout místo Původní soubor | hotovo |
 | 0.6.4 | Ctrl/Cmd+klik a prostřední klik na náhled otevře **detail média ve stejné kartě** (ne zvětšený obrázek ani novou kartu); v detailu, kde detail není kam otevřít, otevře okno | hotovo |
+| 0.7.0 | **MCP server** (`mcp.php`) pro Claude, ChatGPT a další AI klienty: médium vytvořené AI jde poslat rovnou do galerie (z adresy nebo base64) s názvem, tagy, kategorií, autorem, licencí, modelem a promptem; hledání, detail, úprava údajů, kategorie, licence a tagy. Přihlášení OAuth 2.1 (konektor v Claude.ai / ChatGPT, souhlas v administraci) nebo API klíčem (Claude Code). Nový modul platformy `mcp`. Stránka **API a MCP** s adresou a seznamem připojení, nápověda „Připojení AI (MCP)“ | hotovo |
 | 0.6 | Galerie jako zdroj médií pro jiné aplikace (podobně jako Pixabay nebo Wikimedia Commons): náhledy 150–1920 px (trvalé u veřejného odkazu, jinak podepsané na 1–2 h), stažení v dané velikosti, licence jako kód ze společného modulu `licence` (shodný se Social Plannerem) s verzí a hotovou atribucí, orientace, trvalá adresa média, rozpoznání vloženého odkazu (`/media/odkaz`), filtry orientace, min. rozměry, více tagů, kategorie podle názvu, výběr podle id, náhodné pořadí se semenem, číselník `/licence`, ETag/304, limit požadavků na klíč; nápověda „Napojení jiné aplikace“ | hotovo |
 
 ## Struktura
@@ -35,8 +36,11 @@ soubor.php       veřejný odkaz soubor.php/<klíč>/<název> (bez přihlášen�
 nahled.php       podepsaný náhled nahled.php/<id>/<px>/<platí do>/<podpis>/<název> pro média bez veřejného odkazu (adresy vydává API)
 cron.php         pravidelné úlohy: cron.php?key=<cron_key> – denní záloha, kontrola aktualizací, úklid nahrávání, náhledů a protokolu
 api.php          JSON API api.php/v1/… (klíč v Authorization: Bearer nebo X-Api-Key), popis help/sprava/api.md
-lib/             App (služby a moduly), Schema, Media (i náhledy a podpisy), Hledani, Metadata, Kategorie, Vydej, Api, ApiKlice, ZAdresy, Ui, Vstup, Http, ProtokolDb, Chyba, autoload, bootstrap
-stranky/         prehled, galerie, medium (detail), kategorie, api (klíče), nastaveni, protokol, napoveda, prihlaseni
+mcp.php          MCP server pro AI klienty (Streamable HTTP, OAuth token tgoa_… nebo API klíč tgk_…), popis help/sprava/mcp.md
+oauth.php        OAuth 2.1 pro MCP konektory: ?akce=metadata|metadata-zdroje|register|authorize|token|revoke
+.well-known/     oauth-authorization-server a oauth-protected-resource (přepis v .htaccess na PHP soubory → oauth.php)
+lib/             App (služby a moduly), Schema, Media (i náhledy a podpisy), Hledani, Metadata, Kategorie, Vydej, Api, ApiKlice, Mcp (nástroje MCP), ZAdresy, Ui, Vstup, Http, ProtokolDb, Chyba, autoload, bootstrap
+stranky/         prehled, galerie, medium (detail), kategorie, api (klíče a připojení MCP), nastaveni, protokol, napoveda, prihlaseni, souhlas (OAuth)
 help/            nápověda v Markdownu (_obsah.json + sekce/stránka.md), vykresluje modul napoveda
 assets/          style.css, app.js (nahrávání, štítky tagů `input[data-stitky]`, výběr tažením, okno náhledu, Passkey…), ikona.svg
 data/            databáze galerie.sqlite, média (media/), náhledy (nahledy/, dají se kdykoli vytvořit znovu), části nahrávání (tmp/),
@@ -129,6 +133,32 @@ data/            databáze galerie.sqlite, média (media/), náhledy (nahledy/, 
   nemá detail, tedy v detailu samotném, otevřou okno); na detail vede také název média a tlačítko Detail v okně. Shift+klik otevře okno.
   V nové kartě zůstává jen externí odkaz „podmínky licence“.
 - `media.php?nahled=<px>` vydá variantu `Media::varianta` pro px z `Media::NAHLEDY` (ETag obsahuje velikost); `nahled=1` zůstává 480 px pro mřížku.
+
+## MCP server (0.7)
+Účel: AI asistent (Claude, ChatGPT …) pošle médium, které vytvořil, rovnou do galerie – i s názvem, tagy, kategorií a údaji o AI.
+
+- **Adresa** `{base_url}/mcp.php`, Streamable HTTP bez trvalého spojení (POST = JSON-RPC, odpověď JSON; GET 405, DELETE 204, OPTIONS 204 s CORS).
+  Protokol, verze (2024-11-05 až 2025-11-25 s `initialize`, bezstavová 2026-07-28 se `server/discover`) a chyby řeší modul **`mcp`** (`TWB\Mcp\Server`), převzato z MCP Social Planneru.
+- **Přihlášení** (v `mcp.php`): token z `Authorization: Bearer …`
+  - `tgk_…` = API klíč galerie (Claude Code, skripty): stejný zámek po neplatných klíčích a limit požadavků jako API; klíč Čtení = oprávnění `read`, Čtení i zápis = `read write`.
+  - `tgoa_…` = OAuth přístupový token (`TWB\Mcp\OAuth`): konektor v Claude.ai / ChatGPT. Dynamická registrace klienta, PKCE S256, kód 5 min, přístupový token 1 h,
+    refresh 90 dní s rotací, v databázi jen SHA-256. Souhlas `stranky/souhlas.php` (oauth.php?akce=authorize) vyžaduje přihlášení do administrace
+    (nepřihlášeného pošle na přihlášení a `index.php` ho vrátí zpět přes `$_SESSION['po_prihlaseni']`); zápis jde při souhlasu odškrtnout.
+    Opětovné připojení téže aplikace zruší starší připojení. Připojení jsou na stránce **API a MCP** (odebrání zruší všechny tokeny).
+  - bez platného tokenu 401 s `WWW-Authenticate: Bearer resource_metadata="{base_url}/oauth.php?akce=metadata-zdroje"`.
+- **Metadata**: `/.well-known/oauth-authorization-server` (RFC 8414) a `/.well-known/oauth-protected-resource` (RFC 9728) – `.well-known/.htaccess` přepisuje na PHP soubory.
+  Aplikace proto musí běžet v kořeni domény.
+- **Tabulky** modulu: `oauth_clients`, `oauth_grants`, `oauth_codes`, `oauth_tokens` (migrace `mcp` v `module_versions`); nejsou v zálohách.
+  `App::migrujPodlePotreby()` (api.php, mcp.php, oauth.php) spustí migraci i u instalace, kde je schéma aplikace aktuální, ale chybí tabulky modulu.
+- **Nástroje** (`MediaGalerie\Mcp`, české názvy jako v Social Planneru) volají `Api::vnitrni()` – stejné cesty, kontroly a odpovědi jako API v1:
+  `nahraj_medium` (zápis; `url` nebo `data_base64` do 20 MB, i `data:` URI; bez přípony se určí podle `mime` nebo obsahu; ZIP se rozbalí),
+  `hledej_media` (stručné položky, nejvýš 50 na stránku), `detail_media` (id nebo odkaz), `uprav_medium` (zápis), `seznam_kategorii`,
+  `vytvor_kategorii` (zápis), `seznam_licenci`, `seznam_tagu`. Mazat přes MCP nejde. Kategorie jde zadat id nebo názvem.
+- **Médium z AI**: `ai_model` / `ai_prompt` → licence `ai` (pokud není `licence_kod`), autor = model (pokud není `autor`), do poznámky „Vytvořeno AI (model).“ a „Prompt: …“
+  (poznámka do 5000 znaků, prompt se zkrátí) – fulltext pak najde médium i podle promptu. Autor a licence se ověří před uložením souboru.
+- Každý zápis přes MCP je v protokolu i s klientem (`MCP (Claude): nahraj_medium`).
+- **Připojení v Claude**: Nastavení → Konektory → Přidat vlastní konektor → adresa `https://galerie.kazbo.eu/mcp.php` (OAuth Client ID nechat prázdné) → přihlásit se do galerie
+  a povolit. Claude Code: `claude mcp add --transport http galerie https://galerie.kazbo.eu/mcp.php --header "Authorization: Bearer tgk_…"`.
 
 ## Zálohy, aktualizace a cron (0.4)
 - **Zálohy** (modul zalohy, `App::zalohy`): šifrovaný ZIP `twb-galerie-…zip` v `data/backups/` s tabulkami `App::TABULKY` a skupinou souborů `media`

@@ -34,6 +34,7 @@ php tests/run.php tagy       # jeden modul
 | licence | 0.1.0 | hotovo: `Licence` – číselník licencí médií shodný s `IMG_LICENSES` Social Planneru a Kvízů (`cc0`, `cc-by`, `cc-by-sa`, `vlastni`, `placena`, `pixabay`, `pexels`, `ai`, `jine`), `vycisti` (kód + verze), `odhad` z textu a odkazu (metadata, starší data; NC/ND → `jine`, „©…“ → neurčeno), `nazev`, `odkaz` na znění, `uvedeni` (text a HTML „Foto: …“, povinnost u CC BY / BY-SA, volitelně „(upraveno)“). Používá TWB Media galerie 0.6; Social Planner a Kvízy zatím mají vlastní kopii |
 | html | 0.1.0 | hotovo: `Dokument` (kontrola zdroje do 5 MB, dosazení proměnných mimo skripty/styly/komentáře s HTML escapem, vložení písem z `pisma` do dokumentu, seznam externích adres, klíč obsahu), rozhraní `Promenne`; ukládání řeší aplikace |
 | data | 0.1.0 | hotovo: `Format` (čísla, data, filtry), `Tabulka` (Skupina\|Parametr\|Hodnota), `Promenne` (kalendář, svátky, vlastní proměnné, podmínky), rozhraní `Zdroje` a `Pocasi`, napojení `ProSlidy` a `ProHtml`, `Migrace` (`data_rows`). `Vzdalene` (zdroje JSON/CSV: stahování podle intervalu, uchování posledních dat při výpadku, protokol výpadku a obnovy, hodnota podle cesty, strom pro editor) a `Hledani` (CSV, cesty). `Predpoved` (počasí OpenWeather pro `{{Počasí:…}}`: mezipaměť podle místa, stahování a obnova, výpadky, hodnoty dnes/zítra/pozítří). Správa: `Tabulka::uloz/smaz/smazMinule/importuj` (import z Excelu, i s nahrazením skupin, v transakci) a `Vzdalene::uloz/smaz` (kontrola názvu a adresy, hned první stažení). `PocasiPrvek` (prvek „Počasí“ do slidů a bannerů, 3 vzhledy, ikony OpenWeather ukládané do složky) |
+| mcp | 0.1.0 | hotovo: `Server` (MCP přes Streamable HTTP bez trvalého spojení: JSON-RPC i dávky, `initialize` 2024-11-05 až 2025-11-25 i bezstavová 2026-07-28 se `server/discover`, nástroje podle oprávnění, chyby pro uživatele vs. chyby serveru do protokolu), `Nastroj` (název, popis, JSON Schema, oprávnění, anotace), `OAuth` (autorizační server 2.1: dynamická registrace, PKCE S256, rotace refresh tokenů, jen otisky, metadata RFC 8414 a RFC 9728, zrušení RFC 7009, seznam a odebrání připojení), `Migrace` (`oauth_*`). Převzato z MCP Social Planneru (ten zatím má vlastní kopii). Používá TWB Media galerie 0.7 |
 
 ## Známé chyby nalezené při vyčleňování
 - `Napoveda::zkontroluj()` a původní `help_check()` v Plánovači: ve zprávách typu `„$k“` bere PHP uvozovku jako součást jména proměnné. V modulu opraveno, v Plánovači zmizí po přepnutí na modul.
@@ -103,3 +104,11 @@ php tools/sestavit.php <aplikace> --bez-lintu --cil=složka
 - Před sestavením se každý `.php` v balíčku zkontroluje `php -l` (jde vypnout). Symbolické odkazy sestavení zastaví (stejně je odmítne `Balicek::rozbal`).
 - Aplikace s moduly načítá `modules/jadro/boot.php` z vlastní složky `modules/` (v balíčku), při vývoji z `../../modules`.
 - Testy: `tests/nastroje/sestavit_test.php`; jeden test sestaví skutečný Plánovač médií a ověří, že jeho soubory jsou beze změny.
+
+## MCP
+
+- Modul nesahá na `$_SERVER` ani na relaci: aplikace ověří token (`OAuth::bearer`, `OAuth::over`, případně vlastní API klíč), předá tělo `Server::zpracujTelo()` a vrátí JSON.
+  Stránku souhlasu (přihlášení uživatele, CSRF, vzhled) má aplikace; z modulu volá `overPozadavek()`, `vydejKod()` a `navrat()`.
+- Chování protokolu i OAuth odpovídá `apps/social-planner/app/lib/mcp.php` a `oauth.php` (stejné verze, kódy chyb, PKCE, rotace, zrušení starších připojení téže aplikace).
+  Rozdíly: tokeny mají předponu podle aplikace, čas použití připojení se zapisuje nejvýš jednou za minutu, nástroje dostávají kontext (oprávnění, klient), zápisové nástroje se zapisují do protokolu.
+- Testy: `tests/mcp/mcp_test.php` (protokol bez HTTP, OAuth s posouvaným časem) a `tests/twb-galerie/mcp_test.php` (celý tok přes web včetně souhlasu).

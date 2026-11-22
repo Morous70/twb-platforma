@@ -1,6 +1,7 @@
 <?php
 declare(strict_types=1);
-// API klíče: vytvoření (klíč se ukáže jednou), seznam, zrušení; adresa API a odkaz na popis. Proměnné: $app, $ui, $post.
+// API klíče: vytvoření (klíč se ukáže jednou), seznam, zrušení; adresa API a odkaz na popis.
+// Připojení AI (MCP): adresa MCP serveru a seznam připojení přes OAuth (Claude, ChatGPT) s odebráním. Proměnné: $app, $ui, $post.
 use MediaGalerie\{Ui, Chyba, ApiKlice, Api};
 
 $klice = $app->apiKlice();
@@ -12,6 +13,10 @@ if ($post) {
         $ui->zpracuj(function () use ($klice, &$novy) {
             $novy = $klice->vytvor((string)($_POST['nazev'] ?? ''), (string)($_POST['opravneni'] ?? ''));
         });
+    } elseif ($akce === 'odebrat-pripojeni') {
+        $app->oauth()->zrusPripojeni((int)($_POST['id'] ?? 0));
+        $ui->zprava('ok', 'Připojení odebráno. Aplikace už do galerie nesmí; pro nové připojení přidejte konektor znovu.');
+        $ui->presmeruj(Ui::odkaz('api'));
     } elseif ($ui->zpracuj(function () use ($akce, $klice) {
         if ($akce !== 'smazat') throw new Chyba('Neznámá akce.');
         $klice->smaz((int)($_POST['id'] ?? 0));
@@ -22,6 +27,8 @@ if ($post) {
 }
 $seznam = $klice->seznam();
 $adresa = $app->url('api.php/' . Api::VERZE);
+$adresaMcp = $app->url('mcp.php');
+$pripojeni = $app->oauth()->pripojeni();
 ?>
 <?php if ($novy): ?>
 <div class="karta hlaska-ok">
@@ -50,6 +57,26 @@ $adresa = $app->url('api.php/' . Api::VERZE);
     <?php endforeach; ?>
   </table></div>
   <?php endif; ?>
+  <div class="karta" id="mcp">
+    <h2 style="margin-top:0">Připojení AI (MCP)</h2>
+    <div class="tlacitka"><input id="adresa-mcp" readonly value="<?= Ui::h($adresaMcp) ?>" style="flex:1"><button type="button" class="maly" data-kopirovat="adresa-mcp">Kopírovat</button></div>
+    <p class="mala">Adresu vložte v Claude do <b>Nastavení → Konektory → Přidat vlastní konektor</b> (v ChatGPT obdobně). Claude se přihlásí přes tuto galerii a vy připojení povolíte.
+      Claude Code a jiné klienty můžou místo přihlášení poslat API klíč v hlavičce <code>Authorization: Bearer tgk_…</code> (klíč se zápisem smí nahrávat).
+      Podrobnosti v <a href="<?= Ui::h(Ui::odkaz('napoveda', ['s' => 'mcp'])) ?>">nápovědě k MCP</a>.</p>
+    <?php if (!$pripojeni): ?>
+      <p class="slabe mala" style="margin-bottom:0">Zatím žádné připojení.</p>
+    <?php else: ?>
+    <div class="tabulka-obal"><table>
+      <tr><th>Aplikace</th><th>Oprávnění</th><th>Připojeno</th><th>Naposledy</th><th></th></tr>
+      <?php foreach ($pripojeni as $g): ?>
+      <tr><td><strong><?= Ui::h($g['client_name']) ?></strong><div class="slabe mala"><?= Ui::h($g['redirect_host']) ?></div></td>
+        <td><?= str_contains((string)$g['scope'], 'write') ? Ui::stav('paused', 'Čtení i nahrávání') : Ui::stav('active', 'Čtení') ?></td>
+        <td class="mala"><?= Ui::h(Ui::datum($g['created_at'])) ?></td><td class="mala"><?= Ui::h(Ui::datum($g['last_used'])) ?></td>
+        <td><?= $ui->tlacitko('Odebrat', 'odebrat-pripojeni', ['id' => $g['id']], 'maly nebezpecne', 'Odebrat připojení „' . $g['client_name'] . '“? Aplikace přestane mít do galerie přístup.') ?></td></tr>
+      <?php endforeach; ?>
+    </table></div>
+    <?php endif; ?>
+  </div>
 </section>
 <section>
   <form method="post" class="formular karta">

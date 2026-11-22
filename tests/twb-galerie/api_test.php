@@ -1,6 +1,6 @@
 <?php
 declare(strict_types=1);
-// TWB Media galerie 0.3: API (klíče, oprávnění, média, nahrání i po částech a z adresy, úpravy, kampaně, tagy) a ochrana stahování z adresy.
+// TWB Media galerie 0.3: API (klíče, oprávnění, média, nahrání i po částech a z adresy, úpravy, kategorie, tagy) a ochrana stahování z adresy.
 require __DIR__ . '/pomocne.php';
 require __DIR__ . '/server.php';
 
@@ -132,44 +132,44 @@ test('API: bez klíče 401, špatný klíč 401, klíč pro čtení nesmí zapis
     $r = api($s, 'GET', '/', $cteni);
     eq([200, 'application/json', 'Web', 'read'], [$r['code'], $r['type'], $r['json']['klic'], $r['json']['opravneni']]);
     eq('Skript', api($s, 'GET', '/', $zapis, hlavicka: 'X-Api-Key: ')['json']['klic']);
-    $r = api($s, 'POST', '/kampane', $cteni, json: ['nazev' => 'X']);
+    $r = api($s, 'POST', '/kategorie', $cteni, json: ['nazev' => 'X']);
     eq([403, false], [$r['code'], $r['json']['ok']]);
     eq(404, api($s, 'GET', '/neni', $cteni)['code']);
-    eq(405, api($s, 'PUT', '/kampane', $zapis)['code']);
+    eq(405, api($s, 'PUT', '/kategorie', $zapis)['code']);
     ok((int)$s->db()->query("SELECT last_used_at FROM api_keys WHERE name = 'Web'")->fetchColumn() > 0, 'čas použití');
 });
 
-test('API: kampaně – založení, výpis, úprava, chyby', function () use ($s, &$zapis, &$cteni) {
-    $r = api($s, 'POST', '/kampane', $zapis, json: ['nazev' => 'Podzim', 'poznamka' => 'web']);
-    eq([201, 'Podzim', 'web', 0], [$r['code'], $r['json']['kampan']['nazev'], $r['json']['kampan']['poznamka'], $r['json']['kampan']['pocet_medii']]);
-    $id = $r['json']['kampan']['id'];
-    eq(400, api($s, 'POST', '/kampane', $zapis, json: ['nazev' => 'podzim'])['code'], 'duplicitní');
-    $r = api($s, 'PATCH', "/kampane/$id", $zapis, json: ['nazev' => 'Podzim 2026']);
-    eq(['Podzim 2026', 'web'], [$r['json']['kampan']['nazev'], $r['json']['kampan']['poznamka']]);
-    eq('Podzim 2026', api($s, 'GET', '/kampane', $cteni)['json']['kampane'][0]['nazev']);
-    eq(404, api($s, 'GET', '/kampane/999', $cteni)['code']);
-    eq(400, api($s, 'POST', '/kampane', $zapis, json: ['nazev' => ''])['code']);
+test('API: kategorie – založení, výpis, úprava, chyby', function () use ($s, &$zapis, &$cteni) {
+    $r = api($s, 'POST', '/kategorie', $zapis, json: ['nazev' => 'Podzim', 'poznamka' => 'web']);
+    eq([201, 'Podzim', 'web', 0], [$r['code'], $r['json']['kategorie']['nazev'], $r['json']['kategorie']['poznamka'], $r['json']['kategorie']['pocet_medii']]);
+    $id = $r['json']['kategorie']['id'];
+    eq(400, api($s, 'POST', '/kategorie', $zapis, json: ['nazev' => 'podzim'])['code'], 'duplicitní');
+    $r = api($s, 'PATCH', "/kategorie/$id", $zapis, json: ['nazev' => 'Podzim 2026']);
+    eq(['Podzim 2026', 'web'], [$r['json']['kategorie']['nazev'], $r['json']['kategorie']['poznamka']]);
+    eq('Podzim 2026', api($s, 'GET', '/kategorie', $cteni)['json']['kategorie'][0]['nazev']);
+    eq(404, api($s, 'GET', '/kategorie/999', $cteni)['code']);
+    eq(400, api($s, 'POST', '/kategorie', $zapis, json: ['nazev' => ''])['code']);
     $r = (function () use ($s, $zapis) {
-        $ch = curl_init($s->url . '/api.php/v1/kampane');
+        $ch = curl_init($s->url . '/api.php/v1/kategorie');
         curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER => true, CURLOPT_POST => true, CURLOPT_POSTFIELDS => '{neplatny', CURLOPT_HTTPHEADER => ['Authorization: Bearer ' . $zapis, 'Content-Type: application/json']]);
         return [(int)curl_getinfo($ch, CURLINFO_HTTP_CODE) ?: 0, curl_exec($ch), curl_getinfo($ch, CURLINFO_HTTP_CODE)];
     })();
     eq(400, $r[2], 'neplatný JSON');
 });
 
-test('API: nahrání souboru s kampaní, tagy a poznámkou; nepovolený typ', function () use ($s, &$zapis) {
-    $k = (int)$s->db()->query('SELECT id FROM campaigns')->fetchColumn();
+test('API: nahrání souboru s kategorií, tagy a poznámkou; nepovolený typ', function () use ($s, &$zapis) {
+    $k = (int)$s->db()->query('SELECT id FROM categories')->fetchColumn();
     $png = png(300, 200);
-    $r = api($s, 'POST', '/media', $zapis, ['soubor' => soubor($png), 'nazev' => 'banner.png', 'kampan' => (string)$k, 'tagy' => 'web, Léto', 'poznamka' => 'pro web']);
+    $r = api($s, 'POST', '/media', $zapis, ['soubor' => soubor($png), 'nazev' => 'banner.png', 'kategorie' => (string)$k, 'tagy' => 'web, Léto', 'poznamka' => 'pro web']);
     eq(201, $r['code'], $r['body']);
     $m = $r['json']['medium'];
-    eq(['banner.png', 'image', 300, 200, md5($png), $k, ['web', 'Léto'], 'pro web'], [$m['nazev'], $m['druh'], $m['sirka'], $m['vyska'], $m['md5'], $m['kampan']['id'], $m['tagy'], $m['poznamka']]);
+    eq(['banner.png', 'image', 300, 200, md5($png), $k, ['web', 'Léto'], 'pro web'], [$m['nazev'], $m['druh'], $m['sirka'], $m['vyska'], $m['md5'], $m['kategorie']['id'], $m['tagy'], $m['poznamka']]);
     ok(str_contains($m['verejny_odkaz'], '/soubor.php/') && str_ends_with($m['soubor'], '/api.php/v1/media/' . $m['id'] . '/soubor'));
     $r = api($s, 'POST', '/media', $zapis, ['soubor' => soubor('<?php phpinfo();'), 'nazev' => 'x.php']);
     eq(400, $r['code']);
     ok(str_contains($r['json']['chyba'], 'Nepodporovaný typ'));
     eq(400, api($s, 'POST', '/media', $zapis, ['nazev' => 'nic'])['code'], 'bez souboru i adresy');
-    eq(404, api($s, 'POST', '/media', $zapis, ['soubor' => soubor($png), 'kampan' => '999'])['code']);
+    eq(404, api($s, 'POST', '/media', $zapis, ['soubor' => soubor($png), 'kategorie' => '999'])['code']);
     eq(1, (int)$s->db()->query('SELECT COUNT(*) FROM media')->fetchColumn());
 });
 
@@ -200,7 +200,7 @@ test('API: seznam s filtry a stránkováním, detail, stažení souboru s Range'
     eq(['spot.mp4'], array_column(api($s, 'GET', '/media?druh=video', $cteni)['json']['media'], 'nazev'));
     eq(['banner.png'], array_column(api($s, 'GET', '/media?tag=l%C3%A9to', $cteni)['json']['media'], 'nazev'));
     eq(['banner.png'], array_column(api($s, 'GET', '/media?q=pro%20web', $cteni)['json']['media'], 'nazev'));
-    eq(3, api($s, 'GET', '/media?kampan=0', $cteni)['json']['celkem']);
+    eq(3, api($s, 'GET', '/media?kategorie=0', $cteni)['json']['celkem']);
     $r = api($s, 'GET', '/media?na_stranku=3&strana=2&razeni=stare', $cteni);
     eq([2, 2, ['Vlastní.png']], [$r['json']['strana'], $r['json']['stran'], array_column($r['json']['media'], 'nazev')]);
     eq(400, api($s, 'GET', '/media?na_stranku=500', $cteni)['code']);
@@ -222,14 +222,14 @@ test('API: seznam s filtry a stránkováním, detail, stažení souboru s Range'
 
 test('API: úprava (vše nebo nic), archiv, odkaz, nahrazení, smazání', function () use ($s, &$zapis, &$cteni) {
     $id = (int)$s->db()->query("SELECT id FROM media WHERE original_name = 'banner.png'")->fetchColumn();
-    $r = api($s, 'PATCH', "/media/$id", $zapis, json: ['nazev' => 'Hlavní banner', 'tagy' => ['a', 'b'], 'kampan' => null, 'poznamka' => null]);
+    $r = api($s, 'PATCH', "/media/$id", $zapis, json: ['nazev' => 'Hlavní banner', 'tagy' => ['a', 'b'], 'kategorie' => null, 'poznamka' => null]);
     $m = $r['json']['medium'];
-    eq(['Hlavní banner.png', ['a', 'b'], null, null], [$m['nazev'], $m['tagy'], $m['kampan'], $m['poznamka']]);
+    eq(['Hlavní banner.png', ['a', 'b'], null, null], [$m['nazev'], $m['tagy'], $m['kategorie'], $m['poznamka']]);
     $r = api($s, 'PATCH', "/media/$id", $zapis, json: ['nazev' => 'Jiný', 'tagy' => range(1, 11)]);
     eq(400, $r['code']);
     eq('Hlavní banner.png', api($s, 'GET', "/media/$id", $cteni)['json']['medium']['nazev'], 'nic se nezměnilo');
     eq(400, api($s, 'PATCH', "/media/$id", $zapis, json: ['velikost' => 1])['code'], 'neznámé pole');
-    eq(404, api($s, 'PATCH', "/media/$id", $zapis, json: ['kampan' => 999])['code']);
+    eq(404, api($s, 'PATCH', "/media/$id", $zapis, json: ['kategorie' => 999])['code']);
     $r = api($s, 'PATCH', "/media/$id", $zapis, json: ['archiv' => true]);
     ok($r['json']['medium']['archivovano'] !== null);
     eq(1, api($s, 'GET', '/media?archiv=1', $cteni)['json']['celkem']);
@@ -245,13 +245,13 @@ test('API: úprava (vše nebo nic), archiv, odkaz, nahrazení, smazání', funct
     ok(str_contains($r['json']['chyba'], 'stejného druhu'));
     eq(200, api($s, 'DELETE', "/media/$id", $zapis)['code']);
     eq(404, api($s, 'GET', "/media/$id", $cteni)['code']);
-    $k = (int)$s->db()->query('SELECT id FROM campaigns')->fetchColumn();
+    $k = (int)$s->db()->query('SELECT id FROM categories')->fetchColumn();
     $spot = (int)$s->db()->query("SELECT id FROM media WHERE original_name = 'spot.mp4'")->fetchColumn();
-    eq($k, api($s, 'PATCH', "/media/$spot", $zapis, json: ['kampan' => $k])['json']['medium']['kampan']['id']);
-    eq(1, api($s, 'GET', "/kampane/$k", $cteni)['json']['kampan']['pocet_medii']);
-    $r = api($s, 'DELETE', "/kampane/$k", $zapis);
+    eq($k, api($s, 'PATCH', "/media/$spot", $zapis, json: ['kategorie' => $k])['json']['medium']['kategorie']['id']);
+    eq(1, api($s, 'GET', "/kategorie/$k", $cteni)['json']['kategorie']['pocet_medii']);
+    $r = api($s, 'DELETE', "/kategorie/$k", $zapis);
     eq([200, 1], [$r['code'], $r['json']['odpojeno_medii']]);
-    eq(null, api($s, 'GET', "/media/$spot", $cteni)['json']['medium']['kampan']);
+    eq(null, api($s, 'GET', "/media/$spot", $cteni)['json']['medium']['kategorie']);
 });
 
 test('API: zámek po mnoha neplatných klíčích, protokol', function () use ($s, $b, &$cteni) {

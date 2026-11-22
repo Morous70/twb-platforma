@@ -272,7 +272,7 @@ $cron = (int)$n->dej('cron_last_run', 0);
       <p style="margin-top:0"><b>Obnovit zálohu <?= Ui::h($nahled['zaloha']) ?>?</b></p>
       <dl class="udaje">
         <dt>Vytvořena</dt><dd><?= Ui::h($nahled['created_at'] ?? '?') ?> (verze <?= Ui::h($nahled['app_version']) ?>)</dd>
-        <dt>Obsah</dt><dd>média <?= Ui::cislo($nahled['tabulky']['media'] ?? 0) ?>, kampaně <?= Ui::cislo($nahled['tabulky']['campaigns'] ?? 0) ?>, soubory <?= Ui::cislo($nahled['files']) ?></dd>
+        <dt>Obsah</dt><dd>média <?= Ui::cislo($nahled['tabulky']['media'] ?? 0) ?>, kategorie <?= Ui::cislo($nahled['tabulky']['categories'] ?? 0) ?>, soubory <?= Ui::cislo($nahled['files']) ?></dd>
       </dl>
       <p class="mala">Současná data se nahradí obsahem zálohy. Před obnovou se vytvoří pojistná záloha současného stavu. Přihlašovací údaje zůstanou.</p>
       <div class="tlacitka">

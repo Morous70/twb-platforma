@@ -1,6 +1,6 @@
 <?php
 declare(strict_types=1);
-// TWB Media galerie 0.2: média z pohledu aplikace – kampaně, filtry, veřejné klíče, náhledy, rozsahy bajtů, převod schématu.
+// TWB Media galerie 0.2: média z pohledu aplikace – kategorie, filtry, veřejné klíče, náhledy, rozsahy bajtů, převod schématu.
 require __DIR__ . '/pomocne.php';
 
 use MediaGalerie\{App, Media, Vydej, Schema, Chyba};
@@ -10,12 +10,12 @@ echo "Media galerie: galerie\n";
 
 /** Nahraje soubor do galerie aplikace jako po skončení nahrávání. */
 
-function nahraj(App $app, string $nazev, string $obsah, ?int $kampan = null, array $tagy = []): int
+function nahraj(App $app, string $nazev, string $obsah, ?int $kategorie = null, array $tagy = []): int
 {
     $f = docasna('soubor');
     file_put_contents($f, $obsah);
     $v = $app->galerie()->uloz($f, $nazev, $tagy);
-    $app->media()->poNahrani($v['id'], $kampan);
+    $app->media()->poNahrani($v['id'], $kategorie);
     return $v['id'];
 }
 
@@ -40,8 +40,33 @@ test('schéma: převod z verze 1 doplní sloupce, veřejné klíče stávající
     $app->db->q('SELECT COUNT(*) FROM api_keys')->fetchColumn();
     $r = $app->db->q('SELECT * FROM media')->fetch();
     ok(preg_match('/^[0-9a-f]{24}$/', (string)$r['public_key']) === 1, 'klíč doplněn');
-    ok(array_key_exists('campaign_id', $r) && array_key_exists('note', $r));
+    ok(array_key_exists('category_id', $r) && array_key_exists('note', $r));
     eq('0', $app->nastaveni()->dej('img_auto'), 'bez nastavení se komprese po nahrání vypne');
+});
+
+test('schéma: převod z verze 3 přejmenuje kampaně na kategorie i s daty', function () {
+    $dir = docasna('kampane');
+    mkdir($dir, 0775, true);
+    $app = new App(KOREN . '/apps/twb-galerie', ['data_dir' => $dir]);
+    $m = new Migrace($app->db);
+    $m->spust('prihlaseni', \TWB\Prihlaseni\Migrace::class);
+    $m->spust('galerie', \TWB\Galerie\Migrace::class);
+    \MediaGalerie\Schema::zakladniTabulky($app->db);
+    // stav verze 3: tabulka campaigns a sloupec media.campaign_id
+    $app->db->q('CREATE TABLE campaigns (id INTEGER PRIMARY KEY AUTOINCREMENT, name VARCHAR(200) NOT NULL, note TEXT NULL, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL)');
+    foreach (['campaign_id INTEGER NULL', 'note TEXT NULL', 'public_key VARCHAR(40) NULL'] as $sl) $app->db->q("ALTER TABLE media ADD COLUMN $sl");
+    $app->db->q('CREATE INDEX media_campaign ON media (campaign_id)');
+    $app->db->q('CREATE TABLE api_keys (id INTEGER PRIMARY KEY AUTOINCREMENT, name VARCHAR(100) NOT NULL, prefix VARCHAR(12) NOT NULL, key_hash CHAR(64) NOT NULL UNIQUE, scope VARCHAR(10) NOT NULL, created_at INTEGER NOT NULL, last_used_at INTEGER NULL)');
+    $app->db->q("INSERT INTO campaigns (name, created_at, updated_at) VALUES ('Loga', 1, 1)");
+    $app->db->q("INSERT INTO media (filename, original_name, mime, kind, size, md5, created_at, campaign_id, public_key) VALUES ('a.png', 'a.png', 'image/png', 'image', 1, 'x', '2026-11-22 10:00:00', 1, 'abc')");
+    $app->db->q("INSERT INTO module_versions (module, version) VALUES ('twb-galerie', 3)");
+    $app->migruj();
+    eq(\MediaGalerie\Schema::verze(), $m->verze('twb-galerie'));
+    eq('Loga', $app->db->q('SELECT c.name FROM media m JOIN categories c ON c.id = m.category_id')->fetchColumn());
+    eq(0, (int)$app->db->q("SELECT COUNT(*) FROM sqlite_master WHERE name IN ('campaigns', 'media_campaign')")->fetchColumn());
+    eq(1, (int)$app->db->q("SELECT COUNT(*) FROM sqlite_master WHERE name = 'media_category'")->fetchColumn());
+    $app->migruj();
+    eq(['Loga' => 1], array_map('intval', array_column($app->kategorie()->seznam(), 'pocet', 'name')));
 });
 
 test('nová instalace: komprese po nahrání vypnutá, nahrané médium má veřejný klíč', function () {
@@ -69,27 +94,27 @@ test('veřejný odkaz: adresa s názvem, nový klíč zneplatní starý, vypnut�
     eq(null, $app->media()->podleKlice($novy));
 });
 
-test('kampaně: založení, duplicitní název, přiřazení, smazání nechá média bez kampaně', function () {
+test('kategorie: založení, duplicitní název, přiřazení, smazání nechá média bez kategorie', function () {
     $app = novaApp();
-    $k = $app->kampane()->uloz(['name' => 'Vánoce 2026', 'note' => 'banery']);
-    throws(fn() => $app->kampane()->uloz(['name' => 'vánoce 2026']), 'už existuje');
-    throws(fn() => $app->kampane()->uloz(['name' => '  ']), 'Název');
+    $k = $app->kategorie()->uloz(['name' => 'Vánoce 2026', 'note' => 'banery']);
+    throws(fn() => $app->kategorie()->uloz(['name' => 'vánoce 2026']), 'už existuje');
+    throws(fn() => $app->kategorie()->uloz(['name' => '  ']), 'Název');
     $a = nahraj($app, 'a.png', png(10, 10), $k);
     $b = nahraj($app, 'b.png', png(10, 10));
-    eq((string)$k, (string)$app->media()->radek($a)['campaign_id']);
-    eq(1, $app->media()->nastavKampan([$a, $b], $k), 'změní se jen b');
-    throws(fn() => $app->media()->nastavKampan([$a], 999), 'nenalezena');
-    $s = $app->kampane()->seznam();
+    eq((string)$k, (string)$app->media()->radek($a)['category_id']);
+    eq(1, $app->media()->nastavKategorii([$a, $b], $k), 'změní se jen b');
+    throws(fn() => $app->media()->nastavKategorii([$a], 999), 'nenalezena');
+    $s = $app->kategorie()->seznam();
     eq([1, 2], [count($s), (int)$s[0]['pocet']]);
-    $app->kampane()->uloz(['name' => 'Vánoce 2026', 'note' => ''], $k);   // stejný název u sebe sama smí
-    eq(2, $app->kampane()->smaz($k));
-    eq(null, $app->media()->radek($a)['campaign_id']);
-    throws(fn() => $app->kampane()->radek($k), 'nenalezena');
+    $app->kategorie()->uloz(['name' => 'Vánoce 2026', 'note' => ''], $k);   // stejný název u sebe sama smí
+    eq(2, $app->kategorie()->smaz($k));
+    eq(null, $app->media()->radek($a)['category_id']);
+    throws(fn() => $app->kategorie()->radek($k), 'nenalezena');
 });
 
-test('seznam: hledání, druh, kampaň, bez kampaně, tag, archiv, řazení a stránkování', function () {
+test('seznam: hledání, druh, kategorie, bez kategorie, tag, archiv, řazení a stránkování', function () {
     $app = novaApp();
-    $k = $app->kampane()->uloz(['name' => 'Jaro']);
+    $k = $app->kategorie()->uloz(['name' => 'Jaro']);
     $a = nahraj($app, 'jaro-banner.png', png(10, 10), $k, ['Banner']);
     $b = nahraj($app, 'video.mp4', mp4(5000), $k);
     $c = nahraj($app, 'leták 50%.png', png(20, 20), null, ['banner', 'Tisk']);
@@ -101,8 +126,8 @@ test('seznam: hledání, druh, kampaň, bez kampaně, tag, archiv, řazení a st
     eq([$c], $id(['q' => '50%']), 'zástupné znaky LIKE se berou doslova');
     eq([], $id(['q' => '_']));
     eq([$b], $id(['druh' => 'video']));
-    eq([$b, $a], $id(['kampan' => (string)$k]));
-    eq([$c], $id(['kampan' => '0']));
+    eq([$b, $a], $id(['kategorie' => (string)$k]));
+    eq([$c], $id(['kategorie' => '0']));
     eq([$c, $a], $id(['tag' => 'BANNER']));
     eq([$a, $b, $c], $id(['razeni' => 'stare']));
     eq([$a, $c, $b], $id(['razeni' => 'nazev']));
@@ -148,7 +173,7 @@ test('rozsah bajtů (Range)', function () {
     eq(null, Vydej::rozsah('bytes=0-1', 0));
 });
 
-test('kampaň se zálohuje, Passkey ne', function () {
-    ok(in_array('campaigns', App::TABULKY, true));
-    ok(array_search('campaigns', App::TABULKY, true) < array_search('media', App::TABULKY, true));
+test('kategorie se zálohuje, Passkey ne', function () {
+    ok(in_array('categories', App::TABULKY, true));
+    ok(array_search('categories', App::TABULKY, true) < array_search('media', App::TABULKY, true));
 });

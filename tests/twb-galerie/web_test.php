@@ -67,12 +67,12 @@ test('instalace: kontrola hesla a e-mailu, pak přihlášení', function () use 
 });
 
 test('všechny stránky se načtou bez chyb', function () use ($b) {
-    foreach (['prehled', 'galerie', 'kampane', 'api', 'napoveda', 'nastaveni', 'protokol'] as $p) {
+    foreach (['prehled', 'galerie', 'kategorie', 'api', 'napoveda', 'nastaveni', 'protokol'] as $p) {
         $r = $b->jdi("index.php?p=$p");
         eq(200, $r['code'], $p);
         ok(str_contains($r['body'], '<h1>'), $p);
     }
-    foreach (['co-aplikace-umi', 'nahravani', 'verejne-odkazy', 'kampane-a-tagy', 'prihlaseni', 'zapomenute-heslo', 'google', 'api'] as $st) eq(200, $b->jdi("index.php?p=napoveda&s=$st")['code'], $st);
+    foreach (['co-aplikace-umi', 'nahravani', 'verejne-odkazy', 'kategorie-a-tagy', 'prihlaseni', 'zapomenute-heslo', 'google', 'api'] as $st) eq(200, $b->jdi("index.php?p=napoveda&s=$st")['code'], $st);
     eq(404, $b->jdi('index.php?p=neexistuje')['code']);
     eq(404, $b->jdi('index.php?p=napoveda&s=neni')['code']);
 });

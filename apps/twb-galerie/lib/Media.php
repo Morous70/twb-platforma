@@ -5,7 +5,7 @@ namespace MediaGalerie;
 use TWB\Zalohy\Zalohy;
 
 /**
- * Média z pohledu aplikace: seznam s filtry, kampaň, poznámka, veřejný odkaz, náhledy.
+ * Média z pohledu aplikace: seznam s filtry, kategorie, poznámka, veřejný odkaz, náhledy.
  * Soubory, nahrávání, tagy, archiv a komprese obstarává modul galerie (App::galerie()).
  */
 final class Media
@@ -36,7 +36,7 @@ final class Media
     }
 
     /**
-     * Seznam podle filtru. Filtr: q (text v názvu a poznámce), druh, kampan (id, 0 = bez kampaně), tag, archiv (bool), razeni, strana.
+     * Seznam podle filtru. Filtr: q (text v názvu a poznámce), druh, kategorie (id, 0 = bez kategorie), tag, archiv (bool), razeni, strana.
      * @param array<string, mixed> $f
      * @return array{polozky: list<array<string, mixed>>, celkem: int, strana: int, stran: int}
      */
@@ -51,9 +51,9 @@ final class Media
             array_push($p, $vzor, $vzor);
         }
         if (isset(self::DRUHY[$f['druh'] ?? ''])) { $kde[] = 'kind = ?'; $p[] = $f['druh']; }
-        if (isset($f['kampan']) && $f['kampan'] !== '' && $f['kampan'] !== null) {
-            if ((int)$f['kampan'] === 0) $kde[] = 'campaign_id IS NULL';
-            else { $kde[] = 'campaign_id = ?'; $p[] = (int)$f['kampan']; }
+        if (isset($f['kategorie']) && $f['kategorie'] !== '' && $f['kategorie'] !== null) {
+            if ((int)$f['kategorie'] === 0) $kde[] = 'category_id IS NULL';
+            else { $kde[] = 'category_id = ?'; $p[] = (int)$f['kategorie']; }
         }
         $poradi = match ($f['razeni'] ?? 'nove') {
             'stare' => 'id ASC', 'nazev' => 'original_name COLLATE NOCASE ASC, id DESC', 'velikost' => 'size DESC, id DESC', default => 'id DESC',
@@ -91,20 +91,20 @@ final class Media
 
     // ---------- úpravy ----------
 
-    /** Po nahrání: kampaň, poznámka a veřejný odkaz (modul galerie tyto sloupce nezná). */
-    public function poNahrani(int $id, ?int $kampan): void
+    /** Po nahrání: kategorie, poznámka a veřejný odkaz (modul galerie tyto sloupce nezná). */
+    public function poNahrani(int $id, ?int $kategorie): void
     {
         $r = $this->radek($id);
         if ($r['public_key'] === null) $this->app->db->q('UPDATE media SET public_key = ? WHERE id = ?', [self::novyKlic(), $id]);
-        if ($kampan !== null) $this->nastavKampan([$id], $kampan);
+        if ($kategorie !== null) $this->nastavKategorii([$id], $kategorie);
     }
 
-    /** Přiřadí média kampani (null = bez kampaně). Vrací počet změněných. @param list<int> $ids */
-    public function nastavKampan(array $ids, ?int $kampan): int
+    /** Přiřadí média kategorii (null = bez kategorie). Vrací počet změněných. @param list<int> $ids */
+    public function nastavKategorii(array $ids, ?int $kategorie): int
     {
-        if ($kampan !== null) $this->app->kampane()->radek($kampan);
+        if ($kategorie !== null) $this->app->kategorie()->radek($kategorie);
         $n = 0;
-        foreach ($ids as $id) $n += $this->app->db->q('UPDATE media SET campaign_id = ? WHERE id = ? AND campaign_id IS NOT ?', [$kampan, (int)$id, $kampan])->rowCount();
+        foreach ($ids as $id) $n += $this->app->db->q('UPDATE media SET category_id = ? WHERE id = ? AND category_id IS NOT ?', [$kategorie, (int)$id, $kategorie])->rowCount();
         return $n;
     }
 

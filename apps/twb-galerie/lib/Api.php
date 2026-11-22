@@ -89,21 +89,21 @@ final class Api
                 if ($m === 'POST') { $this->app->media()->novyOdkaz($id); return [200, ['ok' => true, 'medium' => $this->medium($this->app->media()->radek($id))]]; }
                 if ($m === 'DELETE') { $this->app->media()->zrusOdkaz($id); return [200, ['ok' => true, 'medium' => $this->medium($this->app->media()->radek($id))]]; }
                 return $nepovolena;
-            case 'kampane':
-                if ($m === 'GET') return [200, ['ok' => true, 'kampane' => array_map([$this, 'kampan'], $this->app->kampane()->seznam())]];
+            case 'kategorie':
+                if ($m === 'GET') return [200, ['ok' => true, 'kategorie' => array_map([$this, 'kategorie'], $this->app->kategorie()->seznam())]];
                 if ($m === 'POST') {
-                    $nove = $this->app->kampane()->uloz(['name' => $v['nazev'] ?? '', 'note' => $v['poznamka'] ?? '']);
-                    return [201, ['ok' => true, 'kampan' => $this->kampanPodleId($nove)]];
+                    $nove = $this->app->kategorie()->uloz(['name' => $v['nazev'] ?? '', 'note' => $v['poznamka'] ?? '']);
+                    return [201, ['ok' => true, 'kategorie' => $this->kategoriePodleId($nove)]];
                 }
                 return $nepovolena;
-            case 'kampane/{id}':
-                if ($m === 'GET') return [200, ['ok' => true, 'kampan' => $this->kampanPodleId($id)]];
+            case 'kategorie/{id}':
+                if ($m === 'GET') return [200, ['ok' => true, 'kategorie' => $this->kategoriePodleId($id)]];
                 if ($m === 'PATCH' || $m === 'POST') {
-                    $k = $this->app->kampane()->radek($id);
-                    $this->app->kampane()->uloz(['name' => $v['nazev'] ?? $k['name'], 'note' => array_key_exists('poznamka', $v) ? $v['poznamka'] : $k['note']], $id);
-                    return [200, ['ok' => true, 'kampan' => $this->kampanPodleId($id)]];
+                    $k = $this->app->kategorie()->radek($id);
+                    $this->app->kategorie()->uloz(['name' => $v['nazev'] ?? $k['name'], 'note' => array_key_exists('poznamka', $v) ? $v['poznamka'] : $k['note']], $id);
+                    return [200, ['ok' => true, 'kategorie' => $this->kategoriePodleId($id)]];
                 }
-                if ($m === 'DELETE') return [200, ['ok' => true, 'smazano' => $id, 'odpojeno_medii' => $this->app->kampane()->smaz($id)]];
+                if ($m === 'DELETE') return [200, ['ok' => true, 'smazano' => $id, 'odpojeno_medii' => $this->app->kategorie()->smaz($id)]];
                 return $nepovolena;
             case 'tagy':
                 if ($m !== 'GET') return $nepovolena;
@@ -122,7 +122,7 @@ final class Api
         $f = [
             'q' => (string)($get['q'] ?? ''),
             'druh' => (string)($get['druh'] ?? ''),
-            'kampan' => isset($get['kampan']) ? (string)(int)$get['kampan'] : '',
+            'kategorie' => isset($get['kategorie']) ? (string)(int)$get['kategorie'] : '',
             'tag' => (string)($get['tag'] ?? ''),
             'archiv' => !empty($get['archiv']) && $get['archiv'] !== '0',
             'razeni' => (string)($get['razeni'] ?? 'nove'),
@@ -138,10 +138,10 @@ final class Api
     /** Médium pro API. @return array<string, mixed> */
     public function medium(array $r): array
     {
-        static $kampane = null;
-        $kampane ??= $this->app->kampane()->volby();
-        $kid = $r['campaign_id'] !== null ? (int)$r['campaign_id'] : null;
-        if ($kid !== null && !isset($kampane[$kid])) $kampane = $this->app->kampane()->volby();
+        static $kategorie = null;
+        $kategorie ??= $this->app->kategorie()->volby();
+        $kid = $r['category_id'] !== null ? (int)$r['category_id'] : null;
+        if ($kid !== null && !isset($kategorie[$kid])) $kategorie = $this->app->kategorie()->volby();
         return [
             'id' => (int)$r['id'],
             'nazev' => (string)$r['original_name'],
@@ -151,7 +151,7 @@ final class Api
             'sirka' => $r['width'] !== null ? (int)$r['width'] : null,
             'vyska' => $r['height'] !== null ? (int)$r['height'] : null,
             'md5' => (string)$r['md5'],
-            'kampan' => $kid !== null ? ['id' => $kid, 'nazev' => $kampane[$kid] ?? null] : null,
+            'kategorie' => $kid !== null ? ['id' => $kid, 'nazev' => $kategorie[$kid] ?? null] : null,
             'tagy' => Media::tagy($r),
             'poznamka' => $r['note'],
             'archivovano' => $r['archived_at'] ? date('c', (int)strtotime((string)$r['archived_at'])) : null,
@@ -163,16 +163,16 @@ final class Api
     }
 
     /** @return array<string, mixed> */
-    private function kampan(array $k): array
+    private function kategorie(array $k): array
     {
         return ['id' => (int)$k['id'], 'nazev' => (string)$k['name'], 'poznamka' => $k['note'], 'pocet_medii' => (int)($k['pocet'] ?? 0),
             'velikost' => (int)($k['velikost'] ?? 0), 'vytvoreno' => date('c', (int)$k['created_at'])];
     }
 
-    private function kampanPodleId(int $id): array
+    private function kategoriePodleId(int $id): array
     {
-        foreach ($this->app->kampane()->seznam() as $k) if ((int)$k['id'] === $id) return $this->kampan($k);
-        throw new Chyba('Kampaň nenalezena.');
+        foreach ($this->app->kategorie()->seznam() as $k) if ((int)$k['id'] === $id) return $this->kategorie($k);
+        throw new Chyba('Kategorie nenalezena.');
     }
 
     // ---------- zápis ----------
@@ -185,8 +185,8 @@ final class Api
     private function nahraj(array $v, array $soubory, ?int $nahradit): array
     {
         if ($nahradit !== null) $this->app->media()->radek($nahradit);
-        $kampan = isset($v['kampan']) && $v['kampan'] !== '' && $v['kampan'] !== null ? (int)$v['kampan'] : null;
-        if ($kampan !== null) $this->app->kampane()->radek($kampan);
+        $kategorie = isset($v['kategorie']) && $v['kategorie'] !== '' && $v['kategorie'] !== null ? (int)$v['kategorie'] : null;
+        if ($kategorie !== null) $this->app->kategorie()->radek($kategorie);
         $tagy = $this->tagy($v['tagy'] ?? []);
         $poznamka = isset($v['poznamka']) ? Vstup::text($v, 'poznamka', 'poznamka', 5000, false) : null;
         $tmp = $this->app->data . '/tmp';
@@ -222,28 +222,28 @@ final class Api
         }
         $vysledek = $this->app->galerie()->uloz($cesta, $nazev, $tagy, $nahradit);
         $id = $vysledek['id'];
-        $this->app->media()->poNahrani($id, $nahradit === null ? $kampan : null);
+        $this->app->media()->poNahrani($id, $nahradit === null ? $kategorie : null);
         if ($nahradit === null && $poznamka !== null) $this->app->media()->nastavPoznamku($id, $poznamka);
         $this->app->log('info', 'API (' . ($nahradit ? 'nahrazení' : 'nahrání') . "): {$nazev}");
         return ['hotovo' => true, 'medium' => $this->medium($this->app->media()->radek($id)), 'poznamka_komprese' => $vysledek['poznamka']];
     }
 
-    /** Úprava údajů: nazev, poznamka, kampan (id nebo null), tagy (pole nebo text s čárkami), archiv (bool). Vše se ověří před zápisem. */
+    /** Úprava údajů: nazev, poznamka, kategorie (id nebo null), tagy (pole nebo text s čárkami), archiv (bool). Vše se ověří před zápisem. */
     private function uprav(int $id, array $v): array
     {
         $r = $this->app->media()->radek($id);
-        $znama = ['nazev', 'poznamka', 'kampan', 'tagy', 'archiv'];
+        $znama = ['nazev', 'poznamka', 'kategorie', 'tagy', 'archiv'];
         if ($nezname = array_diff(array_keys($v), $znama)) throw new Chyba('Neznámé pole: ' . implode(', ', $nezname) . '. Povolená: ' . implode(', ', $znama) . '.');
         $nazev = array_key_exists('nazev', $v) ? Vstup::text($v, 'nazev', 'nazev', 200) : null;
         $pozn = array_key_exists('poznamka', $v) ? Vstup::text($v, 'poznamka', 'poznamka', 5000, false) : null;
-        $kampan = array_key_exists('kampan', $v) ? ($v['kampan'] === null || $v['kampan'] === '' ? null : (int)$v['kampan']) : false;
-        if (is_int($kampan)) $this->app->kampane()->radek($kampan);
+        $kategorie = array_key_exists('kategorie', $v) ? ($v['kategorie'] === null || $v['kategorie'] === '' ? null : (int)$v['kategorie']) : false;
+        if (is_int($kategorie)) $this->app->kategorie()->radek($kategorie);
         $tagy = array_key_exists('tagy', $v) ? $this->tagy($v['tagy']) : null;
         $g = $this->app->galerie();
-        $this->app->db->transakce(function () use ($g, $id, $r, $v, $nazev, $pozn, $kampan, $tagy) {
+        $this->app->db->transakce(function () use ($g, $id, $r, $v, $nazev, $pozn, $kategorie, $tagy) {
             if ($nazev !== null && $nazev !== $r['original_name']) $g->prejmenuj($id, $nazev);
             if (array_key_exists('poznamka', $v)) $this->app->media()->nastavPoznamku($id, $pozn);
-            if ($kampan !== false) $this->app->media()->nastavKampan([$id], $kampan);
+            if ($kategorie !== false) $this->app->media()->nastavKategorii([$id], $kategorie);
             if ($tagy !== null) $g->tagy()->nastav($id, $tagy);
             if (array_key_exists('archiv', $v)) $g->archivuj([$id], (bool)$v['archiv']);
         });

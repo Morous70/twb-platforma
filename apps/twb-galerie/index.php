@@ -27,7 +27,7 @@ if ($p === 'odhlasit') {
     $ui->presmeruj('index.php');
 }
 
-$stranky = ['prehled', 'galerie', 'medium', 'kampane', 'api', 'napoveda', 'nastaveni', 'protokol'];
+$stranky = ['prehled', 'galerie', 'medium', 'kategorie', 'api', 'napoveda', 'nastaveni', 'protokol'];
 if (!in_array($p, $stranky, true)) { http_response_code(404); $p = 'prehled'; }
 $menu = ['protokol' => 'nastaveni', 'medium' => 'galerie'][$p] ?? $p;
 $titulek = Ui::MENU[$p] ?? ['protokol' => 'Protokol'][$p] ?? '';

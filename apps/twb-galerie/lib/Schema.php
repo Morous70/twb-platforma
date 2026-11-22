@@ -8,11 +8,11 @@ use TWB\Jadro\{Db, ModulMigrace};
  * Databázové schéma aplikace (SQLite). Verze se ukládá v module_versions pod „twb-galerie“
  * a do nastavení schema_version (podle ní moduly zalohy a aktualizace poznají starší data).
  * Tabulku media zakládá modul galerie, tabulky auth_tokens a passkeys modul prihlaseni.
- * Aplikace k media přidává kampaň, poznámku a klíč veřejného odkazu (sloupce, které modul nezná a nečte).
+ * Aplikace k media přidává kategorii, poznámku a klíč veřejného odkazu (sloupce, které modul nezná a nečte).
  */
 final class Schema implements ModulMigrace
 {
-    public static function verze(): int { return 3; }
+    public static function verze(): int { return 4; }
 
     /** Tabulky, které musí existovat dřív než cokoli jiného (nastavení a protokol). */
     public static function zakladniTabulky(Db $db): void
@@ -28,18 +28,18 @@ final class Schema implements ModulMigrace
             $db->q('CREATE INDEX IF NOT EXISTS log_level ON log (level, id)');
         }
         if ($zVerze < 2) {
-            // kampaně = složky médií; smazání kampaně média nemaže (campaign_id se vynuluje v aplikaci)
-            $db->q('CREATE TABLE IF NOT EXISTS campaigns (
+            // kategorie = složky médií; smazání kategorie média nemaže (category_id se vynuluje v aplikaci)
+            $db->q('CREATE TABLE IF NOT EXISTS categories (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 name VARCHAR(200) NOT NULL,
                 note TEXT NULL,
                 created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL
             )');
             $sloupce = array_column($db->q('PRAGMA table_info(media)')->fetchAll(), 'name');
-            if (!in_array('campaign_id', $sloupce, true)) $db->q('ALTER TABLE media ADD COLUMN campaign_id INTEGER NULL');
+            if (!in_array('category_id', $sloupce, true)) $db->q('ALTER TABLE media ADD COLUMN category_id INTEGER NULL');
             if (!in_array('note', $sloupce, true)) $db->q('ALTER TABLE media ADD COLUMN note TEXT NULL');
             if (!in_array('public_key', $sloupce, true)) $db->q('ALTER TABLE media ADD COLUMN public_key VARCHAR(40) NULL');
-            $db->q('CREATE INDEX IF NOT EXISTS media_campaign ON media (campaign_id)');
+            $db->q('CREATE INDEX IF NOT EXISTS media_category ON media (category_id)');
             $db->q('CREATE UNIQUE INDEX IF NOT EXISTS media_public_key ON media (public_key)');
             foreach ($db->q('SELECT id FROM media WHERE public_key IS NULL')->fetchAll(\PDO::FETCH_COLUMN) as $id) {
                 $db->q('UPDATE media SET public_key = ? WHERE id = ?', [Media::novyKlic(), $id]);
@@ -55,6 +55,17 @@ final class Schema implements ModulMigrace
                 scope VARCHAR(10) NOT NULL DEFAULT 'read',
                 created_at INTEGER NOT NULL, last_used_at INTEGER NULL
             )");
+        }
+        if ($zVerze < 4) {
+            // kampaně přejmenované na kategorie (0.4.1): instalace, které už mají tabulku campaigns, se převedou
+            $tabulky = $db->q("SELECT name FROM sqlite_master WHERE type = 'table'")->fetchAll(\PDO::FETCH_COLUMN);
+            if (in_array('campaigns', $tabulky, true) && !in_array('categories', $tabulky, true)) $db->q('ALTER TABLE campaigns RENAME TO categories');
+            $sloupce = array_column($db->q('PRAGMA table_info(media)')->fetchAll(), 'name');
+            if (in_array('campaign_id', $sloupce, true) && !in_array('category_id', $sloupce, true)) {
+                $db->q('DROP INDEX IF EXISTS media_campaign');
+                $db->q('ALTER TABLE media RENAME COLUMN campaign_id TO category_id');
+                $db->q('CREATE INDEX IF NOT EXISTS media_category ON media (category_id)');
+            }
         }
     }
 }

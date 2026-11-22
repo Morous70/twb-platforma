@@ -1,6 +1,6 @@
 <?php
 declare(strict_types=1);
-// Detail média: náhled, údaje, název, poznámka, kampaň, tagy, veřejný odkaz, nahrazení souboru, komprese, archiv, smazání.
+// Detail média: náhled, údaje, název, poznámka, kategorie, tagy, veřejný odkaz, nahrazení souboru, komprese, archiv, smazání.
 // Proměnné: $app, $ui, $post.
 use MediaGalerie\{App, Ui, Chyba, Media, Vstup};
 use TWB\Zalohy\Zalohy;
@@ -21,14 +21,14 @@ if ($post) {
                 // nejdřív kontrola všech polí, pak zápis najednou (chyba v tagu nesmí uložit půlku formuláře)
                 $nazev = Vstup::text($_POST, 'nazev', 'Název', 200);
                 $pozn = Vstup::text($_POST, 'note', 'Poznámka', 5000, false);
-                $k = (string)($_POST['kampan'] ?? '');
-                $kampan = $k === '' ? null : (int)$k;
-                if ($kampan !== null) $app->kampane()->radek($kampan);
+                $k = (string)($_POST['kategorie'] ?? '');
+                $kategorie = $k === '' ? null : (int)$k;
+                if ($kategorie !== null) $app->kategorie()->radek($kategorie);
                 $tagy = $galerie->tagy()->vycistiSeznam((string)($_POST['tagy'] ?? ''));
-                $app->db->transakce(function () use ($galerie, $media, $id, $m, $nazev, $pozn, $kampan, $tagy) {
+                $app->db->transakce(function () use ($galerie, $media, $id, $m, $nazev, $pozn, $kategorie, $tagy) {
                     if ($nazev !== $m['original_name']) $galerie->prejmenuj($id, $nazev);
                     $media->nastavPoznamku($id, $pozn);
-                    $media->nastavKampan([$id], $kampan);
+                    $media->nastavKategorii([$id], $kategorie);
                     $galerie->tagy()->nastav($id, $tagy);
                 });
                 break;
@@ -72,7 +72,7 @@ if ($post) {
 
 $titulek = (string)$m['original_name'];
 $url = $media->verejnaAdresa($m);
-$kampane = $app->kampane()->volby();
+$kategorie = $app->kategorie()->volby();
 $tagy = $galerie->tagy()->vsechny();
 $src = 'media.php?id=' . $id . '&v=' . substr((string)$m['md5'], 0, 8);
 ?>
@@ -125,7 +125,7 @@ $src = 'media.php?id=' . $id . '&v=' . substr((string)$m['md5'], 0, 8);
     <?= $ui->csrf() ?>
     <input type="hidden" name="akce" value="ulozit">
     <?= Ui::pole('Název', 'nazev', $m['original_name'], ['required' => true, 'maxlength' => 200]) ?>
-    <?= Ui::vyber('Kampaň', 'kampan', ['' => '— bez kampaně —'] + $kampane, (string)($m['campaign_id'] ?? '')) ?>
+    <?= Ui::vyber('Kategorie', 'kategorie', ['' => '— bez kategorie —'] + $kategorie, (string)($m['category_id'] ?? '')) ?>
     <?= Ui::pole('Tagy', 'tagy', implode(', ', Media::tagy($m)), ['list' => 'seznam-tagu', 'placeholder' => 'oddělte čárkou'], 'Nejvýš 10 tagů po 30 znacích.') ?>
     <datalist id="seznam-tagu"><?php foreach ($tagy as $t): ?><option value="<?= Ui::h($t['name']) ?>"><?php endforeach; ?></datalist>
     <?= Ui::oblast('Poznámka', 'note', $m['note'], ['rows' => 3]) ?>
@@ -134,7 +134,7 @@ $src = 'media.php?id=' . $id . '&v=' . substr((string)$m['md5'], 0, 8);
 
   <div class="karta nahravani" id="nahravani" data-csrf="<?= Ui::h($app->relace()->csrfToken()) ?>" data-cast="<?= App::CAST_NAHRANI ?>" data-max="<?= App::MAX_NAHRANI ?>" data-nahradit="<?= $id ?>">
     <h2 style="margin-top:0">Nahradit soubor</h2>
-    <p class="slabe mala">Nový soubor stejného druhu (<?= Ui::h(Media::DRUHY[$m['kind']] ?? $m['kind']) ?>). Odkaz, kampaň, tagy a poznámka zůstanou.</p>
+    <p class="slabe mala">Nový soubor stejného druhu (<?= Ui::h(Media::DRUHY[$m['kind']] ?? $m['kind']) ?>). Odkaz, kategorie, tagy a poznámka zůstanou.</p>
     <div class="nahravani-plocha" data-plocha>
       <p><strong>Přetáhněte sem soubor</strong> nebo <label class="odkaz-tlacitko">vyberte z počítače<input type="file" hidden data-vyber></label></p>
     </div>

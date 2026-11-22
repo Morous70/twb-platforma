@@ -13,7 +13,7 @@
       "stranky": [
         "nahravani",
         "verejne-odkazy",
-        "kampane-a-tagy"
+        "kategorie-a-tagy"
       ]
     },
     {
@@ -36,7 +36,7 @@
     "nastaveni": "prihlaseni",
     "protokol": "prihlaseni",
     "medium": "verejne-odkazy",
-    "kampane": "kampane-a-tagy",
+    "kategorie": "kategorie-a-tagy",
     "api": "api"
   }
 }

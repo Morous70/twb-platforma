@@ -1,6 +1,6 @@
 <?php
 declare(strict_types=1);
-// TWB Media galerie 0.2 na webovém serveru: nahrávání po částech, veřejný odkaz (Range, 304, CORS), detail, kampaně, hromadné akce.
+// TWB Media galerie 0.2 na webovém serveru: nahrávání po částech, veřejný odkaz (Range, 304, CORS), detail, kategorie, hromadné akce.
 require __DIR__ . '/pomocne.php';
 require __DIR__ . '/server.php';
 
@@ -47,17 +47,17 @@ test('nahrávání: jen přihlášený a s CSRF', function () use ($s, $b) {
     eq(403, $b->jdi('nahrat.php', ['uid' => str_repeat('a', 32), 'index' => 0, 'celkem' => 1, 'nazev' => 'a.png', 'cast' => new CURLFile($f)], csrf: false)['code']);
 });
 
-test('nahrávání po částech: obrázek do kampaně s tagy, video, nepovolený typ', function () use ($s, $b) {
-    $b->jdi('index.php?p=kampane');
-    $b->odesli('index.php?p=kampane', ['akce' => 'ulozit', 'name' => 'Léto']);
-    $k = (int)$s->db()->query("SELECT id FROM campaigns WHERE name = 'Léto'")->fetchColumn();
+test('nahrávání po částech: obrázek do kategorie s tagy, video, nepovolený typ', function () use ($s, $b) {
+    $b->jdi('index.php?p=kategorie');
+    $b->odesli('index.php?p=kategorie', ['akce' => 'ulozit', 'name' => 'Léto']);
+    $k = (int)$s->db()->query("SELECT id FROM categories WHERE name = 'Léto'")->fetchColumn();
     ok($k > 0);
     $b->jdi('index.php?p=galerie');
     $png = obrazek(1200, 800);
-    $j = nahrajWeb($b, 'plakat.png', $png, 4000, ['kampan' => (string)$k, 'tagy' => 'Plakát, léto']);
+    $j = nahrajWeb($b, 'plakat.png', $png, 4000, ['kategorie' => (string)$k, 'tagy' => 'Plakát, léto']);
     ok($j['ok'], $j['error'] ?? '');
     $r = $s->db()->query('SELECT * FROM media WHERE id = ' . (int)$j['id'])->fetch();
-    eq([(string)$k, '["Plakát","léto"]', md5($png)], [(string)$r['campaign_id'], $r['tags'], $r['md5']]);
+    eq([(string)$k, '["Plakát","léto"]', md5($png)], [(string)$r['category_id'], $r['tags'], $r['md5']]);
     $video = mp4(25000);
     $j = nahrajWeb($b, 'spot.mp4', $video, 10000);
     ok($j['ok'], $j['error'] ?? '');
@@ -115,15 +115,15 @@ test('administrace: náhled, originál, stažení, náhled velkého obrázku je 
     eq(404, $b->jdi('media.php?id=9999')['code']);
 });
 
-test('detail: údaje, kampaň, tagy, poznámka, komprese a návrat originálu, nahrazení souboru', function () use ($s, $b) {
+test('detail: údaje, kategorie, tagy, poznámka, komprese a návrat originálu, nahrazení souboru', function () use ($s, $b) {
     $id = (int)$s->db()->query("SELECT id FROM media WHERE original_name = 'plakat.png'")->fetchColumn();
     $klic = $s->db()->query("SELECT public_key FROM media WHERE id = $id")->fetchColumn();
     $r = $b->jdi("index.php?p=medium&id=$id");
     ok(str_contains($r['body'], '<h1>plakat.png') && str_contains($r['body'], '1200×800 px'));
-    $r = $b->odesli("index.php?p=medium&id=$id", ['akce' => 'ulozit', 'nazev' => 'Plakát léto', 'kampan' => '', 'tagy' => 'a, b, A', 'note' => 'tisk A3']);
+    $r = $b->odesli("index.php?p=medium&id=$id", ['akce' => 'ulozit', 'nazev' => 'Plakát léto', 'kategorie' => '', 'tagy' => 'a, b, A', 'note' => 'tisk A3']);
     ok(str_contains($r['body'], 'Uloženo'), strip_tags($r['body']));
     $m = $s->db()->query("SELECT * FROM media WHERE id = $id")->fetch();
-    eq(['Plakát léto.png', null, '["a","b"]', 'tisk A3'], [$m['original_name'], $m['campaign_id'], $m['tags'], $m['note']]);
+    eq(['Plakát léto.png', null, '["a","b"]', 'tisk A3'], [$m['original_name'], $m['category_id'], $m['tags'], $m['note']]);
     $r = $b->odesli("index.php?p=medium&id=$id", ['akce' => 'ulozit', 'nazev' => 'X', 'tagy' => implode(',', range(1, 11))]);
     ok(str_contains($r['body'], 'nejvýš 10 tagů'));
     // komprese s malým limitem
@@ -145,7 +145,7 @@ test('detail: údaje, kampaň, tagy, poznámka, komprese a návrat originálu, n
     eq(404, $b->jdi('index.php?p=medium&id=9999')['code']);
 });
 
-test('galerie: filtry a stránky, hromadné akce (kampaň, tagy, archiv, smazání)', function () use ($s, $b) {
+test('galerie: filtry a stránky, hromadné akce (kategorie, tagy, archiv, smazání)', function () use ($s, $b) {
     for ($i = 1; $i <= 3; $i++) ok(nahrajWeb($b, "obr$i.png", obrazek(50 + $i, 50))['ok']);
     $r = $b->jdi('index.php?p=galerie');
     ok(str_contains($r['body'], 'obr3.png') && str_contains($r['body'], 'spot.mp4') && str_contains($r['body'], 'Kopírovat odkaz'));
@@ -153,12 +153,12 @@ test('galerie: filtry a stránky, hromadné akce (kampaň, tagy, archiv, smazán
     ok(!str_contains($b->jdi('index.php?p=galerie&druh=video')['body'], 'obr3.png'));
     ok(str_contains($b->jdi('index.php?p=galerie&q=nic-takoveho')['body'], 'Filtru nic neodpovídá'));
     $ids = array_map('intval', $s->db()->query("SELECT id FROM media WHERE original_name LIKE 'obr%' ORDER BY id")->fetchAll(PDO::FETCH_COLUMN));
-    $k = (int)$s->db()->query("SELECT id FROM campaigns WHERE name = 'Léto'")->fetchColumn();
+    $k = (int)$s->db()->query("SELECT id FROM categories WHERE name = 'Léto'")->fetchColumn();
     $b->jdi('index.php?p=galerie');
-    $r = $b->odesli('index.php?p=galerie&druh=image', ['akce' => 'kampan', 'kampan' => (string)$k, 'ids' => $ids]);
-    ok(str_contains($r['body'], 'Kampaň změněna u 3 médií'));
+    $r = $b->odesli('index.php?p=galerie&druh=image', ['akce' => 'kategorie', 'kategorie' => (string)$k, 'ids' => $ids]);
+    ok(str_contains($r['body'], 'Kategorie změněna u 3 médií'));
     ok(str_contains($r['body'], 'name="druh"') && str_contains($r['body'], '<option value="image" selected'), 'filtr zůstal');
-    eq(3, (int)$s->db()->query("SELECT COUNT(*) FROM media WHERE campaign_id = $k")->fetchColumn());
+    eq(3, (int)$s->db()->query("SELECT COUNT(*) FROM media WHERE category_id = $k")->fetchColumn());
     $r = $b->odesli('index.php?p=galerie', ['akce' => 'tag-pridat', 'tag' => 'Výběr', 'ids' => $ids]);
     ok(str_contains($r['body'], 'Tag přidán u 3 médií'));
     $r = $b->odesli('index.php?p=galerie', ['akce' => 'tag-odebrat', 'tag' => 'výběr', 'ids' => [$ids[0]]]);
@@ -174,22 +174,22 @@ test('galerie: filtry a stránky, hromadné akce (kampaň, tagy, archiv, smazán
     ok(str_contains($r['body'], 'Smazáno: 1'));
     $r = $b->odesli('index.php?p=galerie', ['akce' => 'smazat']);
     ok(str_contains($r['body'], 'Vyberte aspoň jedno'));
-    $r = $b->jdi('index.php?p=galerie&kampan=' . $k);
+    $r = $b->jdi('index.php?p=galerie&kategorie=' . $k);
     ok(str_contains($r['body'], 'obr1.png') && !str_contains($r['body'], 'spot.mp4'));
 });
 
-test('kampaně: přehled, úprava, smazání nechá média', function () use ($s, $b) {
-    $k = (int)$s->db()->query("SELECT id FROM campaigns WHERE name = 'Léto'")->fetchColumn();
-    $r = $b->jdi('index.php?p=kampane');
+test('kategorie: přehled, úprava, smazání nechá média', function () use ($s, $b) {
+    $k = (int)$s->db()->query("SELECT id FROM categories WHERE name = 'Léto'")->fetchColumn();
+    $r = $b->jdi('index.php?p=kategorie');
     ok(str_contains($r['body'], 'Léto'));
-    $b->jdi("index.php?p=kampane&upravit=$k");
-    $r = $b->odesli("index.php?p=kampane&upravit=$k", ['akce' => 'ulozit', 'name' => 'Léto 2027', 'note' => 'x']);
+    $b->jdi("index.php?p=kategorie&upravit=$k");
+    $r = $b->odesli("index.php?p=kategorie&upravit=$k", ['akce' => 'ulozit', 'name' => 'Léto 2027', 'note' => 'x']);
     ok(str_contains($r['body'], 'Léto 2027'));
-    $n = (int)$s->db()->query("SELECT COUNT(*) FROM media WHERE campaign_id = $k")->fetchColumn();
-    $r = $b->odesli('index.php?p=kampane', ['akce' => 'smazat', 'id' => $k]);
+    $n = (int)$s->db()->query("SELECT COUNT(*) FROM media WHERE category_id = $k")->fetchColumn();
+    $r = $b->odesli('index.php?p=kategorie', ['akce' => 'smazat', 'id' => $k]);
     ok(str_contains($r['body'], "{$n} médií zůstalo"));
-    eq(0, (int)$s->db()->query("SELECT COUNT(*) FROM media WHERE campaign_id = $k")->fetchColumn());
-    eq(404, $b->jdi('index.php?p=kampane&upravit=999')['code']);
+    eq(0, (int)$s->db()->query("SELECT COUNT(*) FROM media WHERE category_id = $k")->fetchColumn());
+    eq(404, $b->jdi('index.php?p=kategorie&upravit=999')['code']);
 });
 
 test('přehled a nastavení komprese', function () use ($s, $b) {

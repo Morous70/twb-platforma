@@ -103,11 +103,11 @@
     };
     var nahraj = function (polozka) {
       var f = polozka.soubor, id = uid(), celkem = Math.max(1, Math.ceil(f.size / cast)), i = 0;
-      var kampan = document.getElementById('f-nahrat_kampan'), tagy = document.getElementById('f-nahrat_tagy');
+      var kategorie = document.getElementById('f-nahrat_kategorie'), tagy = document.getElementById('f-nahrat_tagy');
       var dalsi = function () {
         var fd = new FormData();
         fd.append('uid', id); fd.append('index', String(i)); fd.append('celkem', String(celkem)); fd.append('nazev', f.name);
-        if (kampan && kampan.value) fd.append('kampan', kampan.value);
+        if (kategorie && kategorie.value) fd.append('kategorie', kategorie.value);
         if (tagy && tagy.value) fd.append('tagy', tagy.value);
         if (nahradit) fd.append('nahradit', nahradit);
         fd.append('cast', f.slice(i * cast, Math.min(f.size, (i + 1) * cast)), 'cast');

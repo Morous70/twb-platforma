@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 // Nahrávání do galerie po částech (assets/app.js): POST multipart s polí uid, index, celkem, nazev, cast (soubor),
-// volitelně kampan, tagy (čárkami), nahradit (id média). Jen přihlášený, CSRF v hlavičce X-CSRF. Odpověď JSON.
+// volitelně kategorie, tagy (čárkami), nahradit (id média). Jen přihlášený, CSRF v hlavičce X-CSRF. Odpověď JSON.
 use MediaGalerie\{App, Media, Chyba};
 use TWB\Galerie\Nahravani;
 
@@ -36,12 +36,12 @@ try {
 
     $nazev = mb_substr(trim((string)($_POST['nazev'] ?? '')), 0, 200);
     $nahradit = (int)($_POST['nahradit'] ?? 0) ?: null;
-    $kampan = (int)($_POST['kampan'] ?? 0) ?: null;
-    if ($kampan !== null) $app->kampane()->radek($kampan);
+    $kategorie = (int)($_POST['kategorie'] ?? 0) ?: null;
+    if ($kategorie !== null) $app->kategorie()->radek($kategorie);
     $tagy = array_filter(array_map('trim', explode(',', (string)($_POST['tagy'] ?? ''))));
     $v = $app->galerie()->uloz($hotovo, $nazev, $tagy, $nahradit);
     $media = new Media($app);
-    $media->poNahrani($v['id'], $nahradit === null ? $kampan : null);
+    $media->poNahrani($v['id'], $nahradit === null ? $kategorie : null);
     $odpoved(['ok' => true, 'hotovo' => true, 'id' => $v['id'], 'poznamka' => $v['poznamka'], 'nahrazeno' => $v['nahrazeno']]);
 } catch (RuntimeException | InvalidArgumentException $e) {
     $odpoved(['ok' => false, 'error' => $e->getMessage()], 400);

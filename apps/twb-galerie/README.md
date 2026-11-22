@@ -1,6 +1,7 @@
 # TWB Media galerie
 
-Soukromá galerie médií (obrázky, videa) pro vlastní kampaně: jeden uživatel, česky.
+Soukromé odkladiště médií (obrázky, videa, PDF), která si vytvoříte a zatím nepoužijete ve svých aplikacích: jeden uživatel, česky.
+Média se třídí do kategorií a tagů a každé má veřejný odkaz.
 Adresa nasazení `https://galerie.kazbo.eu`, slug na TWB Update Serveru `twb-galerie` (stejný je i interní slug migrací).
 Aplikace je složená z modulů platformy (`modules/`), vlastní kód je v `lib/` (třídy `MediaGalerie\…`) a `stranky/`.
 Hosting Wedos NoLimit, PHP 8.5 (kód běží od 8.1), SQLite, bez Composeru.
@@ -9,9 +10,10 @@ Hosting Wedos NoLimit, PHP 8.5 (kód běží od 8.1), SQLite, bez Composeru.
 | Verze | Obsah | Stav |
 |---|---|---|
 | 0.1 | Kostra z modulů (jadro, prihlaseni, galerie, tagy, obrazky, zalohy, aktualizace, napoveda), instalace, přihlášení heslem / Google / Passkey, zámek pokusů, obnova zapomenutého hesla e-mailem, odhlášení po nečinnosti nastavitelné v aplikaci, vzhled administrace (jako TWB Reklamy), přehled, protokol, nápověda, kontrola zdraví | hotovo |
-| 0.2 | Galerie: nahrávání po částech (přetažením, až 1 GB), mřížka s náhledy, přehrání videa, detail, tagy, kampaně jako složky, hledání a filtry, stránkování, archiv, nahrazení souboru, komprese s uchováním originálu (ve výchozím stavu vypnutá), hromadné akce, veřejné neuhodnutelné odkazy na soubory (Range, ETag, CORS) | hotovo |
-| 0.3 | JSON API `api.php/v1` pro čtení i zápis: média (seznam s filtry, detail, stažení s Range, nahrání i po částech a z adresy, úpravy, nahrazení, odkaz, smazání), kampaně, tagy; API klíče s oprávněním čtení / zápis (jen otisk), zámek proti zkoušení klíčů, stránka API, popis v nápovědě | hotovo |
+| 0.2 | Galerie: nahrávání po částech (přetažením, až 1 GB), mřížka s náhledy, přehrání videa, detail, tagy, kategorie jako složky, hledání a filtry, stránkování, archiv, nahrazení souboru, komprese s uchováním originálu (ve výchozím stavu vypnutá), hromadné akce, veřejné neuhodnutelné odkazy na soubory (Range, ETag, CORS) | hotovo |
+| 0.3 | JSON API `api.php/v1` pro čtení i zápis: média (seznam s filtry, detail, stažení s Range, nahrání i po částech a z adresy, úpravy, nahrazení, odkaz, smazání), kategorie, tagy; API klíče s oprávněním čtení / zápis (jen otisk), zámek proti zkoušení klíčů, stránka API, popis v nápovědě | hotovo |
 | 0.4 | Zálohy (denní cronem, ruční, stažení, obnova v rozhraní s náhledem obsahu a pojistnou zálohou), aktualizace z Update Serveru (`twb-galerie`), cron s úklidem, upozornění v přehledu, nápověda, balíčky FULL a UPDATE | hotovo |
+| 0.4.1 | Kampaně přejmenované na **kategorie** (rozhraní, nápověda, API `/kategorie` a pole `kategorie`, tabulka `categories`, sloupec `media.category_id`; schéma 4 převede starší instalace) a upřesněný účel: odkladiště vlastních médií, která zatím nejsou použitá v aplikacích | hotovo |
 
 ## Struktura
 ```
@@ -25,8 +27,8 @@ media.php        soubor v administraci (jen přihlášený): ?id=, &nahled=1, &o
 soubor.php       veřejný odkaz soubor.php/<klíč>/<název> (bez přihlášení, ?stahnout=1)
 cron.php         pravidelné úlohy: cron.php?key=<cron_key> – denní záloha, kontrola aktualizací, úklid nahrávání, náhledů a protokolu
 api.php          JSON API api.php/v1/… (klíč v Authorization: Bearer nebo X-Api-Key), popis help/sprava/api.md
-lib/             App (služby a moduly), Schema, Media, Kampane, Vydej, Api, ApiKlice, ZAdresy, Ui, Vstup, Http, ProtokolDb, Chyba, autoload, bootstrap
-stranky/         prehled, galerie, medium (detail), kampane, api (klíče), nastaveni, protokol, napoveda, prihlaseni
+lib/             App (služby a moduly), Schema, Media, Kategorie, Vydej, Api, ApiKlice, ZAdresy, Ui, Vstup, Http, ProtokolDb, Chyba, autoload, bootstrap
+stranky/         prehled, galerie, medium (detail), kategorie, api (klíče), nastaveni, protokol, napoveda, prihlaseni
 help/            nápověda v Markdownu (_obsah.json + sekce/stránka.md), vykresluje modul napoveda
 assets/          style.css, app.js, ikona.svg
 data/            databáze galerie.sqlite, média (media/), náhledy (nahledy/, dají se kdykoli vytvořit znovu), části nahrávání (tmp/),
@@ -43,9 +45,9 @@ data/            databáze galerie.sqlite, média (media/), náhledy (nahledy/, 
 
 ## Galerie (0.2)
 - **Tabulka `media`** je z modulu galerie (soubory, názvy, druh, velikost, MD5, rozměry, originál před kompresí, tagy, archiv). Aplikace (schéma 2) přidává
-  `campaign_id`, `note` a `public_key`; modul tyto sloupce nezná a nečte. Kampaně jsou v tabulce `campaigns` (je v zálohách, obnovuje se před `media`).
+  `category_id`, `note` a `public_key`; modul tyto sloupce nezná a nečte. Kategorie jsou v tabulce `categories` (je v zálohách, obnovuje se před `media`).
 - **Nahrávání** (`nahrat.php`, `assets/app.js`): soubor po částech 2 MB (`App::CAST_NAHRANI`) přes `TWB\Galerie\Nahravani`, nejvýš 1 GB (`App::MAX_NAHRANI`),
-  při výpadku 3 pokusy; po poslední části `Galerie::uloz` (kontrola typu i obsahu) a `Media::poNahrani` (veřejný klíč, kampaň). Nedokončené části starší než hodina se mažou při dalším nahrávání.
+  při výpadku 3 pokusy; po poslední části `Galerie::uloz` (kontrola typu i obsahu) a `Media::poNahrani` (veřejný klíč, kategorie). Nedokončené části starší než hodina se mažou při dalším nahrávání.
 - **Veřejný odkaz** (`soubor.php`): klíč 24 hex znaků (96 bitů, `Media::novyKlic`), unikátní index. Funguje i pro archivovaná média; „Nový odkaz“ starý zneplatní,
   „Vypnout odkaz“ nastaví `public_key = NULL`. Po nahrazení souboru zůstává stejný (ETag = MD5, `max-age=3600`).
 - **Vydání souborů** (`Vydej`): Range (přetáčení videa, 206/416), If-None-Match (304), `nosniff`, CSP `sandbox` (kromě PDF, které v sandboxu Chrome nezobrazí),
@@ -53,10 +55,10 @@ data/            databáze galerie.sqlite, média (media/), náhledy (nahledy/, 
 - **Náhledy** (`Media::nahled`): obrázky delší než 480 px se pro mřížku zmenší do JPEG v `data/nahledy/<id>-<md5>.jpg`; obrázky nad 40 Mpx se posílají celé (paměť GD).
   Videa ukazuje prohlížeč z `media.php` (`preload="metadata"`), PDF ikonou.
 - **Komprese**: nastavení modulu obrazky (`img_auto`, `img_max_w`, `img_max_h`, `img_quality`, `img_min_kb`) v Nastavení. Aplikace při první migraci nastaví `img_auto = 0` –
-  podklady kampaní se nahrávají v plné kvalitě.
+  odložená média se ukládají v plné kvalitě.
 
 ## API (0.3)
-- **Směrování** v `Api::smeruj` (cesty `/`, `/media`, `/media/{id}`, `/media/{id}/soubor`, `/media/{id}/odkaz`, `/kampane`, `/kampane/{id}`, `/tagy`). Test hlídá,
+- **Směrování** v `Api::smeruj` (cesty `/`, `/media`, `/media/{id}`, `/media/{id}/soubor`, `/media/{id}/odkaz`, `/kategorie`, `/kategorie/{id}`, `/tagy`). Test hlídá,
   že každou cestu popisuje `help/sprava/api.md`. PATCH přijímá JSON; soubory jen POST (PHP multipart u PATCH/PUT nečte).
 - **Klíče** (`ApiKlice`, tabulka `api_keys`, schéma 3): `tgk_` + 40 hex, v databázi SHA-256 a prvních 12 znaků; ukáže se jednou (stránka API, bez přesměrování
   a bez uložení do relace). Oprávnění `read` = jen GET/HEAD, `write` = vše. Tabulka se nezálohuje. Po 20 neplatných klíčích za 5 minut odpověď 429
@@ -70,7 +72,7 @@ data/            databáze galerie.sqlite, média (media/), náhledy (nahledy/, 
 ## Zálohy, aktualizace a cron (0.4)
 - **Zálohy** (modul zalohy, `App::zalohy`): šifrovaný ZIP `twb-galerie-…zip` v `data/backups/` s tabulkami `App::TABULKY` a skupinou souborů `media`
   (média i originály). Denní záloha z cronu (`backup_auto`, nutné heslo záloh), ruční v Nastavení. Obnova: výběr nebo nahrání souboru → náhled
-  (počet médií, kampaní, souborů; potvrzení v relaci `twbg_obnova` platí 10 minut a jednou) → pojistná záloha → obnova. Místní nastavení (`App::MISTNI`),
+  (počet médií, kategorií, souborů; potvrzení v relaci `twbg_obnova` platí 10 minut a jednou) → pojistná záloha → obnova. Místní nastavení (`App::MISTNI`),
   heslo, Passkey a API klíče zůstávají. Veřejné odkazy jsou v tabulce `media`, takže po obnově platí ty ze zálohy.
 - **Aktualizace** (modul aktualizace): Update Server, slug `twb-galerie`, kořen balíčku `twb-galerie/`, `config.php` a `data/` se nemění; `update_token` v config.php.
 - **Cron**: klíč `cron_key` (instalace vygeneruje náhodný), čas posledního běhu `cron_last_run`; přehled upozorní, když cron neběží 2 dny, když chybí heslo záloh

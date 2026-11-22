@@ -5,13 +5,13 @@ use MediaGalerie\{App, Ui, Chyba, Media};
 
 $galerie = $app->galerie();
 $media = $app->media();
-$kampane = $app->kampane()->volby();
+$kategorie = $app->kategorie()->volby();
 
 // filtr z adresy (zůstává i po hromadné akci)
 $f = [
     'q' => mb_substr(trim((string)($_GET['q'] ?? '')), 0, 100),
     'druh' => isset(Media::DRUHY[$_GET['druh'] ?? '']) ? (string)$_GET['druh'] : '',
-    'kampan' => isset($_GET['kampan']) && $_GET['kampan'] !== '' && (isset($kampane[(int)$_GET['kampan']]) || (string)$_GET['kampan'] === '0') ? (string)(int)$_GET['kampan'] : '',
+    'kategorie' => isset($_GET['kategorie']) && $_GET['kategorie'] !== '' && (isset($kategorie[(int)$_GET['kategorie']]) || (string)$_GET['kategorie'] === '0') ? (string)(int)$_GET['kategorie'] : '',
     'tag' => mb_substr(trim((string)($_GET['tag'] ?? '')), 0, 30),
     'archiv' => !empty($_GET['archiv']) ? '1' : '',
     'razeni' => isset(Media::RAZENI[$_GET['razeni'] ?? '']) ? (string)$_GET['razeni'] : 'nove',
@@ -26,10 +26,10 @@ if ($post) {
         $ids = array_values(array_filter(array_map('intval', (array)($_POST['ids'] ?? []))));
         if (!$ids) throw new Chyba('Vyberte aspoň jedno médium.');
         switch ($akce) {
-            case 'kampan':
-                $k = (string)($_POST['kampan'] ?? '');
-                $n = $media->nastavKampan($ids, $k === '' ? null : (int)$k);
-                $zprava = "Kampaň změněna u {$n} médií.";
+            case 'kategorie':
+                $k = (string)($_POST['kategorie'] ?? '');
+                $n = $media->nastavKategorii($ids, $k === '' ? null : (int)$k);
+                $zprava = "Kategorie změněna u {$n} médií.";
                 break;
             case 'tag-pridat':
             case 'tag-odebrat':
@@ -59,7 +59,7 @@ if ($post) {
 
 $vysledek = $media->seznam($f);
 $tagy = $galerie->tagy()->vsechny();
-$nazvyKampani = $kampane;
+$nazvyKategorii = $kategorie;
 $odkazFiltru = fn(array $zmena) => Ui::h(Ui::odkaz('galerie', array_filter($zmena + $f, fn($v) => $v !== '' && $v !== 'nove' && $v !== 1)));
 $titulek = $f['archiv'] ? 'Archiv' : 'Galerie';
 ?>
@@ -71,7 +71,7 @@ $titulek = $f['archiv'] ? 'Archiv' : 'Galerie';
     <p class="slabe mala">Obrázky (JPG, PNG, GIF, WebP, BMP), videa (MP4, MOV, WebM, AVI, MKV) a PDF, jeden soubor nejvýš <?= (int)(App::MAX_NAHRANI / 1048576) ?> MB.</p>
   </div>
   <div class="radek">
-    <?= Ui::vyber('Nahrát do kampaně', 'nahrat_kampan', ['' => '— bez kampaně —'] + $kampane, $f['kampan'] !== '0' ? $f['kampan'] : '') ?>
+    <?= Ui::vyber('Nahrát do kategorie', 'nahrat_kategorie', ['' => '— bez kategorie —'] + $kategorie, $f['kategorie'] !== '0' ? $f['kategorie'] : '') ?>
     <?= Ui::pole('Tagy nových souborů', 'nahrat_tagy', '', ['placeholder' => 'oddělte čárkou', 'list' => 'seznam-tagu']) ?>
   </div>
   <ul class="nahravani-seznam" data-seznam></ul>
@@ -85,8 +85,8 @@ $titulek = $f['archiv'] ? 'Archiv' : 'Galerie';
   <input type="search" name="q" value="<?= Ui::h($f['q']) ?>" placeholder="Hledat v názvu a poznámce" aria-label="Hledat">
   <select name="druh" aria-label="Druh"><option value="">Všechny druhy</option>
     <?php foreach (Media::DRUHY as $k => $t): ?><option value="<?= $k ?>"<?= $f['druh'] === $k ? ' selected' : '' ?>><?= Ui::h($t) ?></option><?php endforeach; ?></select>
-  <select name="kampan" aria-label="Kampaň"><option value="">Všechny kampaně</option><option value="0"<?= $f['kampan'] === '0' ? ' selected' : '' ?>>Bez kampaně</option>
-    <?php foreach ($kampane as $id => $n): ?><option value="<?= $id ?>"<?= $f['kampan'] === (string)$id ? ' selected' : '' ?>><?= Ui::h($n) ?></option><?php endforeach; ?></select>
+  <select name="kategorie" aria-label="Kategorie"><option value="">Všechny kategorie</option><option value="0"<?= $f['kategorie'] === '0' ? ' selected' : '' ?>>Bez kategorie</option>
+    <?php foreach ($kategorie as $id => $n): ?><option value="<?= $id ?>"<?= $f['kategorie'] === (string)$id ? ' selected' : '' ?>><?= Ui::h($n) ?></option><?php endforeach; ?></select>
   <select name="tag" aria-label="Tag"><option value="">Všechny tagy</option>
     <?php foreach ($tagy as $t): ?><option value="<?= Ui::h($t['name']) ?>"<?= mb_strtolower($f['tag']) === mb_strtolower($t['name']) ? ' selected' : '' ?>><?= Ui::h($t['name']) ?> (<?= (int)$t['count'] ?>)</option><?php endforeach; ?></select>
   <select name="razeni" aria-label="Řazení">
@@ -96,7 +96,7 @@ $titulek = $f['archiv'] ? 'Archiv' : 'Galerie';
 </form>
 
 <?php if (!$vysledek['polozky']): ?>
-  <div class="prazdne"><?= $f['q'] !== '' || $f['druh'] !== '' || $f['kampan'] !== '' || $f['tag'] !== '' ? 'Filtru nic neodpovídá.' : ($f['archiv'] ? 'Archiv je prázdný.' : 'Galerie je prázdná. Nahrajte první soubory.') ?></div>
+  <div class="prazdne"><?= $f['q'] !== '' || $f['druh'] !== '' || $f['kategorie'] !== '' || $f['tag'] !== '' ? 'Filtru nic neodpovídá.' : ($f['archiv'] ? 'Archiv je prázdný.' : 'Galerie je prázdná. Nahrajte první soubory.') ?></div>
 <?php else: ?>
 <form method="post" id="hromadne" action="<?= Ui::h($zpet) ?>">
   <?= $ui->csrf() ?>
@@ -105,14 +105,14 @@ $titulek = $f['archiv'] ? 'Archiv' : 'Galerie';
     <span class="slabe mala" data-pocet-vybranych>Nic nevybráno</span>
     <select name="akce" aria-label="Hromadná akce" data-hromadna-akce>
       <option value="">Akce s vybranými…</option>
-      <option value="kampan">Přesunout do kampaně</option>
+      <option value="kategorie">Přesunout do kategorie</option>
       <option value="tag-pridat">Přidat tag</option>
       <option value="tag-odebrat">Odebrat tag</option>
       <?php if ($f['archiv']): ?><option value="vratit">Vrátit z archivu</option><?php else: ?><option value="archivovat">Přesunout do archivu</option><?php endif; ?>
       <option value="smazat">Smazat</option>
     </select>
-    <select name="kampan" aria-label="Kampaň" data-pro="kampan" hidden><option value="">— bez kampaně —</option>
-      <?php foreach ($kampane as $id => $n): ?><option value="<?= $id ?>"><?= Ui::h($n) ?></option><?php endforeach; ?></select>
+    <select name="kategorie" aria-label="Kategorie" data-pro="kategorie" hidden><option value="">— bez kategorie —</option>
+      <?php foreach ($kategorie as $id => $n): ?><option value="<?= $id ?>"><?= Ui::h($n) ?></option><?php endforeach; ?></select>
     <input name="tag" list="seznam-tagu" placeholder="Tag" aria-label="Tag" data-pro="tag-pridat tag-odebrat" hidden>
     <button type="submit" class="hlavni" data-hromadne-odeslat disabled>Provést</button>
   </div>
@@ -129,8 +129,8 @@ $titulek = $f['archiv'] ? 'Archiv' : 'Galerie';
       <figcaption>
         <a href="<?= Ui::h(Ui::odkaz('medium', ['id' => $id])) ?>"><strong><?= Ui::h($m['original_name']) ?></strong></a>
         <span class="slabe"><?= Ui::h(Media::popis($m)) ?></span>
-        <?php if ($m['campaign_id'] && isset($nazvyKampani[(int)$m['campaign_id']])): ?>
-          <span><a class="stitek stitek-kampan" href="<?= $odkazFiltru(['kampan' => (string)$m['campaign_id'], 'strana' => 1]) ?>"><?= Ui::h($nazvyKampani[(int)$m['campaign_id']]) ?></a></span>
+        <?php if ($m['category_id'] && isset($nazvyKategorii[(int)$m['category_id']])): ?>
+          <span><a class="stitek stitek-kategorie" href="<?= $odkazFiltru(['kategorie' => (string)$m['category_id'], 'strana' => 1]) ?>"><?= Ui::h($nazvyKategorii[(int)$m['category_id']]) ?></a></span>
         <?php endif; ?>
         <?php if ($t = Media::tagy($m)): ?><span class="stitky"><?php foreach ($t as $tag): ?><a class="stitek" href="<?= $odkazFiltru(['tag' => $tag, 'strana' => 1]) ?>"><?= Ui::h($tag) ?></a><?php endforeach; ?></span><?php endif; ?>
         <?php if ($url): ?><span><button type="button" class="maly" data-kopirovat-text="<?= Ui::h($url) ?>">Kopírovat odkaz</button></span><?php endif; ?>

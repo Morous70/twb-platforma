@@ -1,6 +1,6 @@
 <?php
 declare(strict_types=1);
-// TWB Media galerie 0.4: záloha a obnova v rozhraní (média, soubory, kampaně, veřejný odkaz), aktualizace, cron.
+// TWB Media galerie 0.4: záloha a obnova v rozhraní (média, soubory, kategorie, veřejný odkaz), aktualizace, cron.
 require __DIR__ . '/pomocne.php';
 require __DIR__ . '/server.php';
 
@@ -17,12 +17,12 @@ $b = new Prohlizec($s);
 $media = fn() => $s->db()->query('SELECT original_name FROM media ORDER BY id')->fetchAll(PDO::FETCH_COLUMN);
 
 /** Nahraje soubor do galerie jako po skončení nahrávání; vrací id. */
-function pridej(App $app, string $nazev, string $obsah, ?int $kampan = null): int
+function pridej(App $app, string $nazev, string $obsah, ?int $kategorie = null): int
 {
     $f = docasna('soubor');
     file_put_contents($f, $obsah);
     $v = $app->galerie()->uloz($f, $nazev);
-    $app->media()->poNahrani($v['id'], $kampan);
+    $app->media()->poNahrani($v['id'], $kategorie);
     return $v['id'];
 }
 
@@ -36,14 +36,14 @@ test('cron: bez klíče 403, s klíčem projde a zapíše čas', function () use
     ok((int)$s->db()->query("SELECT v FROM settings WHERE k = 'cron_last_run'")->fetchColumn() > time() - 60);
 });
 
-test('záloha s médii a kampaní; obnova vrátí databázi, soubory i veřejný odkaz', function () use ($b, $s, $app, $media) {
+test('záloha s médii a kategorií; obnova vrátí databázi, soubory i veřejný odkaz', function () use ($b, $s, $app, $media) {
     $b->jdi('index.php');
     $b->jdi('index.php', ['akce' => 'prihlasit', 'heslo' => 'tajneheslo1']);
     $r = $b->jdi('index.php?p=prehled');
     ok(str_contains($r['body'], 'Zálohy nejsou nastavené') && !str_contains($r['body'], 'Cron zatím nikdy'), 'přehled upozorní na zálohy, cron už běžel');
     $b->jdi('index.php?p=nastaveni');
     $b->odesli('index.php?p=nastaveni', ['akce' => 'zalohy-heslo', 'backup_password' => 'heslo-zaloh-123', 'backup_auto' => '1']);
-    $k = $app->kampane()->uloz(['name' => 'Léto']);
+    $k = $app->kategorie()->uloz(['name' => 'Léto']);
     $id = pridej($app, 'spot.mp4', mp4(5000), $k);
     $klic = (string)$s->db()->query("SELECT public_key FROM media WHERE id = $id")->fetchColumn();
     $soubor = $s->data . '/data/media/' . $s->db()->query("SELECT filename FROM media WHERE id = $id")->fetchColumn();
@@ -61,7 +61,7 @@ test('záloha s médii a kampaní; obnova vrátí databázi, soubory i veřejný
     $r = $b->jdi('index.php?p=nastaveni', ['akce' => 'obnova-nahled', 'zaloha' => $m[1], 'heslo' => 'spatne-heslo']);
     ok(str_contains($r['body'], 'nesprávné heslo'), 'špatné heslo zálohy');
     $r = $b->jdi('index.php?p=nastaveni', ['akce' => 'obnova-nahled', 'zaloha' => $m[1], 'heslo' => '']);
-    ok(str_contains($r['body'], 'Obnovit zálohu ' . $m[1]) && str_contains($r['body'], 'média 1, kampaně 1, soubory 1'), 'náhled: ' . mb_substr(strip_tags($r['body']), 0, 600));
+    ok(str_contains($r['body'], 'Obnovit zálohu ' . $m[1]) && str_contains($r['body'], 'média 1, kategorie 1, soubory 1'), 'náhled: ' . mb_substr(strip_tags($r['body']), 0, 600));
     ok(!str_contains($r['body'], 'heslo-zaloh-123'), 'heslo se do stránky nevrací');
     eq(['navic.mp4'], $media(), 'náhled nic nemění');
     $r = $b->odesli('index.php?p=nastaveni', ['akce' => 'obnova', 'zaloha' => 'twb-galerie-jina.zip']);
@@ -70,7 +70,7 @@ test('záloha s médii a kampaní; obnova vrátí databázi, soubory i veřejný
     $r = $b->odesli('index.php?p=nastaveni', ['akce' => 'obnova', 'zaloha' => $m[1]]);
     ok(str_contains($r['body'], 'Záloha obnovena'), mb_substr(strip_tags($r['body']), 0, 400));
     eq(['spot.mp4'], $media());
-    eq('Léto', $s->db()->query("SELECT c.name FROM media m JOIN campaigns c ON c.id = m.campaign_id WHERE m.id = $id")->fetchColumn());
+    eq('Léto', $s->db()->query("SELECT c.name FROM media m JOIN categories c ON c.id = m.category_id WHERE m.id = $id")->fetchColumn());
     ok(is_file($soubor), 'soubor obnoven');
     $v = (new Prohlizec($s))->jdi("soubor.php/$klic/spot.mp4");
     eq([200, 5000], [$v['code'], strlen($v['body'])], 'veřejný odkaz po obnově funguje');

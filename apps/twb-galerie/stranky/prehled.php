@@ -38,5 +38,5 @@ if ($dalsi = $app->aktualizace()->stav()['available'] ?? null) $upozorneni[] = [
 <?php endif; ?>
 <div class="karta">
   <h2 style="margin-top:0">Začínáme</h2>
-  <p>Média nahrajete na stránce <a href="<?= Ui::h(Ui::odkaz('galerie')) ?>">Galerie</a> a roztřídíte do <a href="<?= Ui::h(Ui::odkaz('kampane')) ?>">kampaní</a>. Každý soubor má veřejný odkaz pro vložení na web. Přihlášení přes Google a Passkey nastavíte v <a href="<?= Ui::h(Ui::odkaz('nastaveni')) ?>">Nastavení</a>.</p>
+  <p>Média nahrajete na stránce <a href="<?= Ui::h(Ui::odkaz('galerie')) ?>">Galerie</a> a roztřídíte do <a href="<?= Ui::h(Ui::odkaz('kategorie')) ?>">kategorií</a>. Každý soubor má veřejný odkaz pro vložení na web. Přihlášení přes Google a Passkey nastavíte v <a href="<?= Ui::h(Ui::odkaz('nastaveni')) ?>">Nastavení</a>.</p>
 </div>

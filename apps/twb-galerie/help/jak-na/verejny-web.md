@@ -4,7 +4,7 @@ sekce: jak-na
 admin: ne
 kontext: web
 souvisi: verejne-odkazy, kategorie-a-tagy
-klicova: web, hlavní stránka, veřejná galerie, reklama, banner, o galerii, úvodní fotka
+klicova: web, hlavní stránka, veřejná galerie, reklama, banner, adsense, sklik, reklamní kód, ads.txt, o galerii, úvodní fotka
 ---
 # Veřejný web
 
@@ -40,6 +40,21 @@ V popisku je uvedení autora podle licence (např. „Foto: Jana Nováková, CC 
 Na hlavní stránce jsou dvě: **Reklamní banner** pod úvodní fotkou a **Reklamní plocha** pod galeriemi (ta je i na stránkách galerií).
 U každé nastavíte, zda se zobrazí, štítek vlevo, text, text tlačítka a odkaz. Odkaz může být `https://…`, `mailto:…`, `tel:…`
 nebo adresa na tomto webu, např. `?s=o-galerii`. Bez odkazu se tlačítko nezobrazí.
+
+V poli **Obsah plochy** vyberete, co v ploše bude:
+- **Vlastní text a tlačítko** – štítek vlevo, text, text tlačítka a odkaz (viz výše).
+- **Kód z reklamního systému** – do pole vložíte celý kód reklamní jednotky tak, jak ho dá AdSense, Sklik, Etarget nebo jiný systém,
+  včetně `<script>`. Na web se vloží bez úprav. Štítek (např. *Reklama*) se ukáže drobně nad reklamou, prázdný = bez štítku.
+
+Vkládejte jen kód od reklamního systému, kterému věříte – kód se nekontroluje a na webu se spustí. Po přepnutí se nic neztratí,
+text i kód zůstanou uložené.
+
+## Reklamní systémy
+- **Kód do hlavičky stránky** se vloží do `<head>` všech stránek webu. Sem patří kód, který reklamní systém chce „mezi značky head“:
+  ověření vlastnictví webu, automatické reklamy AdSense nebo měřicí (retargetingový) kód Skliku.
+- **Obsah ads.txt** web vydá na adrese `/ads.txt`. Řádky dostanete v reklamním systému (AdSense: *Weby → ads.txt*). Prázdné pole = soubor neexistuje.
+- Jakmile stránka obsahuje reklamní kód, povolí skripty, rámečky a styly z cizích webů (jinak by se reklama nenačetla). Stránky bez kódu
+  zůstávají na přísném nastavení.
 
 ## O galerii
 Text stránky napíšete v **Veřejný web → Stránka O galerii**. Odstavce oddělte prázdným řádkem; jde použít `**tučně**`, odrážky `- `,

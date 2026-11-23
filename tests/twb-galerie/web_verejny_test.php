@@ -125,6 +125,72 @@ test('web na serveru: stránky, 404, soukromá data se neukážou, vypnutý web,
     ok(str_contains($anon->jdi('verejne.php?s=galerie')['body'], 'Soukromé'), 'zveřejněná kategorie je na webu');
 });
 
+test('web 0.8.2: reklamní plocha jako kód z reklamního systému, kód do hlavičky, ads.txt, CSP', function () {
+    $app = novaApp();
+    $web = $app->web();
+    $n = $web->nastaveni();
+    eq(['text', '', '', ''], [$n['banner1']['typ'], $n['banner1']['kod'], $n['kod_hlavicka'], $n['ads_txt']], 'starší nastavení = vlastní text');
+    eq(false, Web::maKod($n, ['banner1', 'banner2']));
+    $adsense = "<script async src=\"https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1\" crossorigin=\"anonymous\"></script>\r\n"
+        . "<ins class=\"adsbygoogle\" style=\"display:block\" data-ad-client=\"ca-pub-1\" data-ad-slot=\"2\"></ins>\r\n<script>(adsbygoogle = window.adsbygoogle || []).push({});</script>";
+    $p = ['nazev' => 'G', 'nadpis' => 'N', 'tlacitko' => 'T', 'vybrane_nadpis' => 'V', 'zapnuto' => '1',
+        'banner1_zobrazit' => '1', 'banner1_typ' => 'kod', 'banner1_stitek' => 'Reklama', 'banner1_kod' => "  $adsense \n", 'banner1_text' => 'Starý text',
+        'banner2_zobrazit' => '1', 'banner2_typ' => 'text', 'banner2_text' => 'Vlastní', 'banner2_kod' => '<b>schovaný</b>',
+        'kod_hlavicka' => '<meta name="seznam-wmt" content="abc">', 'ads_txt' => "google.com, pub-1, DIRECT, f08c47fec0942fa0\r\n"];
+    $web->uloz($p);
+    $n = $web->nastaveni();
+    eq(['kod', str_replace("\r\n", "\n", $adsense), 'Starý text'], [$n['banner1']['typ'], $n['banner1']['kod'], $n['banner1']['text']], 'kód beze změny, jen konce řádků');
+    eq(['text', '<b>schovaný</b>'], [$n['banner2']['typ'], $n['banner2']['kod']], 'kód zůstane i u textové plochy');
+    eq('google.com, pub-1, DIRECT, f08c47fec0942fa0', $n['ads_txt']);
+    ok(Web::maKod($n, ['banner1']) && Web::maKod($n, []), 'kód v hlavičce stačí');
+    ok(str_contains(Web::csp(true), "script-src 'self' 'unsafe-inline' 'unsafe-eval' https:") && str_contains(Web::csp(true), 'frame-src https:'));
+    ok(str_contains(Web::csp(true), "frame-ancestors 'self'") && str_contains(Web::csp(true), "base-uri 'self'"));
+    eq("default-src 'self'; img-src 'self' https: data:; style-src 'self'; script-src 'self'; frame-ancestors 'self'; base-uri 'self'; form-action 'self'", Web::csp(false));
+    foreach ([['banner1_typ' => 'iframe'], ['banner1_kod' => ''], ['banner1_kod' => str_repeat('x', Web::MAX_KOD + 1)], ['ads_txt' => str_repeat('x', Web::MAX_KOD + 1)]] as $spatne) {
+        try { $web->uloz($spatne + $p); ok(false, json_encode($spatne)); } catch (Chyba) { ok(true); }
+    }
+    $web->uloz(['banner1_zobrazit' => '', 'banner1_kod' => ''] + $p);
+    eq([false, 'kod'], [$web->nastaveni()['banner1']['zobrazit'], $web->nastaveni()['banner1']['typ']], 'skrytá plocha s kódem smí být prázdná');
+});
+
+test('web 0.8.2 na serveru: kód se vloží bez úprav, volnější CSP jen se kódem, /ads.txt, administrace', function () {
+    $s = new TestServer();
+    register_shutdown_function(fn() => $s->zastav());
+    $b = new Prohlizec($s);
+    $b->jdi('install.php');
+    $b->jdi('install.php', ['heslo' => 'tajneheslo1', 'heslo2' => 'tajneheslo1']);
+    $app = new App(KOREN . '/apps/twb-galerie', ['data_dir' => $s->data . '/data', 'base_url' => $s->url]);
+    webData($app);
+    $anon = new Prohlizec($s);
+    $csp = fn(Prohlizec $p): string => preg_match('/^Content-Security-Policy:\s*([^\r\n]+)/mi', $p->posledniHlavicky, $m) ? $m[1] : '';
+    $anon->jdi('verejne.php');
+    ok(str_contains($csp($anon), "script-src 'self';"), 'bez kódu přísná CSP');
+    eq(404, $anon->jdi('verejne.php?s=ads.txt')['code'], 'prázdné ads.txt = 404');
+
+    $b->jdi('index.php?p=web');
+    $r = $b->jdi('index.php?p=web');
+    ok(str_contains($r['body'], 'name="banner1_typ"') && str_contains($r['body'], 'name="banner2_kod"') && str_contains($r['body'], 'name="ads_txt"'), 'pole v administraci');
+    $kod = '<div id="ssp-zone-123"></div><script src="https://ssp.seznam.cz/static/js/ssp.js"></script><script>sssp.getAds([{"zoneId":123,"id":"ssp-zone-123","width":728,"height":90}]);</script>';
+    $r = $b->odesli('index.php?p=web', ['akce' => 'ulozit', 'zapnuto' => '1', 'nazev' => 'G', 'nadpis' => 'N', 'tlacitko' => 'T', 'vybrane_nadpis' => 'V', 'vybrane_pocet' => '4',
+        'banner1_zobrazit' => '1', 'banner1_typ' => 'kod', 'banner1_stitek' => 'Reklama', 'banner1_kod' => $kod,
+        'banner2_zobrazit' => '1', 'banner2_typ' => 'text', 'banner2_text' => 'Textová plocha',
+        'kod_hlavicka' => '<script src="https://c.seznam.cz/js/rc.js"></script>', 'ads_txt' => 'seznam.cz, 123, DIRECT']);
+    ok(str_contains($r['body'], 'Nastavení webu uloženo'));
+    ok(str_contains($r['body'], htmlspecialchars($kod)), 'administrace kód ukáže escapovaný v poli');
+    ok(!str_contains($r['body'], $kod), 'administrace kód nespustí');
+    $r = $anon->jdi('verejne.php');
+    ok(str_contains($r['body'], '<div class="banner-kod-obsah">' . $kod . '</div>'), 'kód na webu beze změny');
+    ok(str_contains($r['body'], 'Textová plocha'), 'druhá plocha s textem');
+    ok(preg_match('~<script src="https://c\.seznam\.cz/js/rc\.js"></script>\s*</head>~', $r['body']) === 1, 'kód v hlavičce');
+    ok(str_contains($csp($anon), "'unsafe-inline'") && str_contains($csp($anon), 'frame-src https:'), 'volnější CSP');
+    $r = $anon->jdi('verejne.php?s=ads.txt');
+    eq([200, 'text/plain', "seznam.cz, 123, DIRECT\n"], [$r['code'], $r['type'], $r['body']]);
+    eq(200, $anon->jdi('index.php?s=ads.txt')['code'], 'i přes index.php');
+    $r = $b->odesli('index.php?p=web', ['akce' => 'ulozit', 'zapnuto' => '1', 'nazev' => 'G', 'nadpis' => 'N', 'tlacitko' => 'T', 'vybrane_nadpis' => 'V', 'vybrane_pocet' => '4',
+        'banner1_zobrazit' => '1', 'banner1_typ' => 'kod', 'banner1_kod' => '']);
+    ok(str_contains($r['body'], 'Vložte kód z reklamního systému'), 'prázdný kód u zobrazené plochy');
+});
+
 test('komprese: úloha jen z obrázků, kroky, souhrn, bez originálu uvolní místo', function () {
     [$app, $ver, , $ids] = webData();
     $k = $app->komprese();

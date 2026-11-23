@@ -3,6 +3,7 @@ declare(strict_types=1);
 // Veřejný web galerie (0.8.0): ?s=domu (hlavní stránka), ?s=galerie (veřejné kategorie), ?s=galerie&k=<id-nazev> (fotky kategorie), ?s=o-galerii.
 // Kořen domény ho otevře přes DirectoryIndex v .htaccess; index.php s parametrem s= (bez p=) sem předá také. Administrace zůstává na index.php.
 // Ukazuje jen veřejné kategorie a v nich obrázky s veřejným odkazem mimo archiv (viz MediaGalerie\Web).
+// 0.8.2: reklamní plochy mohou být kód z reklamního systému (vloží se bez úprav), kód do hlavičky a ads.txt (?s=ads.txt, /ads.txt přes .htaccess).
 use MediaGalerie\{App, Web, Media};
 use TWB\Napoveda\Markdown;
 
@@ -35,16 +36,34 @@ $fotografii = static function (int $n): string {
 $odkazKategorie = static fn(array $k): string => '?s=galerie&k=' . rawurlencode(Web::slug($k));
 
 $stranka = (string)($_GET['s'] ?? 'domu');
+if ($stranka === 'ads.txt') {
+    // ads.txt pro reklamní systémy (AdSense…): prostý text z nastavení webu, bez něj 404
+    http_response_code($n['ads_txt'] !== '' ? 200 : 404);
+    header('Content-Type: text/plain; charset=utf-8');
+    header('Cache-Control: public, max-age=3600');
+    echo $n['ads_txt'] !== '' ? $n['ads_txt'] . "\n" : '';
+    exit;
+}
 $kategorie = $web->kategorie();
 $titulek = '';
 $aktivni = $stranka;
 $obsah = '';
 $kod = 200;
+$plochy = [];   // reklamní plochy, které stránka opravdu ukázala (kvůli CSP)
 
 // ---------- části stránek ----------
-$banner = static function (string $klic) use ($n, $h, $ikona): string {
+$banner = static function (string $klic) use ($n, $h, $ikona, &$plochy): string {
     $b = $n[$klic];
-    if (!$b['zobrazit'] || ($b['text'] === '' && $b['stitek'] === '')) return '';
+    if (!$b['zobrazit']) return '';
+    if ($b['typ'] === 'kod') {
+        // kód z reklamního systému se vkládá tak, jak ho správce zadal (HTML/JS), jen do vlastního obalu
+        if ($b['kod'] === '') return '';
+        $plochy[] = $klic;
+        return '<aside class="banner-kod" aria-label="' . $h($b['stitek'] !== '' ? $b['stitek'] : 'Reklama') . '">'
+            . ($b['stitek'] !== '' ? '<span class="banner-kod-stitek">' . $h($b['stitek']) . '</span>' : '')
+            . '<div class="banner-kod-obsah">' . $b['kod'] . '</div></aside>';
+    }
+    if ($b['text'] === '' && $b['stitek'] === '') return '';
     $tl = $b['tlacitko'] !== '' && $b['odkaz'] !== ''
         ? '<a class="banner-tlacitko" href="' . $h($b['odkaz']) . '"' . (preg_match('~^https?://~i', $b['odkaz']) ? ' rel="sponsored noopener"' : '') . '>' . $h($b['tlacitko']) . $ikona('dalsi', 16) . '</a>' : '';
     return '<aside class="banner" aria-label="' . $h($b['stitek'] !== '' ? $b['stitek'] : 'Reklama') . '">'
@@ -143,6 +162,7 @@ switch ($stranka) {
 if ($kod === 404) {
     $titulek = 'Stránka nenalezena';
     $aktivni = '';
+    $plochy = [];
     $obsah = '<div class="obsah uzky">' . $nadpisSekce('Stránka nenalezena', 'Tahle stránka neexistuje nebo už není veřejná.', 'h1')
         . '<p><a class="tlacitko" href="./">Zpět na hlavní stránku</a></p></div>';
 }
@@ -152,7 +172,7 @@ http_response_code($kod);
 header('Content-Type: text/html; charset=utf-8');
 header('Cache-Control: public, max-age=60');
 header('X-Frame-Options: SAMEORIGIN');
-header("Content-Security-Policy: default-src 'self'; img-src 'self' https: data:; style-src 'self'; script-src 'self'; frame-ancestors 'self'; base-uri 'self'; form-action 'self'");
+header('Content-Security-Policy: ' . Web::csp(Web::maKod($n, $plochy)));
 if ($n['skryt_vyhledavacum']) header('X-Robots-Tag: noindex, nofollow');
 $v = $h($app->verze);
 $menu = ['domu' => ['./', 'Domů'], 'galerie' => ['?s=galerie', 'Galerie'], 'o-galerii' => ['?s=o-galerii', 'O galerii']];
@@ -173,6 +193,10 @@ $popisStranky = $n['podnadpis'] !== '' ? $n['podnadpis'] : $n['nadpis'];
 <link rel="stylesheet" href="assets/verejne.css?v=<?= $v ?>">
 <link rel="icon" href="assets/ikona.svg" type="image/svg+xml">
 <script src="assets/verejne.js?v=<?= $v ?>" defer></script>
+<?php if ($n['kod_hlavicka'] !== ''): ?>
+<?= $n['kod_hlavicka'] ?>
+
+<?php endif; ?>
 </head>
 <body>
 <header class="hlavicka">

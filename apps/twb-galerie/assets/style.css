@@ -424,3 +424,8 @@ body.vybirani, body.vybirani * { user-select: none; cursor: crosshair; }
 .hlavicka-karty { justify-content: space-between; align-items: center; margin-bottom: 1rem; }
 .hlavicka-karty h3 { margin: 0; }
 @media (max-width: 575.98px) { .karty-nav { margin-left: -1rem; margin-right: -1rem; padding: 0 .5rem; } .karty-nav a { padding: .6rem .75rem; } }
+
+/* ---------- Veřejný web: reklamní plocha jako text nebo kód (0.8.2) ---------- */
+.reklamni-plocha:has(select[name$="_typ"] option[value="kod"]:checked) .jen-text,
+.reklamni-plocha:has(select[name$="_typ"] option[value="text"]:checked) .jen-kod { display: none; }
+.reklamni-plocha textarea.kod { min-height: 9rem; }

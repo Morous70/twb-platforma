@@ -1,6 +1,6 @@
 <?php
 declare(strict_types=1);
-// Veřejný web (0.8.0): zapnutí, texty hlavní stránky, úvodní fotka, reklamní plochy, stránka O galerii. Proměnné: $app, $ui, $post.
+// Veřejný web (0.8.0): zapnutí, texty hlavní stránky, úvodní fotka, reklamní plochy (0.8.2: i kód z reklamního systému, kód do hlavičky, ads.txt), stránka O galerii. Proměnné: $app, $ui, $post.
 use MediaGalerie\{Ui, Chyba, Web};
 
 $web = $app->web();
@@ -58,14 +58,33 @@ $zaskrt = static fn(string $nazev, string $popis, bool $vychozi, string $napoved
       'Prvních N veřejných kategorií podle pořadí nastaveného u kategorie (0 = sekce se skryje). Všechny jsou na stránce Galerie.') ?>
 
   <?php foreach (Web::BANNERY as $b => $popis): $hb = $n[$b]; ?>
+  <div class="reklamni-plocha">
   <h2 style="margin:1rem 0 0"><?= Ui::h($popis) ?></h2>
   <?= $zaskrt("{$b}_zobrazit", 'Zobrazit', (bool)$hb['zobrazit']) ?>
-  <?= Ui::pole('Štítek vlevo', "{$b}_stitek", $hb['stitek'], ['maxlength' => 40]) ?>
+  <?= Ui::vyber('Obsah plochy', "{$b}_typ", Web::TYPY_BANNERU, $hb['typ']) ?>
+  <?= Ui::pole('Štítek', "{$b}_stitek", $hb['stitek'], ['maxlength' => 40], 'U vlastního textu vlevo, u kódu drobně nad reklamou (např. <em>Reklama</em>). Prázdný = bez štítku.') ?>
+  <div class="jen-kod">
+  <?= Ui::oblast('Kód z reklamního systému', "{$b}_kod", $hb['kod'], ['rows' => 7, 'maxlength' => Web::MAX_KOD, 'spellcheck' => 'false', 'class' => 'kod',
+      'placeholder' => '<script async src="https://…"></script>' . "\n" . '<ins class="adsbygoogle" …></ins>'],
+      'Vložte celý kód reklamní jednotky tak, jak ho dá reklamní systém (AdSense, Sklik, Etarget…), včetně <code>&lt;script&gt;</code>. Na web se vloží bez úprav, '
+      . 'stránka pak povolí skripty a rámečky reklamních systémů. Kód nekontrolujeme – vkládejte jen kód od reklamního systému, kterému věříte.') ?>
+  </div>
+  <div class="jen-text">
   <?= Ui::pole('Text', "{$b}_text", $hb['text'], ['maxlength' => 200]) ?>
   <?= Ui::pole('Text tlačítka', "{$b}_tlacitko", $hb['tlacitko'], ['maxlength' => 40]) ?>
   <?= Ui::pole('Odkaz tlačítka', "{$b}_odkaz", $hb['odkaz'], ['maxlength' => 500, 'placeholder' => 'https://…'],
       'https://…, mailto:…, tel:… nebo adresa na tomto webu (např. <code>?s=o-galerii</code>). Bez odkazu se tlačítko nezobrazí.') ?>
+  </div>
+  </div>
   <?php endforeach; ?>
+
+  <h2 style="margin:1rem 0 0">Reklamní systémy</h2>
+  <?= Ui::oblast('Kód do hlavičky stránky', 'kod_hlavicka', $n['kod_hlavicka'], ['rows' => 4, 'maxlength' => Web::MAX_KOD, 'spellcheck' => 'false', 'class' => 'kod',
+      'placeholder' => '<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-…" crossorigin="anonymous"></script>'],
+      'Vloží se do <code>&lt;head&gt;</code> každé stránky webu: ověření webu, automatické reklamy AdSense, měřicí kód reklamního systému. Prázdné = nic.') ?>
+  <?= Ui::oblast('Obsah ads.txt', 'ads_txt', $n['ads_txt'], ['rows' => 3, 'maxlength' => Web::MAX_KOD, 'spellcheck' => 'false', 'class' => 'kod',
+      'placeholder' => 'google.com, pub-0000000000000000, DIRECT, f08c47fec0942fa0'],
+      'Web ho vydá na <a href="' . Ui::h($app->url('ads.txt')) . '"><code>/ads.txt</code></a> (chce ho např. AdSense). Prázdné = soubor neexistuje.') ?>
 
   <h2 style="margin:1rem 0 0">Stránka O galerii</h2>
   <?= Ui::oblast('Text', 'o_galerii', $n['o_galerii'], ['rows' => 10, 'maxlength' => 20000],

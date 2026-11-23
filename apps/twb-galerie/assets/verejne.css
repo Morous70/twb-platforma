@@ -75,6 +75,12 @@ h1, h2, h3 { font-weight: 700; line-height: 1.12; color: #1c1b18; margin: 0; let
   background: linear-gradient(180deg, #ecd6a2, var(--zlata-svetla) 55%, #cfae6a); padding: .55rem 1.2rem; border-radius: .3rem; }
 .banner-tlacitko:hover { filter: brightness(1.06); }
 
+/* reklama vložená jako kód z reklamního systému (0.8.2): reklama si velikost určuje sama, obal jen odsadí a vystředí */
+.banner-kod { margin: 1.1rem 0; text-align: center; overflow: hidden; }
+.banner-kod-stitek { display: block; margin-bottom: .25rem; color: var(--slaby); font-size: .72rem; text-transform: uppercase; letter-spacing: .2em; }
+.banner-kod-obsah { width: 100%; }
+.banner-kod-obsah > * { max-width: 100%; margin-inline: auto; }
+
 /* ---------- karty galerií ---------- */
 .karty { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr)); gap: 1.1rem; }
 .karta { position: relative; display: flex; flex-direction: column; background: var(--plocha); border: 1px solid var(--okraj); border-radius: .4rem; overflow: hidden;

@@ -8,6 +8,8 @@ namespace MediaGalerie;
  * které nejsou v archivu a mají zapnutý veřejný odkaz (vypnutý odkaz = fotka zmizí i z webu). Obrázky se vydávají
  * přes trvalé adresy náhledů veřejného odkazu (soubor.php/<klíč>/w<px>/…), originál se na webu nenabízí.
  * Texty, úvodní fotka a reklamní plochy jsou v nastavení `web` (JSON, zálohuje se).
+ * Reklamní plocha (0.8.2) je buď vlastní text s tlačítkem (`typ` = text), nebo kód z reklamního systému (`typ` = kod: HTML/JS
+ * z AdSense, Skliku…), který se na web vloží bez úprav. Kód zadává jen přihlášený správce; stránka s kódem dostane volnější CSP.
  */
 final class Web
 {
@@ -27,9 +29,15 @@ final class Web
         'patka' => '© TWB Galerie',
         'odkaz_administrace' => true,
         'skryt_vyhledavacum' => false,
-        'banner1' => ['zobrazit' => true, 'stitek' => 'Reklamní banner', 'text' => 'Prostor pro reklamní sdělení', 'tlacitko' => 'Zjistit více', 'odkaz' => '?s=o-galerii'],
-        'banner2' => ['zobrazit' => true, 'stitek' => 'Reklamní plocha', 'text' => 'Vaše reklama může být součástí této stránky', 'tlacitko' => 'Zobrazit nabídku', 'odkaz' => '?s=o-galerii'],
+        'banner1' => ['zobrazit' => true, 'typ' => 'text', 'stitek' => 'Reklamní banner', 'text' => 'Prostor pro reklamní sdělení', 'tlacitko' => 'Zjistit více', 'odkaz' => '?s=o-galerii', 'kod' => ''],
+        'banner2' => ['zobrazit' => true, 'typ' => 'text', 'stitek' => 'Reklamní plocha', 'text' => 'Vaše reklama může být součástí této stránky', 'tlacitko' => 'Zobrazit nabídku', 'odkaz' => '?s=o-galerii', 'kod' => ''],
+        'kod_hlavicka' => '',
+        'ads_txt' => '',
     ];
+    /** Druhy reklamní plochy. */
+    public const TYPY_BANNERU = ['text' => 'Vlastní text a tlačítko', 'kod' => 'Kód z reklamního systému (AdSense, Sklik…)'];
+    /** Největší délka vloženého kódu (reklamní plocha, hlavička) a obsahu ads.txt. */
+    public const MAX_KOD = 20000;
     public const BANNERY = ['banner1' => 'Reklamní banner (pod úvodní fotkou)', 'banner2' => 'Reklamní plocha (pod galeriemi)'];
     public const NA_STRANKU = 36;
     /** Náhled v kartách a mřížce, velký obrázek v okně a úvodní fotka (delší strana v px, z Media::NAHLEDY). */
@@ -65,6 +73,8 @@ final class Web
             $n[$k] = (string)Vstup::text($p, $k, $popis, $max, $povinne);
         }
         $n['o_galerii'] = (string)Vstup::text($p, 'o_galerii', 'Text stránky O galerii', 20000, false);
+        $n['kod_hlavicka'] = self::kod($p, 'kod_hlavicka', 'Kód do hlavičky stránky');
+        $n['ads_txt'] = self::kod($p, 'ads_txt', 'Obsah ads.txt');
         $pocet = (int)($p['vybrane_pocet'] ?? 4);
         if ($pocet < 0 || $pocet > 12) throw new Chyba('Počet vybraných galerií musí být 0 až 12.');
         $n['vybrane_pocet'] = $pocet;
@@ -76,9 +86,13 @@ final class Web
             foreach (array_keys(self::VYCHOZI[$b]) as $pole) $v[$pole] = $p["{$b}_{$pole}"] ?? null;
             $odkaz = trim((string)($v['odkaz'] ?? ''));
             if ($odkaz !== '' && !self::platnyOdkaz($odkaz)) throw new Chyba('Odkaz reklamní plochy musí začínat https://, http://, mailto:, tel:, / nebo ? (adresa na tomto webu).');
-            $n[$b] = ['zobrazit' => !empty($v['zobrazit']), 'stitek' => (string)Vstup::text($v, 'stitek', 'Štítek reklamní plochy', 40, false),
+            $typ = (string)($v['typ'] ?? 'text');
+            if (!isset(self::TYPY_BANNERU[$typ])) throw new Chyba('Neznámý druh reklamní plochy.');
+            $kod = self::kod($v, 'kod', 'Kód reklamní plochy');
+            if ($typ === 'kod' && $kod === '' && !empty($v['zobrazit'])) throw new Chyba('Vložte kód z reklamního systému, nebo plochu přepněte na vlastní text či skryjte.');
+            $n[$b] = ['zobrazit' => !empty($v['zobrazit']), 'typ' => $typ, 'stitek' => (string)Vstup::text($v, 'stitek', 'Štítek reklamní plochy', 40, false),
                 'text' => (string)Vstup::text($v, 'text', 'Text reklamní plochy', 200, false), 'tlacitko' => (string)Vstup::text($v, 'tlacitko', 'Tlačítko reklamní plochy', 40, false),
-                'odkaz' => $odkaz];
+                'odkaz' => $odkaz, 'kod' => $kod];
         }
         $this->app->nastaveni()->uloz('web', (string)json_encode($n, JSON_UNESCAPED_UNICODE));
         $this->app->log('info', 'Nastavení veřejného webu změněno' . ($n['zapnuto'] ? '.' : ' (web vypnutý).'));
@@ -91,6 +105,35 @@ final class Web
         $n = $this->nastaveni();
         $n['uvod_id'] = $id;
         $this->app->nastaveni()->uloz('web', (string)json_encode($n, JSON_UNESCAPED_UNICODE));
+    }
+
+    /** Vložený kód (HTML/JS) nebo ads.txt: ořízne okraje, sjednotí konce řádků, kontroluje jen délku (obsah je na správci). @param array<string, mixed> $v */
+    private static function kod(array $v, string $klic, string $popis): string
+    {
+        $s = trim(str_replace(["\r\n", "\r"], "\n", (string)($v[$klic] ?? '')));
+        $s = (string)preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F]/u', '', $s);
+        if (mb_strlen($s) > self::MAX_KOD) throw new Chyba("Pole „{$popis}“ může mít nejvýš " . self::MAX_KOD . ' znaků.');
+        return $s;
+    }
+
+    /** Ukáže stránka vložený kód z reklamního systému (plocha s kódem nebo kód v hlavičce)? Pak potřebuje volnější CSP. @param array<string, mixed> $n */
+    public static function maKod(array $n, array $plochy = []): bool
+    {
+        if ($n['kod_hlavicka'] !== '') return true;
+        foreach ($plochy as $b) if ($n[$b]['zobrazit'] && $n[$b]['typ'] === 'kod' && $n[$b]['kod'] !== '') return true;
+        return false;
+    }
+
+    /**
+     * CSP veřejného webu. Bez reklamních kódů jen vlastní skripty a styly. S kódem musí projít skripty, rámečky a styly
+     * reklamních systémů (AdSense, Sklik, Etarget… načítají další skripty z různých domén a vkládají vložené skripty a styly),
+     * proto https: a 'unsafe-inline'; zůstává zákaz vložení stránky do cizího rámu, změny <base> a odeslání formulářů jinam.
+     */
+    public static function csp(bool $sKodem): string
+    {
+        if (!$sKodem) return "default-src 'self'; img-src 'self' https: data:; style-src 'self'; script-src 'self'; frame-ancestors 'self'; base-uri 'self'; form-action 'self'";
+        return "default-src 'self' https:; img-src 'self' https: data: blob:; style-src 'self' 'unsafe-inline' https:; script-src 'self' 'unsafe-inline' 'unsafe-eval' https:; "
+            . "frame-src https:; connect-src 'self' https:; font-src 'self' https: data:; media-src 'self' https:; frame-ancestors 'self'; base-uri 'self'; form-action 'self'";
     }
 
     /** Odkaz reklamní plochy: web (http/https), e-mail, telefon nebo adresa na tomto webu. Ne javascript: apod. */

@@ -109,7 +109,7 @@ test('server: stránka Štítky – menu, seznam, hledání, přejmenování, sl
     ok(str_contains($r['body'], '>Štítky<'), 'v menu');
     ok(str_contains($r['body'], 'Léto') && str_contains($r['body'], 'moře'));
     ok(str_contains($r['body'], 'index.php?p=galerie&amp;tag=L%C3%A9to'), 'počet vede do Galerie');
-    ok(!str_contains($r['body'], 'target="_blank"'), 'nic v nové kartě');
+    ok(!str_contains(explode('<main', $r['body'], 2)[1], 'target="_blank"'), 'nic v nové kartě (kromě Zobrazit web v liště)');
     $r = $b->jdi('index.php?p=stitky&q=more');
     ok(str_contains($r['body'], 'moře') && !str_contains($r['body'], 'name="vybrane[]" value="Léto"'), 'hledání');
     $r = $b->jdi('index.php?p=stitky&prejmenovat=L%C3%A9to');
@@ -144,13 +144,26 @@ test('server: Základ a texty ve skupinách', function () use ($s, $b) {
     eq('Moje', json_decode((string)$s->db()->query("SELECT v FROM settings WHERE k = 'web'")->fetchColumn(), true)['nazev']);
 });
 
+test('server 0.8.10: v liště Zobrazit web (nová záložka), na Přehledu kategorie a rychlé nahrání', function () use ($s, $b, $kat) {
+    foreach (['index.php', 'index.php?p=galerie', 'index.php?p=nastaveni'] as $str) {
+        $r = $b->jdi($str);
+        ok(str_contains($r['body'], 'class="lista-odkaz lista-web" href="' . $s->url . '/" target="_blank" rel="noopener"'), $str);
+    }
+    $r = $b->jdi('index.php');
+    $dole = explode('Naposledy nahrané', $r['body'], 2)[1];
+    ok(strpos($dole, 'id="h-kategorie"') < strpos($dole, 'id="h-nahrani"'), 'kategorie a nahrání pod Naposledy nahrané');
+    foreach (['Auta', 'Budovy', 'Cesty'] as $n) ok(str_contains($dole, '<span class="nazev">' . $n . '</span>'), $n);
+    ok(str_contains($dole, 'index.php?p=galerie&amp;kategorie=' . $kat['Auta']), 'odkaz do Galerie');
+    ok(str_contains($dole, 'id="nahravani"') && str_contains($dole, 'data-plocha') && str_contains($dole, 'name="nahrat_kategorie"') && str_contains($dole, 'data-stitky'));
+});
+
 // ---------- v prohlížeči ----------
 
 $node = trim((string)shell_exec('command -v node'));
 $pw = $node !== '' && trim((string)shell_exec('node -e "require(\'playwright\'); console.log(1)" 2>/dev/null')) === '1';
 
 /** Playwright: přihlásí se a spustí tělo (p = stránka, u = adresa, v = výsledky). */
-function prohlizec088(string $url, string $telo, int $sirka = 1360): array
+function prohlizec088(string $url, string $telo, int $sirka = 1360, int $novychKaret = 0): array
 {
     $skript = docasna('pw') . '.js';
     file_put_contents($skript, <<<JS
@@ -176,7 +189,7 @@ JS);
     $v = json_decode(trim((string)strrchr("\n" . trim($out), "\n")), true);
     ok(is_array($v) && !isset($v['chyba']), $out);
     eq([], $v['chyby'] ?? [], 'chyby JavaScriptu');
-    eq(0, $v['stranek'] ?? 0, 'žádná nová karta');
+    eq($novychKaret, $v['stranek'] ?? 0, 'nové karty');
     return $v;
 }
 
@@ -231,4 +244,28 @@ JS;
         eq([16, $sloupcu, $radku, 16], $v['m'], "šířka $sirka");
         eq($v['web'][1], $v['web'][0], "Veřejný web bez vodorovného posuvu při $sirka px");
     }
+});
+
+test('prohlížeč 0.8.10: rychlé nahrání na Přehledu do kategorie s tagem; Zobrazit web otevře novou záložku s webem', function () use ($pw, $s, $kat) {
+    if (!$pw) { echo "      (přeskočeno: chybí node nebo playwright)\n"; return; }
+    $f = docasna('up') . '.jpg';
+    file_put_contents($f, jpegMeta());
+    $v = prohlizec088($s->url, <<<JS
+  await p.goto(u + 'index.php');
+  await p.selectOption('#f-nahrat_kategorie', '{$kat['Cesty']}');
+  await p.fill('#f-nahrat_tagy-novy', 'rychle'); await p.press('#f-nahrat_tagy-novy', 'Enter');
+  await Promise.all([p.waitForNavigation(), p.setInputFiles('#nahravani [data-vyber]', '$f')]);
+  v.prvni = await p.\$eval('.posledni-mrizka figure figcaption', e => e.textContent.trim());
+  v.adresa = p.url();
+  const [nova] = await Promise.all([p.context().waitForEvent('page'), p.click('.lista-web')]);
+  await nova.waitForLoadState();
+  v.web = nova.url();
+  v.stejna = p.url();
+JS, 1360, 1);
+    ok(str_contains($v['prvni'], '.jpg'), $v['prvni']);
+    ok(str_contains($v['adresa'], 'index.php'), 'zůstane na Přehledu');
+    $m = $s->db()->query('SELECT category_id, tags FROM media ORDER BY id DESC LIMIT 1')->fetch();
+    eq([$kat['Cesty'], '["rychle"]'], [(int)$m['category_id'], $m['tags']]);
+    eq($s->url . '/', $v['web'], 'web v nové záložce');
+    eq($v['adresa'], $v['stejna'], 'administrace zůstala');
 });

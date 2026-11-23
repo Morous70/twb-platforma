@@ -241,6 +241,9 @@ final class Ui
             . '<div class="hlavni-cast"><header class="lista">'
             . '<button type="button" class="menu-prepinac" aria-label="Zobrazit nebo skrýt menu" aria-controls="menu" data-prepni="menu"><i></i></button>'
             . '<span class="mezera"></span>'
+            // 0.8.10: Zobrazit web – výslovně v nové záložce (jediná výjimka z pravidla „nic neotevírat v nové záložce“)
+            . '<a class="lista-odkaz lista-web" href="' . self::h($this->app->url() . '/') . '" target="_blank" rel="noopener" title="Zobrazit veřejný web v nové záložce">'
+            . self::ikona('web') . '<span>Zobrazit web</span></a>'
             . '<a class="lista-odkaz' . ($aktivni === 'napoveda' ? ' aktivni' : '') . '" href="' . self::h(self::odkaz('napoveda')) . '" title="Nápověda">' . self::ikona('napoveda') . '<span>Nápověda</span></a>'
             . '<form method="post" action="index.php?p=odhlasit" class="odhlasit">' . $this->csrf() . '<button type="submit" class="lista-odkaz" title="Odhlásit">' . self::ikona('odhlasit') . '<span>Odhlásit</span></button></form></header>'
             . '<main' . ($limit > 0 ? ' data-necinnost="' . $limit . '"' : '') . '><h1>' . self::h($titulek)

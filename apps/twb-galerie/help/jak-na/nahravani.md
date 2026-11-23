@@ -8,7 +8,7 @@ klicova: nahrát, upload, video, velikost, komprese, zip, metadata
 ---
 # Nahrávání souborů
 
-Na stránce **Galerie** soubory přetáhněte do rámečku nebo klikněte na **vyberte z počítače**. Najednou jich může být víc.
+Na stránce **Galerie** soubory přetáhněte do rámečku nebo klikněte na **vyberte z počítače**. Najednou jich může být víc. Stejně to jde i na **Přehledu** v ploše **Rychlé nahrání** pod naposledy nahranými médii.
 
 - Povolené jsou obrázky (JPG, PNG, GIF, WebP, BMP), videa (MP4, MOV, WebM, AVI, MKV) a PDF. Jeden soubor může mít až 1 GB.
 - Soubor se posílá po částech, takže velké video projde i na hostingu s malým limitem. Krátký výpadek spojení se třikrát zkusí znovu.

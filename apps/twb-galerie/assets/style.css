@@ -512,3 +512,20 @@ body.vybirani, body.vybirani * { user-select: none; cursor: crosshair; }
 /* 0.8.8: tlačítka v posledním sloupci tabulky (buňka zůstane buňkou, takže okraje řádků navazují) */
 .bunka-akce { white-space: nowrap; }
 .bunka-akce > .tlacitka { justify-content: flex-end; flex-wrap: nowrap; }
+
+/* 0.8.10: Přehled – kategorie a rychlé nahrání pod Naposledy nahrané; v liště Zobrazit web */
+.prehled-dole { display: grid; gap: 1.5rem; grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); align-items: start; margin-bottom: 1.5rem; }
+.prehled-dole > .karta { margin-bottom: 0; }
+@media (max-width: 991.98px) { .prehled-dole { grid-template-columns: minmax(0, 1fr); } }
+.karta-hlavicka { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; margin-bottom: .75rem; }
+.karta-hlavicka h2 { margin: 0; font-size: 1.05rem; }
+.karta-hlavicka a { font-size: .875rem; }
+.seznam-kategorii { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 13rem), 1fr)); gap: .4rem; }
+.seznam-kategorii a { display: flex; align-items: center; gap: .5rem; padding: .5rem .7rem; border: 1px solid var(--okraj); border-radius: var(--polomer); color: var(--text); text-decoration: none; }
+.seznam-kategorii a:hover, .seznam-kategorii a:focus-visible { border-color: var(--hlavni); background: var(--hlavni-svetla); }
+.seznam-kategorii .nazev { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; color: var(--nadpis); }
+.seznam-kategorii .pocet { font-variant-numeric: tabular-nums; color: var(--slaby); font-size: .875rem; }
+.prehled-nahrani .nahravani-plocha { padding: 1.5rem 1rem; }
+.radek-nahrani { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .75rem; margin-top: .75rem; }
+.radek-nahrani .pole { margin: 0; }
+@media (max-width: 575.98px) { .radek-nahrani { grid-template-columns: minmax(0, 1fr); } }

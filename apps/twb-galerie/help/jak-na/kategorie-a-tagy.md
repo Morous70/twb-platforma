@@ -18,6 +18,6 @@ Nad mřížkou je hledání a filtry podle druhu, kategorie a tagu. Kliknutím n
 
 Hledání prochází název, tagy, autora i poznámku a nehledí na velikost písmen ani diakritiku: „snezka mlha“ najde „Sněžka v mlze“ s tagem „mlha“. Víc slov znamená, že se musí najít všechna; frázi dejte do uvozovek („"černý les"“).
 
-Zaškrtněte soubory (nebo **Vybrat vše na stránce**), zvolte akci a klikněte na **Provést**: přesun do kategorie, přidání nebo odebrání tagu, archiv, smazání.
+Zaškrtněte soubory (nebo **Vybrat vše na stránce**), zvolte akci a klikněte na **Provést**: přesun do kategorie, přidání nebo odebrání tagu, označení jako doporučené (pro [Veřejný web](verejny-web)) nebo zrušení doporučení, archiv, smazání.
 
 **Výběr tažením myši**: stiskněte tlačítko myši v mřížce nebo v prázdném místě vedle ní a táhněte – vybere se vše, čeho se obdélník dotkne. Bez klávesy nahradí dosavadní výběr, s **Ctrl** (na Macu **Cmd**) nebo **Shift** přidá k výběru. U okraje okna se stránka sama posouvá, **Esc** tažení zruší. Obyčejné kliknutí dál otevře detail.

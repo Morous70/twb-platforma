@@ -61,6 +61,7 @@ final class Media
         $p = [];
         $vyrazy = Hledani::vyrazy((string)($f['q'] ?? ''));
         if (isset(self::DRUHY[$f['druh'] ?? ''])) { $kde[] = 'kind = ?'; $p[] = $f['druh']; }
+        if (!empty($f['doporucene'])) $kde[] = 'featured = 1';
         $o = (string)($f['orientace'] ?? '');
         if ($o !== '') $kde[] = 'width > 0 AND height > 0 AND ' . match ($o) {
             'na_sirku' => 'width * 100 > height * 102', 'na_vysku' => 'height * 100 > width * 102', default => 'width * 100 <= height * 102 AND height * 100 <= width * 102',
@@ -318,6 +319,14 @@ final class Media
         if ($kategorie !== null) $this->app->kategorie()->radek($kategorie);
         $n = 0;
         foreach ($ids as $id) $n += $this->app->db->q('UPDATE media SET category_id = ? WHERE id = ? AND category_id IS NOT ?', [$kategorie, (int)$id, $kategorie])->rowCount();
+        return $n;
+    }
+
+    /** Označí média jako doporučená (nebo doporučení zruší); vrátí počet změněných. Doporučená fotka se na webu ukáže, jen když je veřejná (Web::VEREJNA). @param list<int> $ids */
+    public function nastavDoporucene(array $ids, bool $doporucene): int
+    {
+        $n = 0;
+        foreach ($ids as $id) $n += $this->app->db->q('UPDATE media SET featured = ? WHERE id = ? AND featured <> ?', [(int)$doporucene, (int)$id, (int)$doporucene])->rowCount();
         return $n;
     }
 

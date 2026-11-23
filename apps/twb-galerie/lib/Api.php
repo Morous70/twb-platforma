@@ -174,6 +174,7 @@ final class Api
             'tagy_vse' => !in_array($get['tagy_rezim'] ?? 'vse', ['kterykoli', 'any'], true),
             'q_vse' => !in_array($get['q_rezim'] ?? 'vse', ['kterykoli', 'any'], true),
             'archiv' => !empty($get['archiv']) && $get['archiv'] !== '0',
+            'doporucene' => !empty($get['doporucene']) && $get['doporucene'] !== '0',
             'razeni' => $razeni,
             'seme' => (string)($get['seme'] ?? ''),
             'orientace' => (string)($get['orientace'] ?? ''),
@@ -284,6 +285,7 @@ final class Api
             'atribuce' => Media::uvedeni($r),
             'orientace' => Media::orientace($r),
             'archivovano' => $r['archived_at'] ? date('c', (int)strtotime((string)$r['archived_at'])) : null,
+            'doporucena' => !empty($r['featured']),
             'vytvoreno' => date('c', (int)strtotime((string)$r['created_at'])),
             'komprimovano' => !empty($r['orig_filename']) ? ['velikost' => (int)$r['orig_size'], 'sirka' => (int)$r['orig_w'], 'vyska' => (int)$r['orig_h']] : null,
             'verejny_odkaz' => $this->app->media()->verejnaAdresa($r),
@@ -370,11 +372,11 @@ final class Api
         return ['hotovo' => true, 'medium' => $this->medium($this->app->media()->radek($id)), 'poznamka_komprese' => $vysledek['poznamka']];
     }
 
-    /** Úprava údajů: nazev, poznamka, kategorie (id nebo null), tagy (pole nebo text s čárkami), archiv (bool), autor, licence, licence_url, licence_kod, licence_verze. Vše se ověří před zápisem. */
+    /** Úprava údajů: nazev, poznamka, kategorie (id nebo null), tagy (pole nebo text s čárkami), archiv (bool), doporucena (bool), autor, licence, licence_url, licence_kod, licence_verze. Vše se ověří před zápisem. */
     private function uprav(int $id, array $v): array
     {
         $r = $this->app->media()->radek($id);
-        $znama = ['nazev', 'poznamka', 'kategorie', 'tagy', 'archiv', 'autor', 'licence', 'licence_url', 'licence_kod', 'licence_verze'];
+        $znama = ['nazev', 'poznamka', 'kategorie', 'tagy', 'archiv', 'doporucena', 'autor', 'licence', 'licence_url', 'licence_kod', 'licence_verze'];
         if ($nezname = array_diff(array_keys($v), $znama)) throw new Chyba('Neznámé pole: ' . implode(', ', $nezname) . '. Povolená: ' . implode(', ', $znama) . '.');
         $nazev = array_key_exists('nazev', $v) ? Vstup::text($v, 'nazev', 'nazev', 200) : null;
         $pozn = array_key_exists('poznamka', $v) ? Vstup::text($v, 'poznamka', 'poznamka', 5000, false) : null;
@@ -401,6 +403,7 @@ final class Api
             if ($kategorie !== false) $this->app->media()->nastavKategorii([$id], $kategorie);
             if ($tagy !== null) $g->tagy()->nastav($id, $tagy);
             if (array_key_exists('archiv', $v)) $g->archivuj([$id], (bool)$v['archiv']);
+            if (array_key_exists('doporucena', $v)) $this->app->media()->nastavDoporucene([$id], (bool)$v['doporucena']);
         });
         return $this->medium($this->app->media()->radek($id));
     }

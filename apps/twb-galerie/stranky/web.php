@@ -22,6 +22,8 @@ $n = $web->nastaveni();
 $kategorie = $web->kategorie();
 $vsechny = $app->kategorie()->seznam();
 $uvod = $web->uvodni($kategorie);
+$doporucenych = $web->pocetDoporucenych();
+$rozsah = static fn(array $od_do): array => array_combine(range($od_do[0], $od_do[1]), array_map('strval', range($od_do[0], $od_do[1])));
 // po chybě ukázat odeslaný stav zaškrtávátek jen ve formuláři, který se odesílal (ostatní karty zůstanou podle uloženého nastavení)
 $castPole = ['reklama_zapnuto' => 'reklama', 'mereni_zapnuto' => 'mereni', 'cookies_souhlas' => 'gdpr', 'zasady_zapnuto' => 'gdpr'];
 $zaskrtnuto = static fn(string $nazev, bool $vychozi): bool => ($post && ($_POST['akce'] ?? '') === ($castPole[$nazev] ?? 'zaklad')) ? !empty($_POST[$nazev]) : $vychozi;
@@ -77,6 +79,19 @@ $adresaZasad = $app->url(Web::ZASADY);
   <?= Ui::pole('Podnadpis', 'vybrane_podnadpis', $n['vybrane_podnadpis'], ['maxlength' => 160]) ?>
   <?= Ui::pole('Počet karet na hlavní stránce', 'vybrane_pocet', (string)$n['vybrane_pocet'], ['type' => 'number', 'min' => 0, 'max' => 12],
       'Prvních N veřejných kategorií podle pořadí nastaveného u kategorie (0 = sekce se skryje). Všechny jsou na stránce Galerie.') ?>
+
+  <h2 style="margin:1rem 0 0">Doporučené fotografie</h2>
+  <p class="slabe" style="margin:0">Hlavní stránka ukáže pod vybranými galeriemi náhodný výběr z fotografií označených jako <strong>doporučená</strong>
+    (v detailu média nebo hromadnou akcí v <a href="<?= Ui::h(Ui::odkaz('galerie')) ?>">Galerii</a>). Při každém načtení stránky jiný. Ukážou se jen veřejné fotky
+    (veřejná kategorie, zapnutý veřejný odkaz, mimo archiv); bez nich se sekce skryje.</p>
+  <p class="karta-poznamka">Doporučených fotografií: <strong><?= $doporucenych['verejne'] ?></strong> na webu<?= $doporucenych['celkem'] > $doporucenych['verejne'] ? ' (dalších ' . ($doporucenych['celkem'] - $doporucenych['verejne']) . ' není veřejných)' : '' ?>
+    · <a href="<?= Ui::h(Ui::odkaz('galerie', ['doporucene' => 1])) ?>">zobrazit v Galerii</a></p>
+  <?= Ui::pole('Nadpis', 'doporucene_nadpis', $n['doporucene_nadpis'], ['required' => true, 'maxlength' => 80]) ?>
+  <?= Ui::pole('Podnadpis', 'doporucene_podnadpis', $n['doporucene_podnadpis'], ['maxlength' => 160]) ?>
+  <div class="radek">
+    <?= Ui::vyber('Sloupce', 'doporucene_sloupce', $rozsah(Web::SLOUPCE), (string)$n['doporucene_sloupce']) ?>
+    <?= Ui::vyber('Řádky', 'doporucene_radky', $rozsah(Web::RADKY), (string)$n['doporucene_radky'], [], 'Na webu najednou nejvýš sloupce × řádky fotek. Na mobilu se sloupce zúží (až na 2).') ?>
+  </div>
 
   <h2 style="margin:1rem 0 0">Stránka O galerii</h2>
   <?= Ui::oblast('Text', 'o_galerii', $n['o_galerii'], ['rows' => 10, 'maxlength' => 20000],

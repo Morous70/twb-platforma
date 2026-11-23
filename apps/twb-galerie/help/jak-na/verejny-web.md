@@ -4,7 +4,7 @@ sekce: jak-na
 admin: ne
 kontext: web
 souvisi: verejne-odkazy, kategorie-a-tagy
-klicova: web, hlavní stránka, veřejná galerie, reklama, banner, adsense, sklik, reklamní kód, ads.txt, měření návštěvnosti, matomo, gdpr, cookies, souhlas, zásady ochrany osobních údajů, o galerii, úvodní fotka
+klicova: web, hlavní stránka, veřejná galerie, reklama, banner, adsense, sklik, reklamní kód, ads.txt, měření návštěvnosti, matomo, gdpr, cookies, souhlas, zásady ochrany osobních údajů, o galerii, úvodní fotka, doporučené fotografie, doporučená, mřížka
 ---
 # Veřejný web
 
@@ -26,6 +26,16 @@ Nic se nezveřejní samo. Na webu je jen to, co výslovně povolíte:
   Když žádnou nezvolíte, použije se obálka první veřejné kategorie.
 - **Štítek, nadpis, podnadpis, text tlačítka a poznámka** se upravují tamtéž.
 - **Vybrané galerie** jsou karty prvních N veřejných kategorií (počet nastavíte, 0 = sekce se skryje). Každá karta má obálku a počet fotografií.
+- **Doporučené fotografie** – pod vybranými galeriemi náhodný výběr z fotek, které označíte jako **doporučené**, při každém načtení jiný.
+
+## Doporučené fotografie
+- **Označení**: v detailu obrázku tlačítko **☆ Označit jako doporučenou** (znovu kliknutím doporučení zrušíte), nebo v **Galerii** zaškrtněte
+  více fotek a zvolte hromadnou akci **Označit jako doporučené** / **Zrušit doporučení**. Doporučené mají v galerii štítek **★ Doporučená**
+  a najdete je filtrem **Jen doporučené**.
+- **Na webu** se ukážou jen doporučené fotky, které jsou veřejné (veřejná kategorie, zapnutý veřejný odkaz, mimo archiv). Když doporučená fotka
+  podmínky nesplňuje, detail média napíše proč. Bez veřejných doporučených fotek se sekce na webu skryje.
+- **Nastavení** v **Veřejný web → Základ a texty → Doporučené fotografie**: **Nadpis**, **Podnadpis** a mřížka – **Sloupce** (3–8)
+  a **Řádky** (1–5). Najednou se ukáže nejvýš sloupce × řádky fotek. Na menších obrazovkách se sloupce zúží (tablet 4, mobil 3 až 2).
 
 ## Kategorie na webu
 U kategorie v **Kategorie → Upravit** nastavíte:

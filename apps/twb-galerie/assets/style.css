@@ -295,6 +295,8 @@ body.okno-otevrene { overflow: hidden; }
 .stitky { display: flex; flex-wrap: wrap; gap: .25rem; }
 .stitek { display: inline-block; font-size: .75rem; padding: .05rem .45rem; border-radius: 1rem; background: var(--kod); color: var(--text); border: 1px solid var(--okraj); text-decoration: none; }
 .stitek-kategorie { background: var(--hlavni-svetla); color: var(--hlavni-tmava); border-color: transparent; }
+.stitek-doporucena { background: #fbeccb; color: #7a5200; border-color: transparent; }
+@media (prefers-color-scheme: dark) { .stitek-doporucena { background: #4a3a14; color: #f3d48a; } }
 .filtr { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; padding: .9rem 1rem; }
 .filtr input[type=search] { flex: 1 1 14rem; }
 .filtr select { flex: 0 1 auto; width: auto; }

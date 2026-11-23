@@ -88,6 +88,18 @@ h1, h2, h3 { font-weight: 700; line-height: 1.12; color: #1c1b18; margin: 0; let
 .foto { display: block; aspect-ratio: 4 / 3; overflow: hidden; border-radius: .3rem; background: var(--krem-tmavsi); }
 .foto img { width: 100%; height: 100%; object-fit: cover; transition: transform .35s, opacity .2s; }
 .foto:hover img { transform: scale(1.04); }
+/* doporučené fotografie (0.8.4): pevný počet sloupců z nastavení, na užších obrazovkách méně */
+.fotky.doporucene { grid-template-columns: repeat(var(--sloupce, 4), minmax(0, 1fr)); }
+.fotky.sloupce-3 { --sloupce: 3; }
+.fotky.sloupce-4 { --sloupce: 4; }
+.fotky.sloupce-5 { --sloupce: 5; }
+.fotky.sloupce-6 { --sloupce: 6; }
+.fotky.sloupce-7 { --sloupce: 7; }
+.fotky.sloupce-8 { --sloupce: 8; }
+@media (max-width: 1100px) { .fotky.sloupce-7, .fotky.sloupce-8 { --sloupce: 6; } }
+@media (max-width: 860px) { .fotky.doporucene:not(.sloupce-3) { --sloupce: 4; } }
+@media (max-width: 640px) { .fotky.doporucene.doporucene { --sloupce: 3; } }
+@media (max-width: 420px) { .fotky.doporucene.doporucene { --sloupce: 2; } }
 .strankovani { display: flex; flex-wrap: wrap; justify-content: center; gap: .35rem; margin: 1.6rem 0; }
 .strankovani a, .strankovani span { min-width: 2.4rem; padding: .35rem .6rem; text-align: center; border-radius: .3rem; border: 1px solid var(--okraj); text-decoration: none; background: var(--plocha); }
 .strankovani span { background: var(--zelena); color: #fff; border-color: var(--zelena); }

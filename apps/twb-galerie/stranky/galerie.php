@@ -15,6 +15,7 @@ $f = [
     'kategorie' => isset($_GET['kategorie']) && $_GET['kategorie'] !== '' && (isset($kategorie[(int)$_GET['kategorie']]) || (string)$_GET['kategorie'] === '0') ? (string)(int)$_GET['kategorie'] : '',
     'tag' => mb_substr(trim((string)($_GET['tag'] ?? '')), 0, 30),
     'archiv' => !empty($_GET['archiv']) ? '1' : '',
+    'doporucene' => !empty($_GET['doporucene']) ? '1' : '',
     'razeni' => isset(Media::RAZENI[$_GET['razeni'] ?? '']) ? (string)$_GET['razeni'] : 'nove',
     'strana' => max(1, (int)($_GET['strana'] ?? 1)),
 ];
@@ -43,6 +44,11 @@ if ($post) {
                 if ($tag === '') throw new Chyba('Zadejte tag.');
                 $n = $akce === 'tag-pridat' ? $galerie->tagy()->hromadne($ids, [$tag], []) : $galerie->tagy()->hromadne($ids, [], [$tag]);
                 $zprava = ($akce === 'tag-pridat' ? 'Tag přidán' : 'Tag odebrán') . " u {$n} médií.";
+                break;
+            case 'doporucit':
+            case 'nedoporucit':
+                $n = $media->nastavDoporucene($ids, $akce === 'doporucit');
+                $zprava = $akce === 'doporucit' ? "Označeno jako doporučené: {$n}." : "Doporučení zrušeno: {$n}.";
                 break;
             case 'archivovat':
             case 'vratit':
@@ -101,6 +107,7 @@ $titulek = $f['archiv'] ? 'Archiv' : 'Galerie';
     <?php foreach ($kategorie as $id => $n): ?><option value="<?= $id ?>"<?= $f['kategorie'] === (string)$id ? ' selected' : '' ?>><?= Ui::h($n) ?></option><?php endforeach; ?></select>
   <select name="tag" aria-label="Tag"><option value="">Všechny tagy</option>
     <?php foreach ($tagy as $t): ?><option value="<?= Ui::h($t['name']) ?>"<?= mb_strtolower($f['tag']) === mb_strtolower($t['name']) ? ' selected' : '' ?>><?= Ui::h($t['name']) ?> (<?= (int)$t['count'] ?>)</option><?php endforeach; ?></select>
+  <label class="zaskrtavatko mala" title="Jen fotografie označené jako doporučená (veřejný web z nich ukazuje náhodný výběr)"><input type="checkbox" name="doporucene" value="1"<?= $f['doporucene'] ? ' checked' : '' ?>> <span>Jen doporučené</span></label>
   <select name="razeni" aria-label="Řazení">
     <?php foreach (Media::RAZENI as $k => $t): ?><option value="<?= $k ?>"<?= $f['razeni'] === $k ? ' selected' : '' ?>><?= Ui::h($t) ?></option><?php endforeach; ?></select>
   <button type="submit">Filtrovat</button>
@@ -108,7 +115,7 @@ $titulek = $f['archiv'] ? 'Archiv' : 'Galerie';
 </form>
 
 <?php if (!$vysledek['polozky']): ?>
-  <div class="prazdne"><?= $f['q'] !== '' || $f['druh'] !== '' || $f['kategorie'] !== '' || $f['tag'] !== '' ? 'Filtru nic neodpovídá.' : ($f['archiv'] ? 'Archiv je prázdný.' : 'Galerie je prázdná. Nahrajte první soubory.') ?></div>
+  <div class="prazdne"><?= $f['q'] !== '' || $f['druh'] !== '' || $f['kategorie'] !== '' || $f['tag'] !== '' || $f['doporucene'] !== '' ? 'Filtru nic neodpovídá.' : ($f['archiv'] ? 'Archiv je prázdný.' : 'Galerie je prázdná. Nahrajte první soubory.') ?></div>
 <?php else: ?>
 <form method="post" id="hromadne" action="<?= Ui::h($zpet) ?>">
   <?= $ui->csrf() ?>
@@ -120,6 +127,8 @@ $titulek = $f['archiv'] ? 'Archiv' : 'Galerie';
       <option value="kategorie">Přesunout do kategorie</option>
       <option value="tag-pridat">Přidat tag</option>
       <option value="tag-odebrat">Odebrat tag</option>
+      <option value="doporucit">Označit jako doporučené</option>
+      <option value="nedoporucit">Zrušit doporučení</option>
       <?php if ($f['archiv']): ?><option value="vratit">Vrátit z archivu</option><?php else: ?><option value="archivovat">Přesunout do archivu</option><?php endif; ?>
       <option value="komprimovat">Komprimovat obrázky</option>
       <option value="smazat">Smazat</option>
@@ -157,6 +166,7 @@ $titulek = $f['archiv'] ? 'Archiv' : 'Galerie';
       <figcaption>
         <a href="<?= Ui::h(Ui::odkaz('medium', ['id' => $id])) ?>"><strong><?= Ui::h($m['original_name']) ?></strong></a>
         <span class="slabe"><?= Ui::h(Media::popis($m)) ?><span class="jen-seznam"> · <?= Ui::h(Media::DRUH_JEDNOTNE[$m['kind']] ?? $m['kind']) ?> · <?= Ui::h(date('j. n. Y', (int)strtotime((string)$m['created_at']))) ?></span></span>
+        <?php if ($m['featured']): ?><span><a class="stitek stitek-doporucena" href="<?= $odkazFiltru(['doporucene' => '1', 'strana' => 1]) ?>" title="Doporučená fotografie pro veřejný web">★ Doporučená</a></span><?php endif; ?>
         <?php if ($m['category_id'] && isset($nazvyKategorii[(int)$m['category_id']])): ?>
           <span><a class="stitek stitek-kategorie" href="<?= $odkazFiltru(['kategorie' => (string)$m['category_id'], 'strana' => 1]) ?>"><?= Ui::h($nazvyKategorii[(int)$m['category_id']]) ?></a></span>
         <?php endif; ?>

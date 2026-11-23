@@ -3,6 +3,7 @@ declare(strict_types=1);
 // Veřejný web galerie (0.8.0): ?s=domu (hlavní stránka), ?s=galerie (veřejné kategorie), ?s=galerie&k=<id-nazev> (fotky kategorie), ?s=o-galerii.
 // Kořen domény ho otevře přes DirectoryIndex v .htaccess; index.php s parametrem s= (bez p=) sem předá také. Administrace zůstává na index.php.
 // Ukazuje jen veřejné kategorie a v nich obrázky s veřejným odkazem mimo archiv (viz MediaGalerie\Web).
+// 0.8.4: hlavní stránka ukazuje náhodný výběr doporučených fotografií (Web::doporucene) v mřížce sloupce × řádky.
 // 0.8.3: reklamní pozice s kódem z reklamního systému, měřicí kód, cookie lišta se souhlasem (bez souhlasu je kód jen neživý <template>),
 // stránka ?s=zasady-ochrany-osobnich-udaju a ads.txt (?s=ads.txt; /ads.txt a /zasady-ochrany-osobnich-udaju přes .htaccess).
 use MediaGalerie\{App, Web, Media};
@@ -77,8 +78,8 @@ $karty = static function (array $seznam) use ($web, $h, $ikona, $fotografii, $od
     return $out . '</div>';
 };
 /** Mřížka fotek s oknem náhledu (assets/verejne.js); bez JS odkaz vede na velký obrázek. */
-$mrizka = static function (array $fotky, bool $sKategorii = false) use ($web, $h): string {
-    $out = '<div class="fotky" data-fotky>';
+$mrizka = static function (array $fotky, bool $sKategorii = false, string $trida = '') use ($web, $h): string {
+    $out = '<div class="fotky' . ($trida !== '' ? ' ' . $trida : '') . '" data-fotky>';
     foreach ($fotky as $m) {
         $uv = Media::uvedeni($m)['text'];
         $popis = implode(' · ', array_filter([$sKategorii ? (string)($m['kategorie_nazev'] ?? '') : '', $uv]));
@@ -113,7 +114,13 @@ switch ($stranka) {
         } elseif (!$kategorie) {
             $obsah .= '<p class="prazdne">Galerie se připravuje. Nové fotografie brzy přibudou.</p>';
         }
-        $obsah .= $reklama('pod_galeriemi') . $reklama('pred_patickou') . '</div>';
+        $obsah .= $reklama('pod_galeriemi');
+        if ($doporucene = $web->doporucene()) {
+            // 0.8.4: náhodný výběr z doporučených; mřížka sloupce × řádky (třídy v assets/verejne.css, CSP nepovoluje style="")
+            $obsah .= '<section class="sekce sekce-doporucene">' . $nadpisSekce($n['doporucene_nadpis'], $n['doporucene_podnadpis'])
+                . $mrizka($doporucene, true, 'doporucene sloupce-' . (int)$n['doporucene_sloupce']) . '</section>';
+        }
+        $obsah .= $reklama('pred_patickou') . '</div>';
         break;
 
     case 'galerie':

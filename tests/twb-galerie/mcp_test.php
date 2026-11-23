@@ -178,6 +178,9 @@ test('hledej_media, detail_media (id i odkaz), uprav_medium, seznamy', function 
     $u = nastroj($s, $zapis, 'uprav_medium', ['id' => $id, 'nazev' => 'Les v mlze.png', 'tagy' => ['mlha'], 'kategorie' => null, 'autor' => null])['medium'];
     eq(['Les v mlze.png', ['mlha'], null, null, 'Vygenerováno AI'], [$u['nazev'], $u['tagy'], $u['kategorie'], $u['autor'], $u['licence']]);
     ok(str_contains(nastroj($s, $zapis, 'uprav_medium', ['id' => $id, 'barva' => 'x'])['_chyba'], 'Neznámé pole'));
+    eq(true, nastroj($s, $zapis, 'uprav_medium', ['id' => $id, 'doporucena' => true])['medium']['doporucena'], '0.8.4: doporučená');
+    eq([$id], array_column(nastroj($s, $cteni, 'hledej_media', ['doporucene' => true])['media'], 'id'));
+    nastroj($s, $zapis, 'uprav_medium', ['id' => $id, 'doporucena' => false]);
     ok(str_contains(nastroj($s, $zapis, 'uprav_medium', ['id' => $id])['_chyba'], 'aspoň jedno pole'));
     eq('AI obrázky', nastroj($s, $cteni, 'seznam_kategorii')['kategorie'][0]['nazev']);
     ok(in_array('ai', array_column(nastroj($s, $cteni, 'seznam_licenci')['licence'], 'kod'), true));

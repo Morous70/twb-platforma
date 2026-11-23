@@ -9,11 +9,11 @@ $velikost = $s['velikost'];
 $posledni = $app->media()->seznam(['razeni' => 'nove'], 8)['polozky'];
 $n = $app->nastaveni();
 $upozorneni = [];
-if ($app->emailObnovy() === '') $upozorneni[] = ['Není nastavený e-mail pro obnovu hesla.', Ui::odkaz('nastaveni') . '#zabezpeceni'];
-if ((string)$n->dej('backup_password', '') === '') $upozorneni[] = ['Zálohy nejsou nastavené – zadejte heslo záloh.', Ui::odkaz('nastaveni') . '#zalohy'];
+if ($app->emailObnovy() === '') $upozorneni[] = ['Není nastavený e-mail pro obnovu hesla.', Ui::odkaz('nastaveni', ['karta' => 'zabezpeceni']) . '#zabezpeceni'];
+if ((string)$n->dej('backup_password', '') === '') $upozorneni[] = ['Zálohy nejsou nastavené – zadejte heslo záloh.', Ui::odkaz('nastaveni', ['karta' => 'zalohy']) . '#zalohy'];
 $cron = (int)$n->dej('cron_last_run', 0);
-if ($cron < time() - 2 * 86400) $upozorneni[] = [$cron ? 'Cron neběží od ' . Ui::datum($cron) . '.' : 'Cron zatím nikdy neběžel (denní záloha, kontrola aktualizací).', Ui::odkaz('nastaveni') . '#system'];
-if ($dalsi = $app->aktualizace()->stav()['available'] ?? null) $upozorneni[] = ['Je k dispozici nová verze ' . $dalsi['version'] . '.', Ui::odkaz('nastaveni') . '#aktualizace'];
+if ($cron < time() - 2 * 86400) $upozorneni[] = [$cron ? 'Cron neběží od ' . Ui::datum($cron) . '.' : 'Cron zatím nikdy neběžel (denní záloha, kontrola aktualizací).', Ui::odkaz('nastaveni', ['karta' => 'system']) . '#system'];
+if ($dalsi = $app->aktualizace()->stav()['available'] ?? null) $upozorneni[] = ['Je k dispozici nová verze ' . $dalsi['version'] . '.', Ui::odkaz('nastaveni', ['karta' => 'aktualizace']) . '#aktualizace'];
 ?>
 <div class="mrizka">
   <?= Ui::dlazdice('Obrázky', Ui::cislo($s['image']), 'obrazky') ?>

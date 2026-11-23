@@ -128,7 +128,7 @@ test('web 0.8.3: reklama jen jako kód pro pozice, měření, převod nastavení
     $web->uloz('reklama', ['reklama_zapnuto' => '1', 'reklama_pod_uvodem' => "  $adsense \n", 'reklama_pred_patickou' => '<b>x</b>', 'ads_txt' => "google.com, pub-1, DIRECT\r\n"]);
     $n = $web->nastaveni();
     eq([str_replace("\r\n", "\n", $adsense), '<b>x</b>', 'google.com, pub-1, DIRECT'], [$n['reklama']['pod_uvodem'], $n['reklama']['pred_patickou'], $n['ads_txt']]);
-    eq(['pod_uvodem', 'pred_patickou'], array_keys($n['reklama']), '0.8.8: jen dvě pozice');
+    eq(['pod_uvodem', 'pod_galeriemi', 'pred_patickou'], array_keys($n['reklama']), '0.8.9: zase tři pozice');
     ok(Web::maReklamu($n));
     eq('', Web::reklamaKod(['reklama_zapnuto' => false] + $n, 'pod_uvodem'), 'vypnutá reklama');
     eq(['reklama' => 'Reklama'], Web::kategorieSouhlasu($n));
@@ -151,29 +151,84 @@ test('web 0.8.3: reklama jen jako kód pro pozice, měření, převod nastavení
     ok(!isset($n['banner1']) && !isset($n['kod_hlavicka']));
 });
 
-test('web 0.8.8: zrušená pozice Pod galeriemi – kód se přesune Před patičku, obsazenou pozici nepřepíše (uschová se)', function () {
+test('web 0.8.9: pozice Před fotografiemi zpět – kód uschovaný verzí 0.8.8 se vrátí, starší nastavení beze změny', function () {
     $app = novaApp();
     $web = $app->web();
-    $uloz = fn(array $r) => $app->nastaveni()->uloz('web', json_encode(['reklama_zapnuto' => true, 'reklama' => $r]));
-    $uloz(['pod_uvodem' => '<i>U</i>', 'pod_galeriemi' => '<i>G</i>', 'pred_patickou' => '']);
-    $n = $web->nastaveni();
-    eq(['<i>U</i>', '<i>G</i>', ''], [$n['reklama']['pod_uvodem'], $n['reklama']['pred_patickou'], $n['reklama_odlozena']]);
-    $uloz(['pod_uvodem' => '', 'pod_galeriemi' => '<i>G</i>', 'pred_patickou' => '<i>P</i>']);
-    $n = $web->nastaveni();
-    eq(['<i>P</i>', '<i>G</i>'], [$n['reklama']['pred_patickou'], $n['reklama_odlozena']], 'obsazená pozice zůstane, kód se uschová');
-    eq('', Web::reklamaKod($n, 'pod_galeriemi'), 'zrušená pozice se nevypíše');
-    // uložení kterékoli části převod zapíše; uschovaný kód přežije uložení reklamy, zahodí se jen na požádání
-    $web->uloz('reklama', ['reklama_zapnuto' => '1', 'reklama_pred_patickou' => '<i>P</i>']);
+    $uloz = fn(array $n) => $app->nastaveni()->uloz('web', json_encode(['reklama_zapnuto' => true] + $n));
+    // nastavení z 0.8.7 a starších (pozice pod_galeriemi uložená) zůstane, jak bylo
+    $uloz(['reklama' => ['pod_uvodem' => '<i>U</i>', 'pod_galeriemi' => '<i>G</i>', 'pred_patickou' => '<i>P</i>']]);
+    eq(['pod_uvodem' => '<i>U</i>', 'pod_galeriemi' => '<i>G</i>', 'pred_patickou' => '<i>P</i>'], $web->nastaveni()['reklama']);
+    // 0.8.8 kód uschovala do reklama_odlozena → vrátí se; prvním uložením se zapíše a uschovaný klíč zmizí
+    $uloz(['reklama' => ['pod_uvodem' => '', 'pred_patickou' => '<i>P</i>'], 'reklama_odlozena' => '<i>G</i>']);
+    eq('<i>G</i>', $web->nastaveni()['reklama']['pod_galeriemi']);
+    $web->uloz('mereni', ['mereni_umisteni' => 'konec']);
     $ulozene = json_decode((string)$app->nastaveni()->dej('web', ''), true);
-    ok(!isset($ulozene['reklama']['pod_galeriemi']), 'zrušená pozice zmizí z uloženého nastavení');
-    eq('<i>G</i>', $web->nastaveni()['reklama_odlozena']);
-    $web->uloz('reklama', ['reklama_zapnuto' => '1', 'reklama_pred_patickou' => '<i>P</i>', 'zahodit_odlozenou' => '1']);
-    eq('', $web->nastaveni()['reklama_odlozena']);
-    // stejný kód v obou pozicích se neuschovává; nastavení z 0.8.0–0.8.2 (banner2) jde rovnou Před patičku
-    $uloz(['pod_galeriemi' => '<i>P</i>', 'pred_patickou' => '<i>P</i>']);
-    eq('', $web->nastaveni()['reklama_odlozena']);
+    eq('<i>G</i>', $ulozene['reklama']['pod_galeriemi']);
+    ok(!isset($ulozene['reklama_odlozena']));
+    // vyplněnou pozici uschovaný kód nepřepíše; banner2 z 0.8.0–0.8.2 jde do Před fotografiemi
+    $uloz(['reklama' => ['pod_galeriemi' => '<i>nový</i>'], 'reklama_odlozena' => '<i>G</i>']);
+    eq('<i>nový</i>', $web->nastaveni()['reklama']['pod_galeriemi']);
     $app->nastaveni()->uloz('web', json_encode(['banner2' => ['zobrazit' => true, 'typ' => 'kod', 'kod' => '<i>B</i>']]));
-    eq('<i>B</i>', $web->nastaveni()['reklama']['pred_patickou']);
+    eq(['', '<i>B</i>', ''], array_values($web->nastaveni()['reklama']));
+});
+
+test('web 0.8.9 na serveru: reklama hlavní stránka 3 pozice (před doporučenými), Galerie 3 (před nejnovějšími), kategorie 2; O galerii plná šířka', function () {
+    $s = new TestServer();
+    register_shutdown_function(fn() => $s->zastav());
+    $b = new Prohlizec($s);
+    $b->jdi('install.php');
+    $b->jdi('install.php', ['heslo' => 'tajneheslo1', 'heslo2' => 'tajneheslo1']);
+    $app = new App(KOREN . '/apps/twb-galerie', ['data_dir' => $s->data . '/data', 'base_url' => $s->url]);
+    [, $ver, , $ids] = webData($app);
+    $app->media()->nastavDoporucene([$ids['ok']], true);
+    $app->nastaveni()->uloz('web', json_encode(['cookies_souhlas' => false, 'reklama_zapnuto' => true,
+        'reklama' => ['pod_uvodem' => '<i id="r-u"></i>', 'pod_galeriemi' => '<i id="r-g"></i>', 'pred_patickou' => '<i id="r-p"></i>']]));
+    $anon = new Prohlizec($s);
+    $poradi = function (string $html, array $znacky): array {
+        $poz = [];
+        foreach ($znacky as $z) { $i = strpos($html, $z); $poz[$z] = $i === false ? -1 : $i; }
+        return $poz;
+    };
+    $p = $poradi($anon->jdi('verejne.php')['body'], ['class="hero', 'id="r-u"', 'class="sekce"', 'id="r-g"', 'sekce-doporucene', 'id="r-p"', '<footer']);
+    ok(min($p) >= 0, json_encode($p));
+    $hodnoty = array_values($p);
+    $serazene = $hodnoty; sort($serazene);
+    eq($serazene, $hodnoty, 'hlavní stránka: úvod, reklama, vybrané galerie, reklama, doporučené, reklama, patička');
+    $p = $poradi($anon->jdi('verejne.php?s=galerie')['body'], ['<h1', 'id="r-u"', 'class="karty"', 'id="r-g"', 'Nejnovější fotografie', 'id="r-p"', '<footer']);
+    ok(min($p) >= 0, json_encode($p));
+    $hodnoty = array_values($p); $serazene = $hodnoty; sort($serazene);
+    eq($serazene, $hodnoty, 'Galerie: nadpis, reklama, galerie, reklama, nejnovější, reklama');
+    $r = $anon->jdi('verejne.php?s=galerie&k=' . $ver)['body'];
+    ok(str_contains($r, 'id="r-u"') && str_contains($r, 'id="r-p"') && !str_contains($r, 'id="r-g"'), 'galerie kategorie jen Pod úvodem a Před patičkou');
+    $r = $anon->jdi('verejne.php?s=o-galerii')['body'];
+    ok(str_contains($r, '<div class="obsah"><header class="sekce-nadpis"><h1>O galerii') && !str_contains($r, 'obsah uzky'), 'O galerii plná šířka');
+    $r = $b->jdi('index.php?p=web&karta=reklama');
+    ok(str_contains($r['body'], 'name="reklama_pod_galeriemi"') && str_contains($r['body'], 'Před fotografiemi'));
+});
+
+test('0.8.9: přihlášení do administrace ve vzhledu webu – záhlaví, úvodní fotka, patička; vypnutý web bez menu', function () {
+    $s = new TestServer();
+    register_shutdown_function(fn() => $s->zastav());
+    $b = new Prohlizec($s);
+    $b->jdi('install.php');
+    $b->jdi('install.php', ['heslo' => 'tajneheslo1', 'heslo2' => 'tajneheslo1']);
+    $app = new App(KOREN . '/apps/twb-galerie', ['data_dir' => $s->data . '/data', 'base_url' => $s->url]);
+    webData($app);
+    $app->nastaveni()->uloz('web', json_encode(['nazev' => 'Moje Galerie', 'patka' => '© Moje']));
+    $b->jdi('index.php?p=odhlasit', []);
+    $r = $b->jdi('index.php');
+    foreach (['assets/verejne.css', 'class="hlavicka"', 'Moje Galerie', 'href="?s=galerie"', 'class="prihlaseni"', 'class="prihlaseni-fotka" src="', '/soubor.php/',
+        'class="prihlaseni-karta"', 'name="heslo"', '<footer class="paticka">', '© Moje', 'index.php?zapomenute'] as $t) ok(str_contains($r['body'], $t), $t);
+    ok(!str_contains($r['body'], 'assets/style.css') && !str_contains($r['body'], 'Přihlášení do administrace</span>'), 'bez stylu administrace a bez tlačítka na sebe');
+    $r = $b->jdi('index.php', ['akce' => 'prihlasit', 'heslo' => 'spatne']);
+    eq(401, $r['code']);
+    ok(str_contains($r['body'], 'class="hlaska hlaska-chyba">Nesprávné heslo.'));
+    ok(str_contains($b->jdi('index.php?zapomenute')['body'], 'class="prihlaseni-karta"'), 'zapomenuté heslo ve stejném vzhledu');
+    $app->nastaveni()->uloz('web', json_encode(['zapnuto' => false]));
+    $r = $b->jdi('index.php');
+    ok(!str_contains($r['body'], 'href="?s=galerie"') && !str_contains($r['body'], 'prihlaseni-fotka'), 'vypnutý web: jen logo, bez fotky');
+    $r = $b->odesli('index.php', ['akce' => 'prihlasit', 'heslo' => 'tajneheslo1']);
+    ok(str_contains($r['body'], 'assets/style.css') && str_contains($r['body'], 'Naposledy nahrané'), 'po přihlášení administrace');
 });
 
 test('web 0.8.3: GDPR – kontrola údajů, vzorový text zásad podle nastavení, vlastní text', function () {

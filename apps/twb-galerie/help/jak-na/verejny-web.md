@@ -52,10 +52,10 @@ Stránka **Veřejný web** má karty **Základ a texty** (rozdělená do skupin 
 Vypínač **Zobrazovat reklamu na veřejných stránkách** a pro každou pozici jedno pole pro **kód z reklamního systému** (AdSense, Sklik,
 Revive, Etarget…), včetně `<script>`. Kód se vypíše přesně tak, jak ho vložíte – vkládejte jen kód, kterému věříte. Prázdná pozice se nezobrazí.
 - **Pod úvodem** – hlavní stránka pod úvodní fotkou, stránka Galerie a galerie kategorie pod nadpisem (banner na šířku, např. 970×250 nebo 728×90).
+- **Před fotografiemi** – na hlavní stránce před doporučenými fotografiemi, na stránce Galerie před nejnovějšími fotografiemi. V galerii jedné kategorie se nezobrazuje (banner na šířku nebo obdélník 300×250).
 - **Před patičkou** – úplně dole na hlavní stránce, v galeriích i na stránce O galerii.
 
-Pozice **Pod galeriemi** od verze 0.8.8 není. Pokud jste do ní měli kód, přesunul se do **Před patičkou**; když tam už jiný kód byl,
-karta Reklama ho ukáže jako *uschovaný kód* (na webu se nezobrazuje) – zkopírujte ho do některé pozice, nebo ho zaškrtnutím zahoďte.
+
 
 **ads.txt** web vydá na adrese `/ads.txt` (řádky dá reklamní systém, AdSense: *Weby → ads.txt*). Prázdné pole = soubor neexistuje.
 

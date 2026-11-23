@@ -249,6 +249,35 @@ final class Ui
     }
 
     /** Jednoduchá stránka bez menu (přihlášení, instalace). */
+    /**
+     * Přihlášení do administrace (0.8.9) ve vzhledu veřejného webu: stejné záhlaví a patička jako hlavní stránka (assets/verejne.css),
+     * úvodní fotka webu jako pozadí a formulář v kartě uprostřed. Vypnutý web: jen logo bez menu. Měřicí ani reklamní kód se sem nevkládá.
+     */
+    public function prihlasovaci(string $titulek, string $obsah, string $podnadpis = ''): void
+    {
+        header('Content-Type: text/html; charset=utf-8');
+        header('Cache-Control: no-store');
+        header('X-Frame-Options: DENY');
+        $web = $this->app->web();
+        $n = $web->nastaveni();
+        $uvod = $n['zapnuto'] ? $web->uvodni() : null;
+        $foto = $uvod ? $web->obrazek($uvod, Web::PX_VELKY) : '';
+        $v = self::h($this->app->verze);
+        echo "<!doctype html>\n<html lang=\"cs\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">"
+            . '<meta name="robots" content="noindex, nofollow"><title>' . self::h($titulek) . ' – ' . self::h($n['nazev']) . '</title>'
+            . "<link rel=\"stylesheet\" href=\"assets/verejne.css?v=$v\"><link rel=\"icon\" href=\"assets/ikona.svg\" type=\"image/svg+xml\">"
+            . "<script src=\"assets/verejne.js?v=$v\" defer></script><script src=\"assets/app.js?v=$v\" defer></script></head><body class=\"stranka-prihlaseni\">"
+            . VerejneRozvrzeni::zahlavi($n, '', (bool)$n['zapnuto'], false)
+            . '<main class="prihlaseni' . ($foto === '' ? ' prihlaseni-bez-fotky' : '') . '">'
+            . ($foto !== '' ? '<img class="prihlaseni-fotka" src="' . self::h($foto) . '" alt="">' : '')
+            . '<section class="prihlaseni-karta" aria-labelledby="prihlaseni-nadpis">'
+            . '<p class="nadtitulek">Administrace</p><h1 id="prihlaseni-nadpis">' . self::h($titulek) . '</h1>'
+            . ($podnadpis !== '' ? '<p class="prihlaseni-pod">' . self::h($podnadpis) . '</p>' : '')
+            . $this->hlasky() . $obsah . '</section></main>'
+            . VerejneRozvrzeni::paticka($n, $n['zasady_zapnuto'] ? '?s=' . Web::ZASADY : '', false, false)
+            . '</body></html>';
+    }
+
     public function samostatna(string $titulek, string $obsah): void
     {
         header('Content-Type: text/html; charset=utf-8');

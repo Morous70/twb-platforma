@@ -6,7 +6,7 @@ declare(strict_types=1);
 // 0.8.4: hlavní stránka ukazuje náhodný výběr doporučených fotografií (Web::doporucene) v mřížce sloupce × řádky.
 // 0.8.3: reklamní pozice s kódem z reklamního systému, měřicí kód, cookie lišta se souhlasem (bez souhlasu je kód jen neživý <template>),
 // stránka ?s=zasady-ochrany-osobnich-udaju a ads.txt (?s=ads.txt; /ads.txt a /zasady-ochrany-osobnich-udaju přes .htaccess).
-use MediaGalerie\{App, Web, Media};
+use MediaGalerie\{App, Web, Media, VerejneRozvrzeni};
 use TWB\Napoveda\Markdown;
 
 /** @var App $app */
@@ -20,20 +20,7 @@ $stranka = (string)($_GET['s'] ?? 'domu');
 if (!$n['zapnuto'] && !in_array($stranka, [Web::ZASADY, 'ads.txt'], true)) { header('Location: index.php', true, 302); exit; }
 
 $h = static fn(mixed $s): string => htmlspecialchars((string)$s, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
-/** Ikony ve stylu Feather Icons (MIT, viz assets/LICENCE.txt). */
-$ikona = static function (string $nazev, int $v = 20): string {
-    $obsah = [
-        'logo' => '<circle cx="12" cy="12" r="10"/><line x1="14.31" y1="8" x2="20.05" y2="17.94"/><line x1="9.69" y1="8" x2="21.17" y2="8"/><line x1="7.38" y1="12" x2="13.12" y2="2.06"/><line x1="9.69" y1="16" x2="3.95" y2="6.06"/><line x1="14.31" y1="16" x2="2.83" y2="16"/><line x1="16.62" y1="12" x2="10.88" y2="21.94"/>',
-        'prihlasit' => '<path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/>',
-        'obrazek' => '<rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/>',
-        'foto' => '<path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/>',
-        'dalsi' => '<polyline points="9 18 15 12 9 6"/>',
-        'zpet' => '<polyline points="15 18 9 12 15 6"/>',
-        'zavrit' => '<line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>',
-        'menu' => '<line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>',
-    ][$nazev] ?? '';
-    return '<svg class="ik" width="' . $v . '" height="' . $v . '" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">' . $obsah . '</svg>';
-};
+$ikona = static fn(string $nazev, int $v = 20): string => VerejneRozvrzeni::ikona($nazev, $v);
 $fotografii = static function (int $n): string {
     return $n . "\u{00A0}" . ($n === 1 ? 'fotografie' : ($n >= 2 && $n <= 4 ? 'fotografie' : 'fotografií'));
 };
@@ -117,6 +104,8 @@ switch ($stranka) {
         } elseif (!$kategorie) {
             $obsah .= '<p class="prazdne">Galerie se připravuje. Nové fotografie brzy přibudou.</p>';
         }
+        // 0.8.9: reklama Před fotografiemi – nad doporučenými fotografiemi (bez nich na stejném místě před patičkou)
+        $obsah .= $reklama('pod_galeriemi');
         if ($doporucene = $web->doporucene()) {
             // 0.8.4: náhodný výběr z doporučených; mřížka sloupce × řádky (třídy v assets/verejne.css, CSP nepovoluje style="")
             $obsah .= '<section class="sekce sekce-doporucene">' . $nadpisSekce($n['doporucene_nadpis'], $n['doporucene_podnadpis'])
@@ -149,6 +138,7 @@ switch ($stranka) {
         $titulek = 'Galerie';
         $obsah .= '<div class="obsah">' . $nadpisSekce('Galerie', $kategorie ? 'Všechny veřejné galerie.' : '', 'h1') . $reklama('pod_uvodem');
         $obsah .= $kategorie ? $karty($kategorie) : '<p class="prazdne">Galerie se připravuje. Nové fotografie brzy přibudou.</p>';
+        $obsah .= $reklama('pod_galeriemi');   // 0.8.9: před nejnovějšími fotografiemi
         if ($nove = $web->nejnovejsi(12)) $obsah .= '<section class="sekce">' . $nadpisSekce('Nejnovější fotografie') . $mrizka($nove, true) . '</section>';
         $obsah .= $reklama('pred_patickou') . '</div>';
         break;
@@ -156,7 +146,7 @@ switch ($stranka) {
     case 'o-galerii':
         $titulek = 'O galerii';
         $text = trim((string)$n['o_galerii']);
-        $obsah .= '<div class="obsah uzky">' . $nadpisSekce('O galerii', '', 'h1')
+        $obsah .= '<div class="obsah">' . $nadpisSekce('O galerii', '', 'h1')   // 0.8.9: stejná šířka jako ostatní stránky
             . '<div class="text">' . ($text !== '' ? (new Markdown(fn(string $id) => '?s=' . rawurlencode($id)))->html($text) : '') . '</div>'
             . $reklama('pred_patickou') . '</div>';
         break;
@@ -212,10 +202,6 @@ header('X-Frame-Options: SAMEORIGIN');
 header('Content-Security-Policy: ' . Web::csp($kodNaStrance));
 if ($n['skryt_vyhledavacum']) header('X-Robots-Tag: noindex, nofollow');
 $v = $h($app->verze);
-$menu = ['domu' => ['./', 'Domů'], 'galerie' => ['?s=galerie', 'Galerie'], 'o-galerii' => ['?s=o-galerii', 'O galerii']];
-$nav = '';
-foreach ($menu as $k => [$href, $text]) $nav .= '<a href="' . $h($href) . '"' . ($aktivni === $k ? ' class="aktivni" aria-current="page"' : '') . '>' . $h($text) . '</a>';
-$admin = $n['odkaz_administrace'];
 $popisStranky = $n['podnadpis'] !== '' ? $n['podnadpis'] : $n['nadpis'];
 ?>
 <!doctype html>
@@ -233,28 +219,11 @@ $popisStranky = $n['podnadpis'] !== '' ? $n['podnadpis'] : $n['nadpis'];
 <?= $mereniHlavicka ?>
 </head>
 <body>
-<header class="hlavicka">
-  <div class="hlavicka-obal">
-    <a class="logo" href="./"><span class="logo-znak"><?= $ikona('logo', 34) ?></span><span class="logo-nazev"><?= $h($n['nazev']) ?></span></a>
-    <button type="button" class="menu-tlacitko" aria-label="Menu" aria-expanded="false" aria-controls="hlavni-menu" data-menu><?= $ikona('menu', 24) ?></button>
-    <nav id="hlavni-menu" class="menu" aria-label="Hlavní menu"><?= $nav ?>
-      <?php if ($admin): ?><a class="tlacitko admin" href="index.php?p=prehled"><?= $ikona('prihlasit', 18) ?><span>Přihlášení do administrace</span></a><?php endif; ?>
-    </nav>
-  </div>
-</header>
+<?= VerejneRozvrzeni::zahlavi($n, $aktivni, true, (bool)$n['odkaz_administrace']) ?>
 <main>
 <?= $obsah ?>
 </main>
-<footer class="paticka">
-  <div class="paticka-obal">
-    <span><?= $h($n['patka']) ?></span>
-    <span class="paticka-odkazy">
-      <?php if ($zasadyOdkaz !== ''): ?><a href="<?= $h($zasadyOdkaz) ?>">Zásady ochrany osobních údajů</a><?php endif; ?>
-      <?php if ($souhlas): ?><button type="button" class="odkaz" data-cookies-nastaveni>Nastavení cookies</button><?php endif; ?>
-      <?php if ($admin): ?><a href="index.php?p=prehled"><?= $ikona('prihlasit', 16) ?><span>Přihlášení do administrace</span></a><?php endif; ?>
-    </span>
-  </div>
-</footer>
+<?= VerejneRozvrzeni::paticka($n, $zasadyOdkaz, (bool)$souhlas, (bool)$n['odkaz_administrace']) ?>
 <?= $lista ?>
 <?= $mereniKonec ?>
 </body>

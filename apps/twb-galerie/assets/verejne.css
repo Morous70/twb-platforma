@@ -190,3 +190,35 @@ button.odkaz { font: inherit; color: #1c1b18; background: none; border: 0; paddi
   .logo-nazev { border-left: 0; padding-left: 0; }
 }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+
+/* ---------- 0.8.9: přihlášení do administrace ve vzhledu webu – úvodní fotka jako pozadí, formulář v kartě ---------- */
+.stranka-prihlaseni { min-height: 100vh; display: flex; flex-direction: column; }
+.prihlaseni { position: relative; flex: 1; display: flex; align-items: center; justify-content: center; padding: clamp(2rem, 6vw, 5rem) 1rem; overflow: hidden;
+  background: radial-gradient(circle at 80% 30%, #e7c98a 0, #c99a52 18%, #4f6b4a 45%, var(--zelena) 75%); }
+.prihlaseni-fotka { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: center 60%; }
+.prihlaseni::before { content: ""; position: absolute; inset: 0; z-index: 1; background: linear-gradient(180deg, rgba(29, 58, 42, .25), rgba(29, 58, 42, .55)); }
+.prihlaseni-karta { position: relative; z-index: 2; width: min(100%, 27rem); background: var(--plocha); border: 1px solid var(--okraj); border-top: 4px solid var(--zlata);
+  border-radius: .5rem; padding: clamp(1.5rem, 4vw, 2.25rem); box-shadow: 0 18px 50px rgba(20, 30, 22, .35); }
+.prihlaseni-karta .nadtitulek { font-size: .8rem; margin-bottom: .6rem; }
+.prihlaseni-karta h1 { font-size: clamp(1.8rem, 3vw, 2.3rem); }
+.prihlaseni-pod { margin: .4rem 0 1.4rem; color: var(--slaby); font-style: italic; }
+.prihlaseni-karta .formular { display: grid; gap: 1rem; }
+.prihlaseni-karta .pole { display: grid; gap: .35rem; font-weight: 700; color: #1c1b18; }
+.prihlaseni-karta .pole small { font-weight: 400; color: var(--slaby); font-size: .9rem; }
+.prihlaseni-karta input[type=password], .prihlaseni-karta input[type=email], .prihlaseni-karta input[type=text] { width: 100%; font: inherit; font-weight: 400; color: var(--text);
+  background: #fff; border: 1px solid var(--okraj); border-radius: .35rem; padding: .65rem .8rem; }
+.prihlaseni-karta input:focus { outline: 3px solid var(--zlata-svetla); outline-offset: 0; border-color: var(--zlata); }
+.prihlaseni-karta button.tlacitko, .prihlaseni-karta .tlacitko { width: 100%; justify-content: center; font: inherit; font-weight: 700; cursor: pointer; padding: .7rem 1.1rem; }
+.prihlaseni-karta .tlacitko.vedlejsi { background: transparent; color: var(--zelena); }
+.prihlaseni-karta .tlacitko.vedlejsi:hover, .prihlaseni-karta .tlacitko.vedlejsi:focus-visible { background: var(--krem-tmavsi); }
+.prihlaseni-karta .tlacitko[hidden] { display: none; }
+.prihlaseni-karta .tlacitka-sloupec { display: grid; gap: .6rem; }
+.prihlaseni-karta .nebo { display: flex; align-items: center; gap: 1rem; margin: 1.2rem 0; color: var(--slaby); font-style: italic; }
+.prihlaseni-karta .nebo::before, .prihlaseni-karta .nebo::after { content: ""; flex: 1; height: 1px; background: var(--okraj); }
+.prihlaseni-odkazy { text-align: center; margin: 1.2rem 0 0; }
+.prihlaseni-odkazy a { color: var(--zlata-text); }
+.prihlaseni-karta .hlaska { border-radius: .35rem; padding: .65rem .9rem; margin: 0 0 1rem; border: 1px solid; font-size: .98rem; }
+.prihlaseni-karta .hlaska-chyba { background: #fbe7e9; border-color: #f1b8bf; color: #8f1d2b; }
+.prihlaseni-karta .hlaska-ok { background: #e6f2ea; border-color: #b7d6c1; color: var(--zelena); }
+.prihlaseni-karta p { margin: 0 0 .8rem; }
+.stranka-prihlaseni .paticka { margin-top: 0; }

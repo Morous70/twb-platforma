@@ -79,7 +79,7 @@ $karty = static function (array $seznam) use ($web, $h, $ikona, $fotografii, $od
 };
 /** Mřížka fotek s oknem náhledu (assets/verejne.js); bez JS odkaz vede na velký obrázek. */
 // 0.8.5: obal je kontejner (container query) – počet sloupců volí CSS tak, aby se stránka (36, 12 fotek) dělila beze zbytku.
-// $viditelne (doporučené): kolik fotek ukázat v každém pásmu šířky, aby byly jen celé řádky (Web::viditelneDoporucene).
+// $viditelne (doporučené): kolik fotek ukázat v každém pásmu šířky, aby zůstal nastavený počet řádků (Web::viditelneDoporucene).
 $mrizka = static function (array $fotky, bool $sKategorii = false, string $trida = '', array $viditelne = []) use ($web, $h): string {
     $out = '<div class="fotky-obal"><div class="fotky' . ($trida !== '' ? ' ' . $trida : '') . '" data-fotky>';
     foreach (array_values($fotky) as $i => $m) {

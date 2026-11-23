@@ -322,7 +322,7 @@ test('web 0.8.4 na serveru: doporučení v detailu a hromadně, sekce na hlavní
     ok(str_contains($b->odesli('index.php?p=galerie', ['akce' => 'nedoporucit', 'ids' => [$ids['soukrome']]])['body'], 'Doporučení zrušeno: 1.'));
 });
 
-test('0.8.5: mřížky jen v celých řádcích – velikosti stránek, doporučené v pásmech šířky', function () {
+test('0.8.5/0.8.6: mřížky – velikosti stránek dělitelné sloupci, doporučené v nastaveném počtu řádků', function () {
     // administrace: 48 dělitelné všemi počty sloupců z assets/style.css; web: 36 a 12 dělitelné 2, 3, 4, 6
     foreach ([2, 3, 4, 6, 8, 12] as $s) eq(0, \MediaGalerie\Media::NA_STRANKU % $s, "administrace $s sloupců");
     foreach ([2, 3, 4, 6] as $s) { eq(0, Web::NA_STRANKU % $s, "web $s sloupců"); eq(0, 12 % $s, "nejnovější $s sloupců"); }
@@ -337,8 +337,9 @@ test('0.8.5: mřížky jen v celých řádcích – velikosti stránek, doporuč
     foreach (Web::PASMA_DOPORUCENYCH as $p) ok(str_contains($vcss, ".foto.skryt-$p { display: none; }"), "CSS pásmo $p");
     // doporučené: 5 × 2 a 10 fotek → desktop 10, ≤1100 10, ≤860 (4 sl.) 8, ≤640 (3 sl.) 6, ≤420 (2 sl.) 4
     eq(['d' => 10, 'm1100' => 10, 'm860' => 8, 'm640' => 6, 'm420' => 4], Web::viditelneDoporucene(10, 5, 2));
-    // jen 9 doporučených pro 5 × 2: neúplný řádek se neukáže
-    eq(['d' => 5, 'm1100' => 5, 'm860' => 8, 'm640' => 6, 'm420' => 4], Web::viditelneDoporucene(9, 5, 2));
+    // 0.8.6: jen 9 doporučených pro 5 × 2 – ukážou se všechny (neúplný poslední řádek), na užších nejvýš 2 řádky
+    eq(['d' => 9, 'm1100' => 9, 'm860' => 8, 'm640' => 6, 'm420' => 4], Web::viditelneDoporucene(9, 5, 2));
+    eq(['d' => 7, 'm1100' => 7, 'm860' => 7, 'm640' => 7, 'm420' => 6], Web::viditelneDoporucene(7, 4, 3));
     // méně než jeden řádek: všechny
     eq(['d' => 2, 'm1100' => 2, 'm860' => 2, 'm640' => 2, 'm420' => 2], Web::viditelneDoporucene(2, 5, 2));
     eq(['d' => 24, 'm1100' => 18, 'm860' => 12, 'm640' => 9, 'm420' => 6], Web::viditelneDoporucene(24, 8, 3));
@@ -360,10 +361,10 @@ test('0.8.5 na serveru: obaly mřížek, třídy skryt- u doporučených navíc'
     $anon = new Prohlizec($s);
     $r = $anon->jdi('verejne.php');
     ok(str_contains($r['body'], '<div class="fotky-obal"><div class="fotky doporucene sloupce-4" data-fotky>'), 'obal doporučených');
-    // 5 fotek ve 4 sloupcích: desktop 4 (pátá skryta), ≤640 3, ≤420 4
-    eq(1, substr_count($r['body'], 'skryt-d '), 'na desktopu jedna navíc');
-    eq(1, substr_count($r['body'], 'skryt-m1100'));
-    eq(2, substr_count($r['body'], 'skryt-m640'));
+    // 0.8.6: 5 fotek v mřížce 4 × 2 – všude všech 5 (druhý řádek neúplný), jen na ≤420 px (2 sloupce × 2 řádky) 4
+    eq(5, substr_count($r['body'], 'class="foto'), 'všech 5 fotek');
+    eq(0, substr_count($r['body'], 'skryt-d'), 'na desktopu se nic neskrývá');
+    eq(0, substr_count($r['body'], 'skryt-m640'));
     eq(1, substr_count($r['body'], 'skryt-m420'));
     $k = $anon->jdi('verejne.php?s=galerie&k=' . $ver);
     ok(str_contains($k['body'], '<div class="fotky-obal"><div class="fotky" data-fotky>') && !str_contains($k['body'], 'skryt-'), 'galerie kategorie bez skrývání');

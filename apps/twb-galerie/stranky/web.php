@@ -90,7 +90,7 @@ $adresaZasad = $app->url(Web::ZASADY);
   <?= Ui::pole('Podnadpis', 'doporucene_podnadpis', $n['doporucene_podnadpis'], ['maxlength' => 160]) ?>
   <div class="radek">
     <?= Ui::vyber('Sloupce', 'doporucene_sloupce', $rozsah(Web::SLOUPCE), (string)$n['doporucene_sloupce']) ?>
-    <?= Ui::vyber('Řádky', 'doporucene_radky', $rozsah(Web::RADKY), (string)$n['doporucene_radky'], [], 'Na webu najednou nejvýš sloupce × řádky fotek. Na mobilu se sloupce zúží (až na 2). Ukazují se jen celé řádky – když doporučených nestačí, poslední neúplný řádek se nezobrazí.') ?>
+    <?= Ui::vyber('Řádky', 'doporucene_radky', $rozsah(Web::RADKY), (string)$n['doporucene_radky'], [], 'Na webu najednou nejvýš sloupce × řádky fotek. Na mobilu se sloupce zúží (až na 2). Když doporučených nestačí, poslední řádek bude neúplný.') ?>
   </div>
 
   <h2 style="margin:1rem 0 0">Stránka O galerii</h2>

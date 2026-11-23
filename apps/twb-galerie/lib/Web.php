@@ -390,8 +390,9 @@ final class Web
     }
 
     /**
-     * 0.8.5: jen celé řádky – pro každé pásmo šířky kolik fotek z $pocet ukázat (zbytek dostane třídu skryt-<pásmo>).
-     * Ukáže nejvýš sloupce × řádky a vždy násobek sloupců; když fotek nestačí ani na jeden řádek, ukáže všechny.
+     * Pro každé pásmo šířky kolik fotek z $pocet ukázat (zbytek dostane třídu skryt-<pásmo>): nejvýš sloupce v pásmu × řádky.
+     * 0.8.6: neúplný poslední řádek se ukáže (0.8.5 ho skrývala, takže při 9 fotkách v mřížce 5 × 2 zbyl jen jeden řádek);
+     * skrývají se jen fotky navíc na užších obrazovkách, kde je sloupců méně, aby zůstal nastavený počet řádků.
      * @return array<string, int>
      */
     public static function viditelneDoporucene(int $pocet, int $sloupce, int $radky): array
@@ -399,8 +400,7 @@ final class Web
         $out = [];
         foreach (self::PASMA_DOPORUCENYCH as $pasmo) {
             $s = self::sloupceVPasmu($sloupce, $pasmo);
-            $n = min($pocet, $s * $radky);
-            $out[$pasmo] = $n >= $s ? intdiv($n, $s) * $s : $pocet;
+            $out[$pasmo] = min($pocet, $s * $radky);
         }
         return $out;
     }

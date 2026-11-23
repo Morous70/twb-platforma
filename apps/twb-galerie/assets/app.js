@@ -25,6 +25,59 @@
   });
   document.addEventListener('keydown', function (e) { if (e.key === 'Escape') document.body.classList.remove('menu-otevrene'); });
 
+  // ---------- Karty stránky (Nastavení, 0.8.1): přepnutí bez načtení, adresa (?karta=…#kotva) se přepíše, takže obnovení
+  // stránky i odkaz vedou na stejnou kartu. Kotva prvku uvnitř karty (např. #obnova) otevře jeho kartu. Šipky přepínají karty. ----------
+  var kartyNav = document.querySelector('.karty-nav');
+  if (kartyNav) {
+    var zalozky = Array.prototype.slice.call(kartyNav.querySelectorAll('[role="tab"]'));
+    var ukazKartu = function (id, fokus) {
+      var nasel = false;
+      zalozky.forEach(function (a) {
+        var ano = a.getAttribute('aria-controls') === id;
+        if (ano) nasel = true;
+        a.classList.toggle('aktivni', ano);
+        a.setAttribute('aria-selected', String(ano));
+        if (ano) a.removeAttribute('tabindex'); else a.setAttribute('tabindex', '-1');
+        var panel = document.getElementById(a.getAttribute('aria-controls'));
+        if (panel) panel.hidden = !ano;
+        if (ano && fokus) a.focus();
+        if (ano && kartyNav.scrollWidth > kartyNav.clientWidth) kartyNav.scrollLeft = a.offsetLeft - kartyNav.offsetLeft - 16;
+      });
+      return nasel;
+    };
+    var podleKotvy = function () {
+      var h = decodeURIComponent(location.hash.slice(1));
+      if (!h) return;
+      var el = document.getElementById(h);
+      var panel = el && el.closest('[data-karta]');
+      if (!panel || !ukazKartu(panel.id)) return;
+      // kotva celé karty: zůstat nahoře u lišty karet; kotva uvnitř karty: posunout na ni
+      if (el === panel) window.scrollTo(0, 0); else el.scrollIntoView();
+    };
+    zalozky.forEach(function (a) {
+      a.addEventListener('click', function (e) {
+        if (e.ctrlKey || e.metaKey || e.shiftKey || e.button !== 0) return;
+        e.preventDefault();
+        ukazKartu(a.getAttribute('aria-controls'));
+        try { history.replaceState(null, '', a.href); } catch (er) { /* starý prohlížeč */ }
+      });
+    });
+    kartyNav.addEventListener('keydown', function (e) {
+      var i = zalozky.indexOf(document.activeElement);
+      if (i < 0) return;
+      var j = e.key === 'ArrowRight' ? i + 1 : e.key === 'ArrowLeft' ? i - 1 : e.key === 'Home' ? 0 : e.key === 'End' ? zalozky.length - 1 : null;
+      if (j === null) return;
+      e.preventDefault();
+      var a = zalozky[(j + zalozky.length) % zalozky.length];
+      a.click();
+      a.focus();
+    });
+    window.addEventListener('hashchange', podleKotvy);
+    var aktivni = kartyNav.querySelector('.aktivni');
+    if (aktivni) ukazKartu(aktivni.getAttribute('aria-controls'));
+    podleKotvy();
+  }
+
   // Kopírování kódu do schránky
   document.addEventListener('click', function (e) {
     var b = e.target.closest('[data-kopirovat]');

@@ -1,12 +1,26 @@
 <?php
 declare(strict_types=1);
-// Nastavení: zabezpečení (heslo, e-mail pro obnovu, odhlášení po nečinnosti, Google, Passkey), komprese, zálohy, aktualizace a systém. Proměnné: $app, $ui, $post, $relace.
+// Nastavení v kartách (0.8.1): Zabezpečení (heslo, e-mail pro obnovu, odhlášení po nečinnosti, Google, Passkey), Komprese obrázků, Zálohy, Aktualizace, Systém.
+// Aktivní karta: ?karta=… (bez JS, po odeslání formuláře) nebo #kotva (přepnutí v assets/app.js). Proměnné: $app, $ui, $post, $relace.
 use MediaGalerie\{Ui, Chyba, Vstup};
 use TWB\Obrazky\Obrazky;
 use TWB\Zalohy\Zalohy;
 
 $n = $app->nastaveni();
 $zalohy = $app->zalohy();
+
+// Karty stránky (kotva => název). Staré odkazy #zabezpeceni, #zalohy… vedou na stejnojmennou kartu.
+$karty = ['zabezpeceni' => 'Zabezpečení', 'komprese' => 'Komprese obrázků', 'zalohy' => 'Zálohy', 'aktualizace' => 'Aktualizace', 'system' => 'Systém'];
+$kartaAkce = fn(string $akce): string => match (true) {
+    str_starts_with($akce, 'zalo'), str_starts_with($akce, 'obnova') => 'zalohy',
+    str_starts_with($akce, 'aktualizace') => 'aktualizace',
+    $akce === 'komprese' => 'komprese',
+    default => 'zabezpeceni',
+};
+$karta = (string)($_GET['karta'] ?? '');
+if (!isset($karty[$karta])) $karta = 'zabezpeceni';
+// po neúspěšném odeslání se stránka vykreslí bez přesměrování: ukázat kartu formuláře, u kterého je chyba
+if ($post) $karta = $kartaAkce((string)($_POST['akce'] ?? ''));
 
 if (isset($_GET['stahnout'])) {
     try {
@@ -140,9 +154,8 @@ if ($post && ($_POST['akce'] ?? '') !== 'obnova-nahled') {
         }
     })) {
         $ui->zprava('ok', $zprava);
-        $kotva = match (true) { str_starts_with($akce, 'zalo'), str_starts_with($akce, 'obnova') => 'zalohy', str_starts_with($akce, 'aktualizace') => 'aktualizace',
-            $akce === 'komprese' => 'komprese', default => 'zabezpeceni' };
-        $ui->presmeruj(Ui::odkaz('nastaveni') . '#' . $kotva);
+        $kotva = $kartaAkce($akce);
+        $ui->presmeruj(Ui::odkaz('nastaveni', ['karta' => $kotva]) . '#' . $kotva);
     }
 }
 
@@ -154,10 +167,26 @@ $maHesloZaloh = (string)$n->dej('backup_password', '') !== '';
 $auto = $n->dej('backup_auto', '1') === '1';
 $cronKlic = (string)$app->cfg('cron_key', '');
 $cron = (int)$n->dej('cron_last_run', 0);
+$akt = $app->aktualizace()->stav();
+// tečka u karty, která chce pozornost (stejné podmínky jako upozornění v přehledu)
+$pozor = [
+    'zabezpeceni' => $resetEmail === '',
+    'zalohy' => !$maHesloZaloh || $zalohy->podporovano() !== null,
+    'aktualizace' => !empty($akt['available']),
+    'system' => $cron < time() - 2 * 86400,
+];
+$panel = fn(string $id): string => '<div class="panel-karty" id="' . $id . '" role="tabpanel" aria-labelledby="karta-' . $id . '" tabindex="-1" data-karta'
+    . ($id === $karta ? '' : ' hidden') . '>';
 ?>
+<nav class="karty-nav" role="tablist" aria-label="Oddíly nastavení">
+<?php foreach ($karty as $id => $nazev): ?>
+  <a href="<?= Ui::h(Ui::odkaz('nastaveni', ['karta' => $id]) . '#' . $id) ?>" id="karta-<?= $id ?>" role="tab" aria-controls="<?= $id ?>" aria-selected="<?= $id === $karta ? 'true' : 'false' ?>"<?= $id === $karta ? ' class="aktivni"' : ' tabindex="-1"' ?>><?= Ui::h($nazev) ?><?php if (!empty($pozor[$id])): ?><span class="tecka" title="Vyžaduje pozornost"></span><?php endif; ?></a>
+<?php endforeach; ?>
+</nav>
+
+<?= $panel('zabezpeceni') ?>
 <div class="dva-sloupce">
 <section>
-  <h2 id="zabezpeceni" style="margin-top:0">Zabezpečení</h2>
   <form method="post" class="formular karta">
     <h3 style="margin:0">Změna hesla</h3>
     <?= $ui->csrf() ?>
@@ -186,6 +215,8 @@ $cron = (int)$n->dej('cron_last_run', 0);
     <?= Ui::pole('Odhlásit po nečinnosti (minuty)', 'idle_minutes', (string)$app->necinnostMinut(), ['type' => 'number', 'min' => 0, 'max' => 1440, 'required' => true], '0 = nikdy, jinak 5 až 1440 minut.') ?>
     <div><button type="submit">Uložit</button></div>
   </form>
+</section>
+<section>
   <div class="karta">
     <h3 style="margin-top:0">Přihlášení přes Google</h3>
     <?php if (!$google->nastaveno()): ?>
@@ -222,11 +253,14 @@ $cron = (int)$n->dej('cron_last_run', 0);
     <?php endif; ?>
   </div>
 </section>
+</div>
+</div>
 
-<section>
-  <h2 id="komprese" style="margin-top:0">Komprese obrázků</h2>
+<?= $panel('komprese') ?>
+<div class="uzky-sloupec">
   <?php $o = Obrazky::nastaveni($n); ?>
   <form method="post" class="formular karta">
+    <h3 style="margin:0">Komprese obrázků</h3>
     <?= $ui->csrf() ?>
     <input type="hidden" name="akce" value="komprese">
     <label class="zaskrtavatko"><input type="checkbox" name="img_auto" value="1"<?= $o['auto'] ? ' checked' : '' ?>>
@@ -241,10 +275,15 @@ $cron = (int)$n->dej('cron_last_run', 0);
     </div>
     <div><button type="submit">Uložit</button></div>
   </form>
+</div>
+</div>
 
-  <h2 id="zalohy" >Zálohy</h2>
+<?= $panel('zalohy') ?>
+<div class="dva-sloupce">
+<section>
   <?php if ($proc = $zalohy->podporovano()): ?><div class="hlaska hlaska-chyba"><?= Ui::h($proc) ?></div><?php endif; ?>
   <form method="post" class="formular karta">
+    <h3 style="margin:0">Nastavení záloh</h3>
     <?= $ui->csrf() ?>
     <input type="hidden" name="akce" value="zalohy-heslo">
     <?= Ui::pole($maHesloZaloh ? 'Nové heslo záloh' : 'Heslo záloh', 'backup_password', '', ['type' => 'password', 'minlength' => 10, 'required' => true, 'autocomplete' => 'new-password'],
@@ -252,23 +291,8 @@ $cron = (int)$n->dej('cron_last_run', 0);
     <label class="zaskrtavatko"><input type="checkbox" name="backup_auto" value="1"<?= $auto ? ' checked' : '' ?>> Automatická denní záloha (spouští cron)</label>
     <div><button type="submit"><?= $maHesloZaloh ? 'Změnit heslo' : 'Nastavit zálohy' ?></button></div>
   </form>
-  <?php if ($maHesloZaloh): ?>
-    <div class="tlacitka" style="margin-bottom:1rem"><?= $ui->tlacitko('Zálohovat teď', 'zaloha', [], 'hlavni') ?></div>
-    <?php $seznam = $zalohy->seznam(); if ($seznam): ?>
-    <div class="tabulka-obal"><table>
-      <tr><th>Záloha</th><th class="cisla">Velikost</th></tr>
-      <?php foreach (array_slice($seznam, 0, 15) as $z): ?>
-      <tr><td><a href="<?= Ui::h(Ui::odkaz('nastaveni', ['stahnout' => $z['name']])) ?>"><?= Ui::h(Ui::datum($z['time'])) ?></a>
-        <span class="slabe mala"><?= $z['files'] ? 'se soubory' : 'jen databáze' ?><?= $z['before_restore'] ? ', před obnovou' : '' ?></span></td>
-        <td class="cisla"><?= Ui::h(Zalohy::velikost((int)$z['size'])) ?></td></tr>
-      <?php endforeach; ?>
-    </table></div>
-    <?php endif; ?>
-  <?php endif; ?>
-
-  <h3 id="obnova">Obnova ze zálohy</h3>
   <?php if ($nahled): ?>
-    <div class="karta hlaska-varovani">
+    <div class="karta hlaska-varovani" id="obnova">
       <p style="margin-top:0"><b>Obnovit zálohu <?= Ui::h($nahled['zaloha']) ?>?</b></p>
       <dl class="udaje">
         <dt>Vytvořena</dt><dd><?= Ui::h($nahled['created_at'] ?? '?') ?> (verze <?= Ui::h($nahled['app_version']) ?>)</dd>
@@ -283,6 +307,7 @@ $cron = (int)$n->dej('cron_last_run', 0);
     </div>
   <?php elseif (!$zalohy->podporovano()): ?>
     <form method="post" enctype="multipart/form-data" class="formular karta">
+      <h3 id="obnova" style="margin:0">Obnova ze zálohy</h3>
       <?= $ui->csrf() ?><input type="hidden" name="akce" value="obnova-nahled">
       <?php $volby = ['' => '— vyberte —']; foreach ($zalohy->seznam() as $z) $volby[$z['name']] = Ui::datum($z['time']) . ($z['files'] ? ' (se soubory)' : '') . ($z['before_restore'] ? ' – před obnovou' : '') . ($z['uploaded'] ? ' – nahraná' : ''); ?>
       <?= Ui::vyber('Záloha z úložiště', 'zaloha', $volby, '') ?>
@@ -291,10 +316,33 @@ $cron = (int)$n->dej('cron_last_run', 0);
       <div class="tlacitka"><button type="submit">Pokračovat</button></div>
     </form>
   <?php endif; ?>
+</section>
+<section>
+  <?php if ($maHesloZaloh): ?>
+    <div class="karta">
+      <div class="tlacitka hlavicka-karty"><h3>Uložené zálohy</h3><?= $ui->tlacitko('Zálohovat teď', 'zaloha', [], 'hlavni') ?></div>
+    <?php $seznam = $zalohy->seznam(); if ($seznam): ?>
+    <div class="tabulka-obal" style="margin-bottom:0"><table>
+      <tr><th>Záloha</th><th class="cisla">Velikost</th></tr>
+      <?php foreach (array_slice($seznam, 0, 15) as $z): ?>
+      <tr><td><a href="<?= Ui::h(Ui::odkaz('nastaveni', ['stahnout' => $z['name']])) ?>"><?= Ui::h(Ui::datum($z['time'])) ?></a>
+        <span class="slabe mala"><?= $z['files'] ? 'se soubory' : 'jen databáze' ?><?= $z['before_restore'] ? ', před obnovou' : '' ?></span></td>
+        <td class="cisla"><?= Ui::h(Zalohy::velikost((int)$z['size'])) ?></td></tr>
+      <?php endforeach; ?>
+    </table></div>
+    <?php else: ?><p class="slabe" style="margin-bottom:0">Zatím žádná záloha.</p><?php endif; ?>
+    </div>
+  <?php else: ?>
+    <div class="karta"><h3 style="margin-top:0">Uložené zálohy</h3><p class="slabe" style="margin-bottom:0">Nejdřív nastavte heslo záloh.</p></div>
+  <?php endif; ?>
+</section>
+</div>
+</div>
 
-  <h2 id="aktualizace">Aktualizace</h2>
-  <?php $akt = $app->aktualizace()->stav(); ?>
+<?= $panel('aktualizace') ?>
+<div class="uzky-sloupec">
   <div class="karta">
+    <h3 style="margin-top:0">Aktualizace</h3>
     <dl class="udaje">
       <dt>Nainstalovaná verze</dt><dd><?= Ui::h($akt['version']) ?></dd>
       <dt>Token</dt><dd><?= $akt['token'] !== '' ? Ui::h($akt['token']) : 'v config.php chybí <code>update_token</code>' ?></dd>
@@ -313,9 +361,13 @@ $cron = (int)$n->dej('cron_last_run', 0);
       <?php endif; ?>
     </div>
   </div>
+</div>
+</div>
 
-  <h2 id="system">Systém</h2>
+<?= $panel('system') ?>
+<div class="uzky-sloupec">
   <div class="karta">
+    <h3 style="margin-top:0">Systém</h3>
     <dl class="udaje">
       <dt>Verze</dt><dd><?= Ui::h($app->verze) ?></dd>
       <dt>PHP</dt><dd><?= Ui::h(PHP_VERSION) ?></dd>
@@ -330,5 +382,5 @@ $cron = (int)$n->dej('cron_last_run', 0);
       <div class="tlacitka"><input id="cron-url" readonly value="<?= Ui::h($app->url('cron.php?key=' . rawurlencode($cronKlic))) ?>" style="flex:1"><button type="button" class="maly" data-kopirovat="cron-url">Kopírovat</button></div>
     <?php endif; ?>
   </div>
-</section>
+</div>
 </div>

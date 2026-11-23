@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 // Veřejný web: karty Základ a texty (0.8.8: skupiny polí ve vlastních kartách), Reklama (0.8.3: jen kód pro každou pozici, ads.txt), Měření návštěvnosti (kód, kam vložit),
-// GDPR a cookies (souhlas, zásady ochrany osobních údajů). Každá karta má svůj formulář (akce = část). Proměnné: $app, $ui, $post.
+// GDPR a cookies (souhlas, zásady ochrany osobních údajů), 0.8.12: u každé reklamní pozice štítek „Reklama“ a karta Vlastní CSS. Každá karta má svůj formulář (akce = část). Proměnné: $app, $ui, $post.
 use MediaGalerie\{Ui, Chyba, Web};
 
 $web = $app->web();
@@ -35,7 +35,8 @@ $doporucenych = $web->pocetDoporucenych();
 $mimoWeb = $doporucenych['celkem'] > $doporucenych['verejne'] ? $web->doporuceneMimoWeb() : [];
 $rozsah = static fn(array $od_do): array => array_combine(range($od_do[0], $od_do[1]), array_map('strval', range($od_do[0], $od_do[1])));
 // po chybě ukázat odeslaný stav zaškrtávátek jen ve formuláři, který se odesílal (ostatní karty zůstanou podle uloženého nastavení)
-$castPole = ['reklama_zapnuto' => 'reklama', 'mereni_zapnuto' => 'mereni', 'cookies_souhlas' => 'gdpr', 'zasady_zapnuto' => 'gdpr'];
+$castPole = ['reklama_zapnuto' => 'reklama', 'mereni_zapnuto' => 'mereni', 'cookies_souhlas' => 'gdpr', 'zasady_zapnuto' => 'gdpr', 'vlastni_css_zapnuto' => 'css']
+    + array_fill_keys(array_map(fn($k) => "reklama_stitek_{$k}", array_keys(Web::POZICE)), 'reklama');
 $zaskrtnuto = static fn(string $nazev, bool $vychozi): bool => ($post && ($_POST['akce'] ?? '') === ($castPole[$nazev] ?? 'zaklad')) ? !empty($_POST[$nazev]) : $vychozi;
 /** Vypínač (zaškrtávátko vzhledu přepínače) s nápovědou pod ním. */
 $vypinac = static fn(string $nazev, string $popis, bool $vychozi, string $napoveda = ''): string => '<label class="vypinac"><input type="checkbox" role="switch" name="' . Ui::h($nazev) . '" value="1"'
@@ -176,6 +177,7 @@ $adresaZasad = $app->url(Web::ZASADY);
   <p class="slabe" style="margin:0"><?= Ui::h($popis) ?></p>
   <textarea name="reklama_<?= $k ?>" class="kod" rows="4" spellcheck="false" maxlength="<?= Web::MAX_KOD ?>" aria-label="Kód reklamy – <?= Ui::h($nazev) ?>"
     placeholder="<ins …></ins>&#10;<script async src=&quot;https://…&quot;></script>"><?= Ui::h($post && $karta === 'reklama' ? (string)($_POST["reklama_{$k}"] ?? '') : $n['reklama'][$k]) ?></textarea>
+  <?= $vypinac("reklama_stitek_{$k}", 'Nad bannerem malým písmem zobrazit „Reklama“', Web::reklamaStitek($n, $k)) ?>
 </div>
 <?php endforeach; ?>
 <div class="karta formular">
@@ -236,5 +238,27 @@ $adresaZasad = $app->url(Web::ZASADY);
 </div>
 <div class="tlacitka"><button type="submit" class="hlavni">Uložit</button>
   <?php if ($n['zasady_zapnuto']): ?><a class="tlacitko" href="<?= Ui::h($adresaZasad) ?>">Zobrazit zásady</a><?php endif; ?></div>
+</form>
+</div>
+
+<?= $panel('css') ?>
+<?= $formular('css') ?>
+<?php /* 0.8.12: vlastní CSS – web ho vydá jako samostatný soubor (Web::vlastniCssAdresa), načte se za styly webu */ ?>
+<div class="karta">
+  <?= $vypinac('vlastni_css_zapnuto', 'Použít vlastní CSS na veřejných stránkách', (bool)$n['vlastni_css_zapnuto'],
+      'Styly se načtou <strong>za styly webu</strong>, takže je můžete přepsat – barvy, písmo, mezery, vzhled reklamních ploch (<code>.reklama</code>, <code>.reklama-stitek</code>)…'
+      . ' Platí pro hlavní stránku, galerie, O galerii i zásady; <strong>přihlášení a administrace zůstávají beze změny</strong>, takže se k nastavení vždycky dostanete.'
+      . ' Vypínačem styly dočasně vypnete, aniž byste je smazali.') ?>
+</div>
+<div class="karta formular">
+  <h2 style="margin:0">Vlastní CSS</h2>
+  <p class="slabe" style="margin:0">Jen CSS, bez značek <code>&lt;style&gt;</code>. Web ho vydá jako samostatný soubor
+    <?php if (($cssAdresa = Web::vlastniCssAdresa($n)) !== ''): ?>(<a href="<?= Ui::h($app->url($cssAdresa)) ?>"><code>vlastni.css</code></a>)<?php else: ?><code>vlastni.css</code><?php endif; ?>,
+    proto nic z něj nemůže změnit HTML stránky ani spustit skript. Proměnné vzhledu webu: <code>--krem</code>, <code>--plocha</code>, <code>--text</code>, <code>--slaby</code>, <code>--okraj</code>…</p>
+  <textarea name="vlastni_css" id="f-vlastni_css" class="kod" rows="16" spellcheck="false" maxlength="<?= Web::MAX_CSS ?>" aria-label="Vlastní CSS"
+    placeholder=".reklama-stitek { color: #999; }&#10;.hlavicka { background: #fff; }"><?= Ui::h($post && $karta === 'css' ? (string)($_POST['vlastni_css'] ?? '') : $n['vlastni_css']) ?></textarea>
+</div>
+<div class="tlacitka"><button type="submit" class="hlavni">Uložit</button>
+  <a class="tlacitko" href="<?= Ui::h($app->url()) ?>/">Zobrazit web</a></div>
 </form>
 </div>

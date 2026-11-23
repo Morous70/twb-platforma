@@ -226,3 +226,6 @@ button.odkaz { font: inherit; color: #1c1b18; background: none; border: 0; paddi
 .prihlaseni-karta .hlaska-ok { background: #e6f2ea; border-color: #b7d6c1; color: var(--zelena); }
 .prihlaseni-karta p { margin: 0 0 .8rem; }
 .stranka-prihlaseni .paticka { margin-top: 0; }
+
+/* ---------- štítek „Reklama“ nad bannerem (0.8.12, volba u každé pozice) ---------- */
+.reklama-stitek { margin: 0 0 .25rem; font-size: .6875rem; line-height: 1.2; letter-spacing: .08em; text-transform: uppercase; color: var(--slaby); font-family: var(--sans, system-ui, sans-serif); }

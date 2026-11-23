@@ -6,6 +6,7 @@ declare(strict_types=1);
 // 0.8.4: hlavní stránka ukazuje náhodný výběr doporučených fotografií (Web::doporucene) v mřížce sloupce × řádky.
 // 0.8.3: reklamní pozice s kódem z reklamního systému, měřicí kód, cookie lišta se souhlasem (bez souhlasu je kód jen neživý <template>),
 // stránka ?s=zasady-ochrany-osobnich-udaju a ads.txt (?s=ads.txt; /ads.txt a /zasady-ochrany-osobnich-udaju přes .htaccess).
+// 0.8.12: volitelný štítek „Reklama“ nad bannerem (každá pozice zvlášť) a vlastní CSS jako samostatný soubor ?s=vlastni.css.
 use MediaGalerie\{App, Web, Media, VerejneRozvrzeni};
 use TWB\Napoveda\Markdown;
 
@@ -17,7 +18,7 @@ $web = $app->web();
 $n = $web->nastaveni();
 $stranka = (string)($_GET['s'] ?? 'domu');
 // zásady a ads.txt fungují i s vypnutým webem (odkaz na zásady může vést odjinud, reklamní systém kontroluje ads.txt)
-if (!$n['zapnuto'] && !in_array($stranka, [Web::ZASADY, 'ads.txt'], true)) { header('Location: index.php', true, 302); exit; }
+if (!$n['zapnuto'] && !in_array($stranka, [Web::ZASADY, 'ads.txt', Web::CSS], true)) { header('Location: index.php', true, 302); exit; }
 
 $h = static fn(mixed $s): string => htmlspecialchars((string)$s, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
 $ikona = static fn(string $nazev, int $v = 20): string => VerejneRozvrzeni::ikona($nazev, $v);
@@ -34,6 +35,17 @@ if ($stranka === 'ads.txt') {
     echo $n['ads_txt'] !== '' ? $n['ads_txt'] . "\n" : '';
     exit;
 }
+if ($stranka === Web::CSS) {
+    // 0.8.12: vlastní CSS jako samostatný soubor – stačí CSP style-src 'self' a obsah nejde „ukončit“ a vložit do něj HTML ani skript.
+    // Adresa nese otisk obsahu (Web::vlastniCssAdresa), proto se smí cachovat dlouho; bez CSS prázdný soubor s 404.
+    $css = Web::vlastniCss($n);
+    http_response_code($css !== '' ? 200 : 404);
+    header('Content-Type: text/css; charset=utf-8');
+    header('X-Content-Type-Options: nosniff');
+    header('Cache-Control: ' . ($css !== '' && isset($_GET['v']) ? 'public, max-age=31536000, immutable' : 'no-cache'));
+    echo $css !== '' ? $css . "\n" : '';
+    exit;
+}
 $kategorie = $web->kategorie();
 $titulek = '';
 $aktivni = $stranka;
@@ -48,9 +60,12 @@ $vlozKod = static function (string $kod, string $kategorie) use ($souhlas, &$kod
 };
 
 // ---------- části stránek ----------
+// 0.8.12: štítek „Reklama“ je uvnitř vkládaného kódu – se souhlasem s cookies se tak ukáže až s reklamou, ne nad prázdným místem
 $reklama = static function (string $pozice) use ($n, $vlozKod): string {
     $kod = Web::reklamaKod($n, $pozice);
-    return $kod === '' ? '' : '<aside class="reklama reklama-' . str_replace('_', '-', $pozice) . '" aria-label="Reklama">' . $vlozKod($kod, 'reklama') . '</aside>';
+    if ($kod === '') return '';
+    $stitek = Web::reklamaStitek($n, $pozice) ? '<p class="reklama-stitek">Reklama</p>' : '';
+    return '<aside class="reklama reklama-' . str_replace('_', '-', $pozice) . '" aria-label="Reklama">' . $vlozKod($stitek . $kod, 'reklama') . '</aside>';
 };
 $karty = static function (array $seznam) use ($web, $h, $ikona, $fotografii, $odkazKategorie): string {
     $out = '<div class="karty">';
@@ -215,6 +230,8 @@ $popisStranky = $n['podnadpis'] !== '' ? $n['podnadpis'] : $n['nadpis'];
 <?php if ($n['skryt_vyhledavacum']): ?><meta name="robots" content="noindex, nofollow">
 <?php endif; ?>
 <link rel="stylesheet" href="assets/verejne.css?v=<?= $v ?>">
+<?php if (($cssAdresa = Web::vlastniCssAdresa($n)) !== ''): ?><link rel="stylesheet" href="<?= $h($cssAdresa) ?>">
+<?php endif; ?>
 <link rel="icon" href="assets/ikona.svg" type="image/svg+xml">
 <script src="assets/verejne.js?v=<?= $v ?>" defer></script>
 <?= $mereniHlavicka ?>

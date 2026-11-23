@@ -18,6 +18,8 @@ namespace MediaGalerie;
  * v mřížce s nastaveným počtem sloupců (3–8) a řádků (1–5).
  * 0.8.11: až 5 úvodních fotek (uvod_ids, při každém načtení hlavní stránky náhodně jedna; dřívější uvod_id je první z nich)
  * a vlastní grafické logo (tabulka web_files, vydává logo.php) v záhlaví webu, na přihlášení a v administraci; bez loga zůstává znak + název.
+ * 0.8.12: u každé reklamní pozice volba „Reklama“ malým písmem nad bannerem (reklama_stitek) a karta Vlastní CSS (vlastni_css): styly se
+ * vydávají jako samostatný soubor (verejne.php?s=vlastni.css&v=<otisk>), takže stačí přísné CSP style-src 'self' a CSS nemůže „vyskočit“ do HTML stránky.
  */
 final class Web
 {
@@ -47,7 +49,12 @@ final class Web
         // reklama (0.8.3): kód pro každou pozici, prázdná pozice se nezobrazí
         'reklama_zapnuto' => true,
         'reklama' => ['pod_uvodem' => '', 'pod_galeriemi' => '', 'pred_patickou' => ''],
+        // 0.8.12: nad bannerem malým písmem „Reklama“ – každá pozice zvlášť, výchozí vypnuto
+        'reklama_stitek' => ['pod_uvodem' => false, 'pod_galeriemi' => false, 'pred_patickou' => false],
         'ads_txt' => '',
+        // 0.8.12: vlastní CSS pro veřejné stránky
+        'vlastni_css_zapnuto' => true,
+        'vlastni_css' => '',
         // měření návštěvnosti
         'mereni_zapnuto' => false,
         'mereni_kod' => '',
@@ -79,6 +86,10 @@ final class Web
     public const COOKIE_SOUHLAS = 'twbg_souhlas';
     /** Největší délka vloženého kódu (reklamní pozice, měření) a obsahu ads.txt. */
     public const MAX_KOD = 20000;
+    /** Největší délka vlastního CSS (0.8.12). */
+    public const MAX_CSS = 50000;
+    /** Adresa (?s=…) souboru s vlastním CSS (0.8.12). */
+    public const CSS = 'vlastni.css';
     /** Fotek na stránku galerie na webu. 0.8.5: dělitelné 2, 3, 4 i 6 – počty sloupců v assets/verejne.css (.fotky-obal). */
     public const NA_STRANKU = 36;
     /** Mřížka doporučených fotografií: počet sloupců a řádků. */
@@ -105,6 +116,9 @@ final class Web
         $n = is_array($n) ? $n : [];
         $out = array_replace(self::VYCHOZI, array_intersect_key($n, self::VYCHOZI));
         $out['reklama'] = array_replace(self::VYCHOZI['reklama'], is_array($n['reklama'] ?? null) ? array_map('strval', array_intersect_key($n['reklama'], self::VYCHOZI['reklama'])) : []);
+        $out['reklama_stitek'] = array_replace(self::VYCHOZI['reklama_stitek'], is_array($n['reklama_stitek'] ?? null) ? array_map('boolval', array_intersect_key($n['reklama_stitek'], self::VYCHOZI['reklama_stitek'])) : []);
+        $out['vlastni_css_zapnuto'] = (bool)$out['vlastni_css_zapnuto'];
+        $out['vlastni_css'] = (string)$out['vlastni_css'];
         if (!isset($n['reklama'])) {
             // nastavení z 0.8.0–0.8.2: z reklamních ploch zůstane jen kód (textové plochy byly jen ukázka), kód do hlavičky → měření
             foreach (['banner1' => 'pod_uvodem', 'banner2' => 'pod_galeriemi'] as $stary => $pozice) {
@@ -132,7 +146,7 @@ final class Web
     }
 
     /** Části stránky Veřejný web (karty), každá se ukládá svým formulářem. */
-    public const CASTI = ['zaklad' => 'Základ a texty', 'reklama' => 'Reklama', 'mereni' => 'Měření návštěvnosti', 'gdpr' => 'GDPR a cookies'];
+    public const CASTI = ['zaklad' => 'Základ a texty', 'reklama' => 'Reklama', 'mereni' => 'Měření návštěvnosti', 'gdpr' => 'GDPR a cookies', 'css' => 'Vlastní CSS'];
 
     /** Uloží jednu část nastavení z formuláře (administrace → Veřejný web). @param array<string, mixed> $p */
     public function uloz(string $cast, array $p): void
@@ -143,6 +157,7 @@ final class Web
             'reklama' => $this->reklama($n, $p),
             'mereni' => $this->mereni($n, $p),
             'gdpr' => $this->gdpr($n, $p),
+            'css' => $this->css($n, $p),
             default => throw new Chyba('Neznámá část nastavení.'),
         };
         $this->app->nastaveni()->uloz('web', (string)json_encode($n, JSON_UNESCAPED_UNICODE));
@@ -190,8 +205,43 @@ final class Web
     private function reklama(array &$n, array $p): void
     {
         $n['reklama_zapnuto'] = !empty($p['reklama_zapnuto']);
-        foreach (self::POZICE as $k => [$nazev]) $n['reklama'][$k] = self::kod($p, "reklama_{$k}", "Reklama – {$nazev}");
+        foreach (self::POZICE as $k => [$nazev]) {
+            $n['reklama'][$k] = self::kod($p, "reklama_{$k}", "Reklama – {$nazev}");
+            $n['reklama_stitek'][$k] = !empty($p["reklama_stitek_{$k}"]);   // 0.8.12
+        }
         $n['ads_txt'] = self::kod($p, 'ads_txt', 'Obsah ads.txt');
+    }
+
+    /** Vlastní CSS (0.8.12). @param array<string, mixed> $n @param array<string, mixed> $p */
+    private function css(array &$n, array $p): void
+    {
+        $n['vlastni_css_zapnuto'] = !empty($p['vlastni_css_zapnuto']);
+        $n['vlastni_css'] = self::cistiCss((string)($p['vlastni_css'] ?? ''));
+    }
+
+    /**
+     * Vlastní CSS: sjednotí konce řádků, odstraní řídicí znaky a kontroluje délku. Obsah se nevkládá do HTML, ale vydává jako
+     * samostatný soubor text/css (verejne.php?s=vlastni.css), takže ho nejde ukončit značkou </style> a vložit skript.
+     */
+    public static function cistiCss(string $css): string
+    {
+        $s = trim(str_replace(["\r\n", "\r"], "\n", $css));
+        $s = (string)preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/u', '', $s);
+        if (mb_strlen($s) > self::MAX_CSS) throw new Chyba('Vlastní CSS může mít nejvýš ' . self::MAX_CSS . ' znaků.');
+        return $s;
+    }
+
+    /** Vlastní CSS k použití na webu ('' = žádné). @param array<string, mixed> $n */
+    public static function vlastniCss(array $n): string
+    {
+        return $n['vlastni_css_zapnuto'] ? (string)$n['vlastni_css'] : '';
+    }
+
+    /** Adresa souboru s vlastním CSS s otiskem obsahu (změna CSS = nová adresa, stará se smí dlouho cachovat); '' = žádné. @param array<string, mixed> $n */
+    public static function vlastniCssAdresa(array $n): string
+    {
+        $css = self::vlastniCss($n);
+        return $css === '' ? '' : 'verejne.php?s=' . self::CSS . '&v=' . substr(md5($css), 0, 10);
     }
 
     /** @param array<string, mixed> $n @param array<string, mixed> $p */
@@ -226,6 +276,12 @@ final class Web
     public static function reklamaKod(array $n, string $pozice): string
     {
         return $n['reklama_zapnuto'] ? (string)($n['reklama'][$pozice] ?? '') : '';
+    }
+
+    /** Ukázat nad bannerem pozice malým písmem „Reklama“? (0.8.12) @param array<string, mixed> $n */
+    public static function reklamaStitek(array $n, string $pozice): bool
+    {
+        return !empty($n['reklama_stitek'][$pozice]);
     }
 
     /** Měří se? (zapnuto a je kód) @param array<string, mixed> $n */

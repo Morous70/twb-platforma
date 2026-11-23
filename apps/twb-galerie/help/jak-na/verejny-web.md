@@ -4,7 +4,7 @@ sekce: jak-na
 admin: ne
 kontext: web
 souvisi: verejne-odkazy, kategorie-a-tagy
-klicova: web, hlavní stránka, veřejná galerie, reklama, banner, adsense, sklik, reklamní kód, ads.txt, měření návštěvnosti, matomo, gdpr, cookies, souhlas, zásady ochrany osobních údajů, o galerii, úvodní fotka, úvodní fotky, logo, vlastní logo, doporučené fotografie, doporučená, mřížka
+klicova: web, hlavní stránka, veřejná galerie, reklama, banner, adsense, sklik, reklamní kód, ads.txt, měření návštěvnosti, matomo, gdpr, cookies, souhlas, zásady ochrany osobních údajů, o galerii, úvodní fotka, úvodní fotky, logo, vlastní logo, vlastní css, css, styly, vzhled, štítek reklama, označení reklamy, doporučené fotografie, doporučená, mřížka
 ---
 # Veřejný web
 
@@ -47,7 +47,7 @@ U kategorie v **Kategorie → Upravit** nastavíte:
 Stránka galerie ukazuje fotky po 36, nejnovější první. Kliknutím se fotka zvětší, šipkami (nebo posunem prstu) se listuje, Esc okno zavře.
 V popisku je uvedení autora podle licence (např. „Foto: Jana Nováková, CC BY 4.0“).
 
-Stránka **Veřejný web** má karty **Základ a texty** (rozdělená do skupin Stav webu, Logo a patička, Úvodní část, Vybrané galerie, Doporučené fotografie a Stránka O galerii), **Reklama**, **Měření návštěvnosti** a **GDPR a cookies**; každá se ukládá svým tlačítkem Uložit.
+Stránka **Veřejný web** má karty **Základ a texty** (rozdělená do skupin Stav webu, Logo a patička, Úvodní část, Vybrané galerie, Doporučené fotografie a Stránka O galerii), **Reklama**, **Měření návštěvnosti**, **GDPR a cookies** a **Vlastní CSS**; každá se ukládá svým tlačítkem Uložit.
 
 ## Reklama
 Vypínač **Zobrazovat reklamu na veřejných stránkách** a pro každou pozici jedno pole pro **kód z reklamního systému** (AdSense, Sklik,
@@ -55,6 +55,9 @@ Revive, Etarget…), včetně `<script>`. Kód se vypíše přesně tak, jak ho 
 - **Pod úvodem** – hlavní stránka pod úvodní fotkou, stránka Galerie a galerie kategorie pod nadpisem (banner na šířku, např. 970×250 nebo 728×90).
 - **Před fotografiemi** – na hlavní stránce před doporučenými fotografiemi, na stránce Galerie před nejnovějšími fotografiemi. V galerii jedné kategorie se nezobrazuje (banner na šířku nebo obdélník 300×250).
 - **Před patičkou** – úplně dole na hlavní stránce, v galeriích i na stránce O galerii.
+
+Pod polem každé pozice je vypínač **Nad bannerem malým písmem zobrazit „Reklama“** – každá pozice má svůj (výchozí vypnuto).
+Se zapnutým souhlasem s cookies se štítek ukáže až spolu s reklamou, nikdy nad prázdným místem.
 
 
 
@@ -76,6 +79,13 @@ a **Kam kód vložit**: na konec stránky (bezpečné pro jakýkoli kód) nebo d
 
 Jakmile stránka obsahuje reklamní nebo měřicí kód, povolí skripty, rámečky a styly z cizích webů (jinak by se nenačetly). Stránky bez kódu
 zůstávají na přísném nastavení.
+
+## Vlastní CSS
+Karta **Vlastní CSS**: vypínač **Použít vlastní CSS na veřejných stránkách** a pole pro styly (jen CSS, bez značek `<style>`, nejvýš 50 000 znaků).
+Styly se načtou **za styly webu**, takže jimi můžete cokoli přepsat – např. `.reklama-stitek { color: #999; }` nebo `.hlavicka { background: #fff; }`.
+Platí na hlavní stránce, v galeriích, na stránce O galerii i v zásadách. **Přihlášení a administrace zůstávají beze změny**, takže se
+k nastavení dostanete, i když se něco ve stylech pokazí. Vypínačem styly dočasně vypnete, aniž byste je smazali.
+Web je vydává jako samostatný soubor, proto nemůžou změnit obsah stránky ani spustit skript.
 
 ## O galerii
 Text stránky napíšete v **Veřejný web → Stránka O galerii**. Odstavce oddělte prázdným řádkem; jde použít `**tučně**`, odrážky `- `,

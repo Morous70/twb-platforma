@@ -10,11 +10,11 @@ use TWB\Licence\Licence;
  * a do nastavení schema_version (podle ní moduly zalohy a aktualizace poznají starší data).
  * Tabulku media zakládá modul galerie, tabulky auth_tokens a passkeys modul prihlaseni.
  * Tabulka web_files (0.8.11) drží soubory veřejného webu (vlastní logo) přímo v databázi – jsou malé a zálohují se s ní.
- * Aplikace k media přidává kategorii, poznámku, autora, licenci (text, kód a verzi), klíč veřejného odkazu a příznak doporučené (sloupce, které modul nezná a nečte).
+ * Aplikace k media přidává kategorii, poznámku, autora, licenci (text, kód a verzi), klíč veřejného odkazu, příznak doporučené a popis úprav obrázku edits (sloupce, které modul nezná a nečte).
  */
 final class Schema implements ModulMigrace
 {
-    public static function verze(): int { return 9; }
+    public static function verze(): int { return 10; }
 
     /** Tabulky, které musí existovat dřív než cokoli jiného (nastavení a protokol). */
     public static function zakladniTabulky(Db $db): void
@@ -114,6 +114,11 @@ final class Schema implements ModulMigrace
                 width INTEGER NULL, height INTEGER NULL,
                 updated_at INTEGER NOT NULL
             )');
+        }
+        if ($zVerze < 10) {
+            // 0.8.13: úprava obrázku (ořez, otočení) – popis úprav; podle něj komprese vychází z upravené verze, ne z originálu
+            $sloupce = array_column($db->q('PRAGMA table_info(media)')->fetchAll(), 'name');
+            if (!in_array('edits', $sloupce, true)) $db->q('ALTER TABLE media ADD COLUMN edits TEXT NULL');
         }
     }
 }

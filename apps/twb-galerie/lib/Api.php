@@ -287,6 +287,7 @@ final class Api
             'archivovano' => $r['archived_at'] ? date('c', (int)strtotime((string)$r['archived_at'])) : null,
             'doporucena' => !empty($r['featured']),
             'vytvoreno' => date('c', (int)strtotime((string)$r['created_at'])),
+            'upraveno' => isset($r['edits']) && $r['edits'] !== '' ? (string)$r['edits'] : null,
             'komprimovano' => !empty($r['orig_filename']) ? ['velikost' => (int)$r['orig_size'], 'sirka' => (int)$r['orig_w'], 'vyska' => (int)$r['orig_h']] : null,
             'verejny_odkaz' => $this->app->media()->verejnaAdresa($r),
             'nahledy' => $nahledy['adresy'] ?? null,

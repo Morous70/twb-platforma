@@ -1,7 +1,7 @@
 {
   "name": "obrazky",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "php": ">=8.1",
-  "popis": "Zpracování obrázků: komprese a zmenšení (JPG/PNG), oprava orientace z EXIF, detekce průhlednosti a animovaných GIFů; výstup WebP a přenos metadat JPEG (od 0.2.0).",
+  "popis": "Zpracování obrázků: komprese a zmenšení (JPG/PNG), oprava orientace z EXIF, detekce průhlednosti a animovaných GIFů; výstup WebP a přenos metadat JPEG (od 0.2.0); úprava – otočení, překlopení, ořez v poměru stran (od 0.3.0).",
   "requires": { "jadro": ">=0.1.0" }
 }

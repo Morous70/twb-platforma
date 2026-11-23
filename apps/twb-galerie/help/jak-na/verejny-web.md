@@ -4,7 +4,7 @@ sekce: jak-na
 admin: ne
 kontext: web
 souvisi: verejne-odkazy, kategorie-a-tagy
-klicova: web, hlavní stránka, veřejná galerie, reklama, banner, adsense, sklik, reklamní kód, ads.txt, o galerii, úvodní fotka
+klicova: web, hlavní stránka, veřejná galerie, reklama, banner, adsense, sklik, reklamní kód, ads.txt, měření návštěvnosti, matomo, gdpr, cookies, souhlas, zásady ochrany osobních údajů, o galerii, úvodní fotka
 ---
 # Veřejný web
 
@@ -36,25 +36,33 @@ U kategorie v **Kategorie → Upravit** nastavíte:
 Stránka galerie ukazuje fotky po 36, nejnovější první. Kliknutím se fotka zvětší, šipkami (nebo posunem prstu) se listuje, Esc okno zavře.
 V popisku je uvedení autora podle licence (např. „Foto: Jana Nováková, CC BY 4.0“).
 
-## Reklamní plochy
-Na hlavní stránce jsou dvě: **Reklamní banner** pod úvodní fotkou a **Reklamní plocha** pod galeriemi (ta je i na stránkách galerií).
-U každé nastavíte, zda se zobrazí, štítek vlevo, text, text tlačítka a odkaz. Odkaz může být `https://…`, `mailto:…`, `tel:…`
-nebo adresa na tomto webu, např. `?s=o-galerii`. Bez odkazu se tlačítko nezobrazí.
+Stránka **Veřejný web** má karty **Základ a texty**, **Reklama**, **Měření návštěvnosti** a **GDPR a cookies**; každá se ukládá svým tlačítkem Uložit.
 
-V poli **Obsah plochy** vyberete, co v ploše bude:
-- **Vlastní text a tlačítko** – štítek vlevo, text, text tlačítka a odkaz (viz výše).
-- **Kód z reklamního systému** – do pole vložíte celý kód reklamní jednotky tak, jak ho dá AdSense, Sklik, Etarget nebo jiný systém,
-  včetně `<script>`. Na web se vloží bez úprav. Štítek (např. *Reklama*) se ukáže drobně nad reklamou, prázdný = bez štítku.
+## Reklama
+Vypínač **Zobrazovat reklamu na veřejných stránkách** a pro každou pozici jedno pole pro **kód z reklamního systému** (AdSense, Sklik,
+Revive, Etarget…), včetně `<script>`. Kód se vypíše přesně tak, jak ho vložíte – vkládejte jen kód, kterému věříte. Prázdná pozice se nezobrazí.
+- **Pod úvodem** – hlavní stránka pod úvodní fotkou, stránka Galerie a galerie kategorie pod nadpisem (banner na šířku, např. 970×250 nebo 728×90).
+- **Pod galeriemi** – pod kartami galerií, v galerii kategorie pod mřížkou fotek (obdélník 300×250 nebo banner na šířku).
+- **Před patičkou** – úplně dole na hlavní stránce, v galeriích i na stránce O galerii.
 
-Vkládejte jen kód od reklamního systému, kterému věříte – kód se nekontroluje a na webu se spustí. Po přepnutí se nic neztratí,
-text i kód zůstanou uložené.
+**ads.txt** web vydá na adrese `/ads.txt` (řádky dá reklamní systém, AdSense: *Weby → ads.txt*). Prázdné pole = soubor neexistuje.
 
-## Reklamní systémy
-- **Kód do hlavičky stránky** se vloží do `<head>` všech stránek webu. Sem patří kód, který reklamní systém chce „mezi značky head“:
-  ověření vlastnictví webu, automatické reklamy AdSense nebo měřicí (retargetingový) kód Skliku.
-- **Obsah ads.txt** web vydá na adrese `/ads.txt`. Řádky dostanete v reklamním systému (AdSense: *Weby → ads.txt*). Prázdné pole = soubor neexistuje.
-- Jakmile stránka obsahuje reklamní kód, povolí skripty, rámečky a styly z cizích webů (jinak by se reklama nenačetla). Stránky bez kódu
-  zůstávají na přísném nastavení.
+## Měření návštěvnosti
+Vypínač **Měřit návštěvnost veřejných stránek**, pole **Měřicí kód** (celý úsek z Matomo, Google Analytics apod., klidně s `<noscript>`)
+a **Kam kód vložit**: na konec stránky (bezpečné pro jakýkoli kód) nebo do hlavičky, když to nástroj výslovně chce. Do administrace se kód nevkládá.
+
+## GDPR a cookies
+- **Ptát se návštěvníků na souhlas s cookies** – dole na webu se ukáže lišta (Přijmout vše / Odmítnout / Nastavení). Dokud návštěvník
+  nepovolí, **měřicí ani reklamní kód se vůbec nenačte** (je ve stránce jen jako neživý text). Lišta se ptá jen na to, co je opravdu
+  vyplněné (měření, reklama). Volbu si prohlížeč pamatuje rok, změnit se dá odkazem **Nastavení cookies** v patičce. Bez souhlasu
+  (vypnutý vypínač) se kód vkládá rovnou.
+- **Zásady ochrany osobních údajů** – stránka na adrese `/zasady-ochrany-osobnich-udaju` s odkazem v patičce a v liště. Vyplňte provozovatele,
+  IČO, e-mail, adresu a případně název stránky. Prázdný **vlastní text** = vzorový text sestavený z těchto údajů a z toho, co web skutečně dělá
+  (záznamy serveru, cookie s volbou, měření a reklama podle nastavení). Tlačítkem **Vložit vzorový text do pole** si ho můžete vzít a upravit.
+  Vzor je podklad, ne právní posudek. Stránka funguje i při vypnutém webu.
+
+Jakmile stránka obsahuje reklamní nebo měřicí kód, povolí skripty, rámečky a styly z cizích webů (jinak by se nenačetly). Stránky bez kódu
+zůstávají na přísném nastavení.
 
 ## O galerii
 Text stránky napíšete v **Veřejný web → Stránka O galerii**. Odstavce oddělte prázdným řádkem; jde použít `**tučně**`, odrážky `- `,

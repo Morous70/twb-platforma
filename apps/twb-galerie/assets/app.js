@@ -632,4 +632,18 @@
   };
   vyber.addEventListener('change', obnov);
   obnov();
+
+})();
+
+// Veřejný web → GDPR (0.8.3): vložit vzorový text zásad do pole
+(function () {
+  document.querySelectorAll('[data-vlozit-vzor]').forEach(function (b) {
+    b.addEventListener('click', function () {
+      var pole = document.getElementById(b.getAttribute('data-vlozit-vzor'));
+      if (!pole) return;
+      if (pole.value.trim() !== '' && !window.confirm('Pole už obsahuje text. Nahradit ho vzorovým textem?')) return;
+      pole.value = b.getAttribute('data-vzor');
+      pole.focus();
+    });
+  });
 })();

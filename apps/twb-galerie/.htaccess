@@ -2,10 +2,11 @@
 Options -Indexes
 # kořen domény = veřejný web (0.8.0); administrace zůstává na index.php
 DirectoryIndex verejne.php index.php
-# ads.txt pro reklamní systémy (0.8.2): obsah se zadává v administraci (Veřejný web), vydá ho verejne.php
+# ads.txt pro reklamní systémy (0.8.2) a stránka se zásadami ochrany osobních údajů (0.8.3); obsah se zadává v administraci (Veřejný web)
 <IfModule mod_rewrite.c>
     RewriteEngine On
     RewriteRule ^ads\.txt$ verejne.php?s=ads.txt [L]
+    RewriteRule ^zasady-ochrany-osobnich-udaju/?$ verejne.php?s=zasady-ochrany-osobnich-udaju [L]
 </IfModule>
 <FilesMatch "^(VERSION|modules\.lock|build\.json|BUILD\.json|config\.php|config\.sample\.php|README\.md)$">
     Require all denied

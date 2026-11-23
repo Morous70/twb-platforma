@@ -1,4 +1,5 @@
 // Veřejný web TWB Galerie (0.8.0): menu na mobilu a okno náhledu fotek (šipky, Esc, posun prstem). Bez JS odkaz fotky otevře velký obrázek.
+// 0.8.3: cookie lišta – měřicí a reklamní kód čeká jako neživý <template data-souhlas="…"> a oživí se až po souhlasu.
 (function () {
   'use strict';
   var menuTl = document.querySelector('[data-menu]');
@@ -82,4 +83,72 @@
     else if (e.key === 'ArrowLeft') ukaz(aktualni - 1);
     else if (e.key === 'ArrowRight') ukaz(aktualni + 1);
   });
+
+  // ---------- Souhlas s cookies (0.8.3) ----------
+  var lista = document.querySelector('[data-cookies]');
+  if (lista) {
+    var jmeno = lista.getAttribute('data-cookie');
+    var kategorie = lista.getAttribute('data-kategorie').split(',');
+    var volby = lista.querySelector('[data-cookies-volby]');
+    // uložená volba: „mereni=1&reklama=0“; null = návštěvník se ještě nerozhodl
+    var nacti = function () {
+      var m = document.cookie.match(new RegExp('(?:^|; )' + jmeno + '=([^;]*)'));
+      if (!m) return null;
+      var v = {};
+      decodeURIComponent(m[1]).split('&').forEach(function (p) { var c = p.split('='); if (c[0]) v[c[0]] = c[1] === '1'; });
+      return v;
+    };
+    // <template> nahradí jeho obsahem; skripty se musí vytvořit znovu, jinak by se nespustily
+    var ozivene = {};
+    var ozivit = function (kat) {
+      if (ozivene[kat]) return;
+      ozivene[kat] = true;
+      Array.prototype.forEach.call(document.querySelectorAll('template[data-souhlas="' + kat + '"]'), function (t) {
+        var obsah = document.importNode(t.content, true);
+        Array.prototype.forEach.call(obsah.querySelectorAll('script'), function (st) {
+          var nove = document.createElement('script');
+          Array.prototype.forEach.call(st.attributes, function (a) { nove.setAttribute(a.name, a.value); });
+          nove.text = st.text;
+          st.parentNode.replaceChild(nove, st);
+        });
+        t.parentNode.replaceChild(obsah, t);
+      });
+    };
+    var uplatni = function (v) { kategorie.forEach(function (k) { if (v[k]) ozivit(k); }); };
+    var uloz = function (v) {
+      var pred = nacti() || {};
+      document.cookie = jmeno + '=' + encodeURIComponent(kategorie.map(function (k) { return k + '=' + (v[k] ? 1 : 0); }).join('&'))
+        + '; max-age=31536000; path=/; SameSite=Lax' + (location.protocol === 'https:' ? '; Secure' : '');
+      lista.hidden = true;
+      // odvolaný souhlas: už spuštěný kód nejde zastavit, stránka se načte znovu bez něj
+      if (kategorie.some(function (k) { return pred[k] && !v[k] && ozivene[k]; })) { location.reload(); return; }
+      uplatni(v);
+    };
+    var ukazNastaveni = function (ano) {
+      volby.hidden = !ano;
+      lista.querySelector('[data-cookies-akce="nastaveni"]').hidden = ano;
+      lista.querySelector('[data-cookies-akce="vyber"]').hidden = !ano;
+    };
+    var otevri = function (sNastavenim) {
+      var v = nacti() || {};
+      kategorie.forEach(function (k) { var i = volby.querySelector('input[name="' + k + '"]'); if (i) i.checked = !!v[k]; });
+      ukazNastaveni(sNastavenim);
+      lista.hidden = false;
+    };
+    lista.addEventListener('click', function (e) {
+      var tl = e.target.closest('[data-cookies-akce]');
+      if (!tl) return;
+      var akce = tl.getAttribute('data-cookies-akce'), v = {};
+      if (akce === 'nastaveni') { ukazNastaveni(true); return; }
+      kategorie.forEach(function (k) {
+        v[k] = akce === 'vse' || (akce === 'vyber' && volby.querySelector('input[name="' + k + '"]').checked);
+      });
+      uloz(v);
+    });
+    Array.prototype.forEach.call(document.querySelectorAll('[data-cookies-nastaveni]'), function (b) {
+      b.addEventListener('click', function () { otevri(true); });
+    });
+    var ulozene = nacti();
+    if (ulozene) uplatni(ulozene); else otevri(false);
+  }
 })();

@@ -3,7 +3,8 @@ declare(strict_types=1);
 // Veřejný web galerie (0.8.0): ?s=domu (hlavní stránka), ?s=galerie (veřejné kategorie), ?s=galerie&k=<id-nazev> (fotky kategorie), ?s=o-galerii.
 // Kořen domény ho otevře přes DirectoryIndex v .htaccess; index.php s parametrem s= (bez p=) sem předá také. Administrace zůstává na index.php.
 // Ukazuje jen veřejné kategorie a v nich obrázky s veřejným odkazem mimo archiv (viz MediaGalerie\Web).
-// 0.8.2: reklamní plochy mohou být kód z reklamního systému (vloží se bez úprav), kód do hlavičky a ads.txt (?s=ads.txt, /ads.txt přes .htaccess).
+// 0.8.3: reklamní pozice s kódem z reklamního systému, měřicí kód, cookie lišta se souhlasem (bez souhlasu je kód jen neživý <template>),
+// stránka ?s=zasady-ochrany-osobnich-udaju a ads.txt (?s=ads.txt; /ads.txt a /zasady-ochrany-osobnich-udaju přes .htaccess).
 use MediaGalerie\{App, Web, Media};
 use TWB\Napoveda\Markdown;
 
@@ -13,7 +14,9 @@ if (!$app->nainstalovano()) { header('Location: install.php'); exit; }
 $app->migrujPodlePotreby();
 $web = $app->web();
 $n = $web->nastaveni();
-if (!$n['zapnuto']) { header('Location: index.php', true, 302); exit; }
+$stranka = (string)($_GET['s'] ?? 'domu');
+// zásady a ads.txt fungují i s vypnutým webem (odkaz na zásady může vést odjinud, reklamní systém kontroluje ads.txt)
+if (!$n['zapnuto'] && !in_array($stranka, [Web::ZASADY, 'ads.txt'], true)) { header('Location: index.php', true, 302); exit; }
 
 $h = static fn(mixed $s): string => htmlspecialchars((string)$s, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
 /** Ikony ve stylu Feather Icons (MIT, viz assets/LICENCE.txt). */
@@ -35,7 +38,6 @@ $fotografii = static function (int $n): string {
 };
 $odkazKategorie = static fn(array $k): string => '?s=galerie&k=' . rawurlencode(Web::slug($k));
 
-$stranka = (string)($_GET['s'] ?? 'domu');
 if ($stranka === 'ads.txt') {
     // ads.txt pro reklamní systémy (AdSense…): prostý text z nastavení webu, bez něj 404
     http_response_code($n['ads_txt'] !== '' ? 200 : 404);
@@ -49,26 +51,18 @@ $titulek = '';
 $aktivni = $stranka;
 $obsah = '';
 $kod = 200;
-$plochy = [];   // reklamní plochy, které stránka opravdu ukázala (kvůli CSP)
+$kodNaStrance = false;   // stránka obsahuje reklamní nebo měřicí kód (kvůli CSP)
+$souhlas = Web::kategorieSouhlasu($n);   // na co se ptá cookie lišta; prázdné = kód se vkládá rovnou
+/** Kód reklamy nebo měření: se souhlasem jako neživý <template> (oživí ho verejne.js po povolení), jinak rovnou. */
+$vlozKod = static function (string $kod, string $kategorie) use ($souhlas, &$kodNaStrance): string {
+    $kodNaStrance = true;
+    return isset($souhlas[$kategorie]) ? '<template data-souhlas="' . $kategorie . '">' . $kod . '</template>' : $kod;
+};
 
 // ---------- části stránek ----------
-$banner = static function (string $klic) use ($n, $h, $ikona, &$plochy): string {
-    $b = $n[$klic];
-    if (!$b['zobrazit']) return '';
-    if ($b['typ'] === 'kod') {
-        // kód z reklamního systému se vkládá tak, jak ho správce zadal (HTML/JS), jen do vlastního obalu
-        if ($b['kod'] === '') return '';
-        $plochy[] = $klic;
-        return '<aside class="banner-kod" aria-label="' . $h($b['stitek'] !== '' ? $b['stitek'] : 'Reklama') . '">'
-            . ($b['stitek'] !== '' ? '<span class="banner-kod-stitek">' . $h($b['stitek']) . '</span>' : '')
-            . '<div class="banner-kod-obsah">' . $b['kod'] . '</div></aside>';
-    }
-    if ($b['text'] === '' && $b['stitek'] === '') return '';
-    $tl = $b['tlacitko'] !== '' && $b['odkaz'] !== ''
-        ? '<a class="banner-tlacitko" href="' . $h($b['odkaz']) . '"' . (preg_match('~^https?://~i', $b['odkaz']) ? ' rel="sponsored noopener"' : '') . '>' . $h($b['tlacitko']) . $ikona('dalsi', 16) . '</a>' : '';
-    return '<aside class="banner" aria-label="' . $h($b['stitek'] !== '' ? $b['stitek'] : 'Reklama') . '">'
-        . ($b['stitek'] !== '' ? '<span class="banner-stitek">' . $h($b['stitek']) . '</span>' : '')
-        . '<p class="banner-text">' . $h($b['text']) . '</p>' . $tl . '</aside>';
+$reklama = static function (string $pozice) use ($n, $vlozKod): string {
+    $kod = Web::reklamaKod($n, $pozice);
+    return $kod === '' ? '' : '<aside class="reklama reklama-' . str_replace('_', '-', $pozice) . '" aria-label="Reklama">' . $vlozKod($kod, 'reklama') . '</aside>';
 };
 $karty = static function (array $seznam) use ($web, $h, $ikona, $fotografii, $odkazKategorie): string {
     $out = '<div class="karty">';
@@ -111,7 +105,7 @@ switch ($stranka) {
             . '<a class="tlacitko velke" href="?s=galerie">' . $ikona('obrazek', 22) . '<span>' . $h($n['tlacitko']) . '</span>' . $ikona('dalsi', 18) . '</a>'
             . ($n['poznamka'] !== '' ? '<p class="poznamka">' . $ikona('foto', 18) . '<em>' . $h($n['poznamka']) . '</em></p>' : '')
             . '</div></section>';
-        $obsah .= '<div class="obsah">' . $banner('banner1');
+        $obsah .= '<div class="obsah">' . $reklama('pod_uvodem');
         $vybrane = $n['vybrane_pocet'] > 0 ? array_slice($kategorie, 0, (int)$n['vybrane_pocet']) : [];
         if ($vybrane) {
             $obsah .= '<section class="sekce">' . $nadpisSekce($n['vybrane_nadpis'], $n['vybrane_podnadpis']) . $karty($vybrane)
@@ -119,7 +113,7 @@ switch ($stranka) {
         } elseif (!$kategorie) {
             $obsah .= '<p class="prazdne">Galerie se připravuje. Nové fotografie brzy přibudou.</p>';
         }
-        $obsah .= $banner('banner2') . '</div>';
+        $obsah .= $reklama('pod_galeriemi') . $reklama('pred_patickou') . '</div>';
         break;
 
     case 'galerie':
@@ -130,8 +124,9 @@ switch ($stranka) {
             $titulek = (string)$k['name'];
             $f = $web->fotky($kId, (int)($_GET['strana'] ?? 1));
             $obsah .= '<div class="obsah"><nav class="drobecky" aria-label="Drobečková navigace"><a href="?s=galerie">Galerie</a> <span aria-hidden="true">›</span> <span>' . $h($k['name']) . '</span></nav>'
-                . $nadpisSekce((string)$k['name'], ($k['web_description'] ? $k['web_description'] . ' · ' : '') . $fotografii($f['celkem']), 'h1');
+                . $nadpisSekce((string)$k['name'], ($k['web_description'] ? $k['web_description'] . ' · ' : '') . $fotografii($f['celkem']), 'h1') . $reklama('pod_uvodem');
             $obsah .= $f['polozky'] ? $mrizka($f['polozky']) : '<p class="prazdne">V této galerii zatím nejsou žádné fotografie.</p>';
+            $obsah .= $reklama('pod_galeriemi');
             if ($f['stran'] > 1) {
                 $obsah .= '<nav class="strankovani" aria-label="Stránky">';
                 for ($i = 1; $i <= $f['stran']; $i++) {
@@ -139,21 +134,31 @@ switch ($stranka) {
                 }
                 $obsah .= '</nav>';
             }
-            $obsah .= $banner('banner2') . '</div>';
+            $obsah .= $reklama('pred_patickou') . '</div>';
             break;
         }
         $titulek = 'Galerie';
-        $obsah .= '<div class="obsah">' . $nadpisSekce('Galerie', $kategorie ? 'Všechny veřejné galerie.' : '', 'h1');
+        $obsah .= '<div class="obsah">' . $nadpisSekce('Galerie', $kategorie ? 'Všechny veřejné galerie.' : '', 'h1') . $reklama('pod_uvodem');
         $obsah .= $kategorie ? $karty($kategorie) : '<p class="prazdne">Galerie se připravuje. Nové fotografie brzy přibudou.</p>';
+        $obsah .= $reklama('pod_galeriemi');
         if ($nove = $web->nejnovejsi(12)) $obsah .= '<section class="sekce">' . $nadpisSekce('Nejnovější fotografie') . $mrizka($nove, true) . '</section>';
-        $obsah .= $banner('banner2') . '</div>';
+        $obsah .= $reklama('pred_patickou') . '</div>';
         break;
 
     case 'o-galerii':
         $titulek = 'O galerii';
         $text = trim((string)$n['o_galerii']);
         $obsah .= '<div class="obsah uzky">' . $nadpisSekce('O galerii', '', 'h1')
-            . '<div class="text">' . ($text !== '' ? (new Markdown(fn(string $id) => '?s=' . rawurlencode($id)))->html($text) : '') . '</div></div>';
+            . '<div class="text">' . ($text !== '' ? (new Markdown(fn(string $id) => '?s=' . rawurlencode($id)))->html($text) : '') . '</div>'
+            . $reklama('pred_patickou') . '</div>';
+        break;
+
+    case Web::ZASADY:
+        if (!$n['zasady_zapnuto']) { $kod = 404; break; }
+        $titulek = 'Zásady ochrany osobních údajů';
+        $obsah .= '<div class="obsah uzky">' . $nadpisSekce($titulek, '', 'h1')
+            . '<div class="text">' . (new Markdown(fn(string $id) => '?s=' . rawurlencode($id)))->html($web->textZasad($n)) . '</div>'
+            . ($souhlas ? '<p><button type="button" class="tlacitko" data-cookies-nastaveni>Nastavení cookies</button></p>' : '') . '</div>';
         break;
 
     default:
@@ -162,9 +167,33 @@ switch ($stranka) {
 if ($kod === 404) {
     $titulek = 'Stránka nenalezena';
     $aktivni = '';
-    $plochy = [];
+    $kodNaStrance = false;
     $obsah = '<div class="obsah uzky">' . $nadpisSekce('Stránka nenalezena', 'Tahle stránka neexistuje nebo už není veřejná.', 'h1')
         . '<p><a class="tlacitko" href="./">Zpět na hlavní stránku</a></p></div>';
+}
+
+// ---------- měření návštěvnosti a cookie lišta ----------
+$mereni = Web::meri($n) ? $vlozKod((string)$n['mereni_kod'], 'mereni') . "\n" : '';
+$mereniHlavicka = $n['mereni_umisteni'] === 'hlavicka' ? $mereni : '';
+$mereniKonec = $n['mereni_umisteni'] === 'hlavicka' ? '' : $mereni;
+$zasadyOdkaz = $n['zasady_zapnuto'] ? '?s=' . Web::ZASADY : '';
+$lista = '';
+if ($souhlas) {
+    $co = implode(' a ', array_intersect_key(['mereni' => 'měření návštěvnosti', 'reklama' => 'reklamu'], $souhlas));
+    $volby = '';
+    foreach ($souhlas as $k => $nazev) {
+        $popis = $k === 'mereni' ? 'Souhrnné statistiky návštěvnosti, podle kterých web zlepšujeme.' : 'Reklama z reklamních systémů, které mohou ukládat cookies a zpracovávat údaje o návštěvě.';
+        $volby .= '<label class="cookies-volba"><input type="checkbox" name="' . $k . '" value="1"> <span><strong>' . $h($nazev) . '</strong> ' . $h($popis) . '</span></label>';
+    }
+    $lista = '<div class="cookies" data-cookies data-cookie="' . Web::COOKIE_SOUHLAS . '" data-kategorie="' . $h(implode(',', array_keys($souhlas))) . '" role="dialog" aria-live="polite" aria-label="Souhlas s cookies" hidden>'
+        . '<div class="cookies-obal"><p class="cookies-text"><strong>Cookies</strong> Rádi bychom použili cookies pro ' . $h($co) . '. Bez vašeho souhlasu se nic z toho nenačte, '
+        . 'web funguje i tak. Volbu můžete kdykoli změnit odkazem Nastavení cookies v patičce.'
+        . ($zasadyOdkaz !== '' ? ' <a href="' . $h($zasadyOdkaz) . '">Zásady ochrany osobních údajů</a>' : '') . '</p>'
+        . '<div class="cookies-volby" data-cookies-volby hidden><label class="cookies-volba"><input type="checkbox" checked disabled> <span><strong>Nezbytné</strong> Uložení vaší volby. Bez nich web nefunguje.</span></label>' . $volby . '</div>'
+        . '<div class="cookies-tlacitka"><button type="button" class="tlacitko" data-cookies-akce="nastaveni">Nastavení</button>'
+        . '<button type="button" class="tlacitko" data-cookies-akce="vyber" hidden>Uložit výběr</button>'
+        . '<button type="button" class="tlacitko" data-cookies-akce="odmitnout">Odmítnout</button>'
+        . '<button type="button" class="tlacitko hlavni" data-cookies-akce="vse">Přijmout vše</button></div></div></div>';
 }
 
 // ---------- rozvržení ----------
@@ -172,7 +201,7 @@ http_response_code($kod);
 header('Content-Type: text/html; charset=utf-8');
 header('Cache-Control: public, max-age=60');
 header('X-Frame-Options: SAMEORIGIN');
-header('Content-Security-Policy: ' . Web::csp(Web::maKod($n, $plochy)));
+header('Content-Security-Policy: ' . Web::csp($kodNaStrance));
 if ($n['skryt_vyhledavacum']) header('X-Robots-Tag: noindex, nofollow');
 $v = $h($app->verze);
 $menu = ['domu' => ['./', 'Domů'], 'galerie' => ['?s=galerie', 'Galerie'], 'o-galerii' => ['?s=o-galerii', 'O galerii']];
@@ -193,10 +222,7 @@ $popisStranky = $n['podnadpis'] !== '' ? $n['podnadpis'] : $n['nadpis'];
 <link rel="stylesheet" href="assets/verejne.css?v=<?= $v ?>">
 <link rel="icon" href="assets/ikona.svg" type="image/svg+xml">
 <script src="assets/verejne.js?v=<?= $v ?>" defer></script>
-<?php if ($n['kod_hlavicka'] !== ''): ?>
-<?= $n['kod_hlavicka'] ?>
-
-<?php endif; ?>
+<?= $mereniHlavicka ?>
 </head>
 <body>
 <header class="hlavicka">
@@ -214,8 +240,14 @@ $popisStranky = $n['podnadpis'] !== '' ? $n['podnadpis'] : $n['nadpis'];
 <footer class="paticka">
   <div class="paticka-obal">
     <span><?= $h($n['patka']) ?></span>
-    <?php if ($admin): ?><a href="index.php?p=prehled"><?= $ikona('prihlasit', 16) ?><span>Přihlášení do administrace</span></a><?php endif; ?>
+    <span class="paticka-odkazy">
+      <?php if ($zasadyOdkaz !== ''): ?><a href="<?= $h($zasadyOdkaz) ?>">Zásady ochrany osobních údajů</a><?php endif; ?>
+      <?php if ($souhlas): ?><button type="button" class="odkaz" data-cookies-nastaveni>Nastavení cookies</button><?php endif; ?>
+      <?php if ($admin): ?><a href="index.php?p=prehled"><?= $ikona('prihlasit', 16) ?><span>Přihlášení do administrace</span></a><?php endif; ?>
+    </span>
   </div>
 </footer>
+<?= $lista ?>
+<?= $mereniKonec ?>
 </body>
 </html>

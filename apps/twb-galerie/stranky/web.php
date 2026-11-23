@@ -1,26 +1,41 @@
 <?php
 declare(strict_types=1);
-// Veřejný web (0.8.0): zapnutí, texty hlavní stránky, úvodní fotka, reklamní plochy (0.8.2: i kód z reklamního systému, kód do hlavičky, ads.txt), stránka O galerii. Proměnné: $app, $ui, $post.
+// Veřejný web: karty Základ a texty, Reklama (0.8.3: jen kód pro každou pozici, ads.txt), Měření návštěvnosti (kód, kam vložit),
+// GDPR a cookies (souhlas, zásady ochrany osobních údajů). Každá karta má svůj formulář (akce = část). Proměnné: $app, $ui, $post.
 use MediaGalerie\{Ui, Chyba, Web};
 
 $web = $app->web();
-
+$karta = (string)($_GET['karta'] ?? '');
+if (!isset(Web::CASTI[$karta])) $karta = 'zaklad';
 if ($post) {
-    if ($ui->zpracuj(function () use ($web) {
-        if (($_POST['akce'] ?? '') !== 'ulozit') throw new Chyba('Neznámá akce.');
-        $web->uloz($_POST);
+    $cast = (string)($_POST['akce'] ?? '');
+    if (isset(Web::CASTI[$cast])) $karta = $cast;   // po chybě zůstat na kartě formuláře
+    if ($ui->zpracuj(function () use ($web, $cast) {
+        if (!isset(Web::CASTI[$cast])) throw new Chyba('Neznámá akce.');
+        $web->uloz($cast, $_POST);
     })) {
         $ui->zprava('ok', 'Nastavení webu uloženo.');
-        $ui->presmeruj(Ui::odkaz('web'));
+        $ui->presmeruj(Ui::odkaz('web', ['karta' => $cast]) . '#' . $cast);
     }
 }
 $n = $web->nastaveni();
 $kategorie = $web->kategorie();
 $vsechny = $app->kategorie()->seznam();
 $uvod = $web->uvodni($kategorie);
-$zaskrtnuto = static fn(string $nazev, bool $vychozi): bool => ($_SERVER['REQUEST_METHOD'] === 'POST') ? !empty($_POST[$nazev]) : $vychozi;
+// po chybě ukázat odeslaný stav zaškrtávátek jen ve formuláři, který se odesílal (ostatní karty zůstanou podle uloženého nastavení)
+$castPole = ['reklama_zapnuto' => 'reklama', 'mereni_zapnuto' => 'mereni', 'cookies_souhlas' => 'gdpr', 'zasady_zapnuto' => 'gdpr'];
+$zaskrtnuto = static fn(string $nazev, bool $vychozi): bool => ($post && ($_POST['akce'] ?? '') === ($castPole[$nazev] ?? 'zaklad')) ? !empty($_POST[$nazev]) : $vychozi;
 $zaskrt = static fn(string $nazev, string $popis, bool $vychozi, string $napoveda = ''): string => '<label class="zaskrtavatko"><input type="checkbox" name="' . Ui::h($nazev) . '" value="1"'
     . ($zaskrtnuto($nazev, $vychozi) ? ' checked' : '') . '> <span>' . Ui::h($popis) . '</span></label>' . ($napoveda !== '' ? '<small class="slabe mala" style="display:block;margin:-.25rem 0 .5rem 1.6rem">' . $napoveda . '</small>' : '');
+/** Vypínač (zaškrtávátko vzhledu přepínače) s nápovědou pod ním. */
+$vypinac = static fn(string $nazev, string $popis, bool $vychozi, string $napoveda = ''): string => '<label class="vypinac"><input type="checkbox" role="switch" name="' . Ui::h($nazev) . '" value="1"'
+    . ($zaskrtnuto($nazev, $vychozi) ? ' checked' : '') . '> <span>' . Ui::h($popis) . '</span></label>' . ($napoveda !== '' ? '<p class="slabe" style="margin:.5rem 0 0">' . $napoveda . '</p>' : '');
+$panel = fn(string $id): string => '<div class="panel-karty" id="' . $id . '" role="tabpanel" aria-labelledby="karta-' . $id . '" tabindex="-1" data-karta'
+    . ($id === $karta ? '' : ' hidden') . '>';
+$formular = fn(string $cast): string => '<form method="post" action="' . Ui::h(Ui::odkaz('web', ['karta' => $cast]) . '#' . $cast) . '">' . $ui->csrf()
+    . '<input type="hidden" name="akce" value="' . $cast . '">';
+$souhlas = Web::kategorieSouhlasu(['cookies_souhlas' => true] + $n);
+$adresaZasad = $app->url(Web::ZASADY);
 ?>
 <div class="karta">
   <p style="margin-top:0">Veřejný web je na adrese <a href="<?= Ui::h($app->url()) ?>/"><strong><?= Ui::h($app->url()) ?>/</strong></a>: hlavní stránka, <a href="<?= Ui::h($app->url('?s=galerie')) ?>">Galerie</a> a <a href="<?= Ui::h($app->url('?s=o-galerii')) ?>">O galerii</a>.
@@ -31,9 +46,15 @@ $zaskrt = static fn(string $nazev, string $popis, bool $vychozi, string $napoved
     · veřejných kategorií s fotkami: <strong><?= count($kategorie) ?></strong> z <?= count($vsechny) ?></p>
 </div>
 
-<form method="post" class="formular karta" action="<?= Ui::h(Ui::odkaz('web')) ?>">
-  <?= $ui->csrf() ?>
-  <input type="hidden" name="akce" value="ulozit">
+<nav class="karty-nav" role="tablist" aria-label="Oddíly veřejného webu">
+<?php foreach (Web::CASTI as $id => $nazev): ?>
+  <a href="<?= Ui::h(Ui::odkaz('web', ['karta' => $id]) . '#' . $id) ?>" id="karta-<?= $id ?>" role="tab" aria-controls="<?= $id ?>" aria-selected="<?= $id === $karta ? 'true' : 'false' ?>"<?= $id === $karta ? ' class="aktivni"' : ' tabindex="-1"' ?>><?= Ui::h($nazev) ?></a>
+<?php endforeach; ?>
+</nav>
+
+<?= $panel('zaklad') ?>
+<?= $formular('zaklad') ?>
+<div class="formular karta">
   <h2 style="margin:0">Základ</h2>
   <?= $zaskrt('zapnuto', 'Veřejný web zapnutý', (bool)$n['zapnuto'], 'Vypnutý web přesměruje návštěvníky na přihlášení do administrace.') ?>
   <?= $zaskrt('odkaz_administrace', 'Ukázat tlačítko „Přihlášení do administrace“', (bool)$n['odkaz_administrace'], 'Bez tlačítka se do administrace dostanete na adrese …/index.php.') ?>
@@ -57,39 +78,88 @@ $zaskrt = static fn(string $nazev, string $popis, bool $vychozi, string $napoved
   <?= Ui::pole('Počet karet na hlavní stránce', 'vybrane_pocet', (string)$n['vybrane_pocet'], ['type' => 'number', 'min' => 0, 'max' => 12],
       'Prvních N veřejných kategorií podle pořadí nastaveného u kategorie (0 = sekce se skryje). Všechny jsou na stránce Galerie.') ?>
 
-  <?php foreach (Web::BANNERY as $b => $popis): $hb = $n[$b]; ?>
-  <div class="reklamni-plocha">
-  <h2 style="margin:1rem 0 0"><?= Ui::h($popis) ?></h2>
-  <?= $zaskrt("{$b}_zobrazit", 'Zobrazit', (bool)$hb['zobrazit']) ?>
-  <?= Ui::vyber('Obsah plochy', "{$b}_typ", Web::TYPY_BANNERU, $hb['typ']) ?>
-  <?= Ui::pole('Štítek', "{$b}_stitek", $hb['stitek'], ['maxlength' => 40], 'U vlastního textu vlevo, u kódu drobně nad reklamou (např. <em>Reklama</em>). Prázdný = bez štítku.') ?>
-  <div class="jen-kod">
-  <?= Ui::oblast('Kód z reklamního systému', "{$b}_kod", $hb['kod'], ['rows' => 7, 'maxlength' => Web::MAX_KOD, 'spellcheck' => 'false', 'class' => 'kod',
-      'placeholder' => '<script async src="https://…"></script>' . "\n" . '<ins class="adsbygoogle" …></ins>'],
-      'Vložte celý kód reklamní jednotky tak, jak ho dá reklamní systém (AdSense, Sklik, Etarget…), včetně <code>&lt;script&gt;</code>. Na web se vloží bez úprav, '
-      . 'stránka pak povolí skripty a rámečky reklamních systémů. Kód nekontrolujeme – vkládejte jen kód od reklamního systému, kterému věříte.') ?>
-  </div>
-  <div class="jen-text">
-  <?= Ui::pole('Text', "{$b}_text", $hb['text'], ['maxlength' => 200]) ?>
-  <?= Ui::pole('Text tlačítka', "{$b}_tlacitko", $hb['tlacitko'], ['maxlength' => 40]) ?>
-  <?= Ui::pole('Odkaz tlačítka', "{$b}_odkaz", $hb['odkaz'], ['maxlength' => 500, 'placeholder' => 'https://…'],
-      'https://…, mailto:…, tel:… nebo adresa na tomto webu (např. <code>?s=o-galerii</code>). Bez odkazu se tlačítko nezobrazí.') ?>
-  </div>
-  </div>
-  <?php endforeach; ?>
-
-  <h2 style="margin:1rem 0 0">Reklamní systémy</h2>
-  <?= Ui::oblast('Kód do hlavičky stránky', 'kod_hlavicka', $n['kod_hlavicka'], ['rows' => 4, 'maxlength' => Web::MAX_KOD, 'spellcheck' => 'false', 'class' => 'kod',
-      'placeholder' => '<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-…" crossorigin="anonymous"></script>'],
-      'Vloží se do <code>&lt;head&gt;</code> každé stránky webu: ověření webu, automatické reklamy AdSense, měřicí kód reklamního systému. Prázdné = nic.') ?>
-  <?= Ui::oblast('Obsah ads.txt', 'ads_txt', $n['ads_txt'], ['rows' => 3, 'maxlength' => Web::MAX_KOD, 'spellcheck' => 'false', 'class' => 'kod',
-      'placeholder' => 'google.com, pub-0000000000000000, DIRECT, f08c47fec0942fa0'],
-      'Web ho vydá na <a href="' . Ui::h($app->url('ads.txt')) . '"><code>/ads.txt</code></a> (chce ho např. AdSense). Prázdné = soubor neexistuje.') ?>
-
   <h2 style="margin:1rem 0 0">Stránka O galerii</h2>
   <?= Ui::oblast('Text', 'o_galerii', $n['o_galerii'], ['rows' => 10, 'maxlength' => 20000],
       'Odstavce oddělte prázdným řádkem. Jde použít <code>**tučně**</code>, odrážky <code>- </code>, nadpisy <code>## </code> a odkazy <code>[text](https://…)</code>.') ?>
 
   <div class="tlacitka"><button type="submit" class="hlavni">Uložit</button>
     <a class="tlacitko" href="<?= Ui::h($app->url()) ?>/">Zobrazit web</a></div>
+</div>
 </form>
+</div>
+
+<?= $panel('reklama') ?>
+<?= $formular('reklama') ?>
+<div class="karta">
+  <?= $vypinac('reklama_zapnuto', 'Zobrazovat reklamu na veřejných stránkách', (bool)$n['reklama_zapnuto'],
+      'Do každé pozice vložte <strong>kód ze svého reklamního systému</strong> (HTML, případně i <code>&lt;script&gt;</code>) – AdSense, Sklik, Revive, Etarget…'
+      . ' Vypíše se přesně tak, jak ho sem napíšete – vkládejte proto jen kód, kterému věříte. Prázdná pozice se nezobrazí. Do administrace se reklama nevkládá.') ?>
+</div>
+<?php foreach (Web::POZICE as $k => [$nazev, $popis]): ?>
+<div class="karta formular">
+  <h2 style="margin:0"><?= Ui::h($nazev) ?></h2>
+  <p class="slabe" style="margin:0"><?= Ui::h($popis) ?></p>
+  <textarea name="reklama_<?= $k ?>" class="kod" rows="4" spellcheck="false" maxlength="<?= Web::MAX_KOD ?>" aria-label="Kód reklamy – <?= Ui::h($nazev) ?>"
+    placeholder="<ins …></ins>&#10;<script async src=&quot;https://…&quot;></script>"><?= Ui::h($post && $karta === 'reklama' ? (string)($_POST["reklama_{$k}"] ?? '') : $n['reklama'][$k]) ?></textarea>
+</div>
+<?php endforeach; ?>
+<div class="karta formular">
+  <h2 style="margin:0">ads.txt</h2>
+  <p class="slabe" style="margin:0">Web ho vydá na <a href="<?= Ui::h($app->url('ads.txt')) ?>"><code>/ads.txt</code></a> – vyžaduje ho např. AdSense (<em>Weby → ads.txt</em>). Prázdné = soubor neexistuje.</p>
+  <textarea name="ads_txt" class="kod" rows="3" spellcheck="false" maxlength="<?= Web::MAX_KOD ?>" aria-label="Obsah ads.txt"
+    placeholder="google.com, pub-0000000000000000, DIRECT, f08c47fec0942fa0"><?= Ui::h($post && $karta === 'reklama' ? (string)($_POST['ads_txt'] ?? '') : $n['ads_txt']) ?></textarea>
+</div>
+<div class="tlacitka"><button type="submit" class="hlavni">Uložit</button></div>
+</form>
+</div>
+
+<?= $panel('mereni') ?>
+<?= $formular('mereni') ?>
+<div class="karta">
+  <?= $vypinac('mereni_zapnuto', 'Měřit návštěvnost veřejných stránek', (bool)$n['mereni_zapnuto'],
+      'Vložte <strong>měřicí kód</strong> ze svého nástroje – typicky Matomo (v něm <em>Administrace → Webové stránky → Sledovací kód</em>) nebo Google Analytics, ale funguje jakýkoli kód.'
+      . ' Vypíše se přesně tak, jak ho sem napíšete. Měří se jen <strong>veřejné stránky</strong> (hlavní stránka, galerie, O galerii, zásady); do administrace se kód nevkládá.') ?>
+</div>
+<div class="karta formular">
+  <h2 style="margin:0">Měřicí kód</h2>
+  <p class="slabe" style="margin:0">Celý úsek včetně <code>&lt;script&gt;</code> (klidně i s <code>&lt;noscript&gt;</code>). Prázdné pole = neměří se nic.</p>
+  <textarea name="mereni_kod" class="kod" rows="12" spellcheck="false" maxlength="<?= Web::MAX_KOD ?>" aria-label="Měřicí kód"
+    placeholder="<!-- Matomo -->&#10;<script>&#10;  var _paq = window._paq = window._paq || [];&#10;  …&#10;</script>"><?= Ui::h($post && $karta === 'mereni' ? (string)($_POST['mereni_kod'] ?? '') : $n['mereni_kod']) ?></textarea>
+  <?= Ui::vyber('Kam kód vložit', 'mereni_umisteni', Web::UMISTENI_MERENI, $n['mereni_umisteni']) ?>
+</div>
+<div class="tlacitka"><button type="submit" class="hlavni">Uložit</button></div>
+</form>
+</div>
+
+<?= $panel('gdpr') ?>
+<?= $formular('gdpr') ?>
+<div class="karta">
+  <h2 style="margin:0 0 .5rem">Souhlas s cookies</h2>
+  <?= $vypinac('cookies_souhlas', 'Ptát se návštěvníků na souhlas s cookies', (bool)$n['cookies_souhlas'],
+      'Se zapnutým souhlasem se <strong>měřicí ani reklamní kód vůbec nenačte</strong>, dokud ho návštěvník nepovolí – nečeká v stránce „připravený“, ale jen jako neživý text.'
+      . ' Volbu si prohlížeč pamatuje rok a změnit se dá odkazem <em>Nastavení cookies</em> v patičce.') ?>
+  <p class="karta-poznamka"><?= $souhlas ? 'Lišta se bude ptát na: <strong>' . Ui::h(implode(', ', $souhlas)) . '</strong>.'
+      : 'Teď není na co se ptát – reklama ani měření nemají vyplněný kód, lišta se nezobrazí.' ?></p>
+</div>
+<div class="karta formular">
+  <h2 style="margin:0">Zásady ochrany osobních údajů</h2>
+  <?= $vypinac('zasady_zapnuto', 'Zveřejnit stránku se zásadami', (bool)$n['zasady_zapnuto'],
+      'Adresa: <a href="' . Ui::h($adresaZasad) . '"><code>' . Ui::h($adresaZasad) . '</code></a>. Odkaz se přidá do patičky webu a do cookie lišty. Stránka funguje i při vypnutém webu.') ?>
+  <div class="radek radek-zasady">
+    <?= Ui::pole('Provozovatel (jméno nebo firma)', 'provozovatel', $n['provozovatel'], ['maxlength' => 120]) ?>
+    <?= Ui::pole('IČO', 'ico', $n['ico'], ['maxlength' => 12, 'inputmode' => 'numeric', 'placeholder' => '12345678']) ?>
+    <?= Ui::pole('Kontaktní e-mail', 'email', $n['email'], ['type' => 'email', 'maxlength' => 120]) ?>
+  </div>
+  <div class="radek radek-zasady">
+    <?= Ui::pole('Adresa', 'adresa', $n['adresa'], ['maxlength' => 200]) ?>
+    <?= Ui::pole('Název stránky', 'nazev_stranky', $n['nazev_stranky'], ['maxlength' => 80, 'placeholder' => $web->nazevStranky(['nazev_stranky' => ''] + $n)]) ?>
+  </div>
+  <?= Ui::oblast('Vlastní text (Markdown)', 'zasady_text', $n['zasady_text'], ['rows' => 16, 'maxlength' => 30000, 'class' => 'kod', 'placeholder' => "## Kdo zpracovává vaše údaje\n\n…"],
+      'Prázdné = použije se vzorový text sestavený z údajů výše, který popisuje, co web <strong>skutečně</strong> dělá (záznamy serveru, cookie s volbou souhlasu, měření a reklama podle toho, co je zapnuté).'
+      . ' <strong>Projděte si ho</strong> a upravte podle sebe – je to podklad, ne právní posudek. Tlačítkem níž si ho vložíte do pole a můžete v něm dál psát (vzor je z uložených údajů, po jejich změně nejdřív uložte).') ?>
+  <div><button type="button" data-vlozit-vzor="f-zasady_text" data-vzor="<?= Ui::h($web->vzorZasad($n)) ?>">Vložit vzorový text do pole</button></div>
+</div>
+<div class="tlacitka"><button type="submit" class="hlavni">Uložit</button>
+  <?php if ($n['zasady_zapnuto']): ?><a class="tlacitko" href="<?= Ui::h($adresaZasad) ?>">Zobrazit zásady</a><?php endif; ?></div>
+</form>
+</div>

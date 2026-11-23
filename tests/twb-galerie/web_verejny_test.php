@@ -71,21 +71,17 @@ test('web: úvodní fotka jen s veřejným odkazem; obálka jen z vlastní kateg
     eq(null, $web->uvodni(), 'nic veřejného = bez úvodní fotky');
 });
 
-test('web: nastavení – výchozí hodnoty, uložení, kontrola odkazů reklamních ploch', function () {
+test('web: nastavení – výchozí hodnoty, uložení po částech', function () {
     $app = novaApp();
     $web = $app->web();
     $n = $web->nastaveni();
-    eq([true, 'Objevte svět v obrazech', 'Reklamní banner'], [$n['zapnuto'], $n['nadpis'], $n['banner1']['stitek']]);
-    $p = ['nazev' => 'Moje fotky', 'nadpis' => 'Ahoj', 'tlacitko' => 'Dál', 'vybrane_nadpis' => 'Výběr', 'vybrane_pocet' => '3', 'o_galerii' => "**Ahoj**\n\nsvěte",
-        'banner1_zobrazit' => '1', 'banner1_text' => 'Kup', 'banner1_tlacitko' => 'Ano', 'banner1_odkaz' => 'https://example.com/a?b=1'];
-    $web->uloz($p);
+    eq([true, 'Objevte svět v obrazech', true, '', false, true, false], [$n['zapnuto'], $n['nadpis'], $n['reklama_zapnuto'], $n['reklama']['pod_uvodem'], $n['mereni_zapnuto'], $n['cookies_souhlas'], $n['zasady_zapnuto']]);
+    $p = ['nazev' => 'Moje fotky', 'nadpis' => 'Ahoj', 'tlacitko' => 'Dál', 'vybrane_nadpis' => 'Výběr', 'vybrane_pocet' => '3', 'o_galerii' => "**Ahoj**\n\nsvěte"];
+    $web->uloz('zaklad', $p);
     $n = $web->nastaveni();
-    eq([false, 'Moje fotky', 3, 'https://example.com/a?b=1', true, false], [$n['zapnuto'], $n['nazev'], $n['vybrane_pocet'], $n['banner1']['odkaz'], $n['banner1']['zobrazit'], $n['banner2']['zobrazit']]);
-    foreach (['javascript:alert(1)', '//evil.cz', 'data:text/html,x', 'https://a b'] as $spatny) {
-        try { $web->uloz(['banner2_odkaz' => $spatny] + $p); ok(false, $spatny); } catch (Chyba) { ok(true); }
-    }
-    foreach (['mailto:a@b.cz', 'tel:+420123', '?s=o-galerii', '/kontakt'] as $dobry) ok(Web::platnyOdkaz($dobry), $dobry);
-    try { $web->uloz(['nadpis' => ''] + $p); ok(false); } catch (Chyba) { ok(true); }
+    eq([false, 'Moje fotky', 3, true], [$n['zapnuto'], $n['nazev'], $n['vybrane_pocet'], $n['reklama_zapnuto']], 'základ nesahá na reklamu');
+    try { $web->uloz('zaklad', ['nadpis' => ''] + $p); ok(false); } catch (Chyba) { ok(true); }
+    try { $web->uloz('neco', $p); ok(false); } catch (Chyba) { ok(true); }
 });
 
 test('web na serveru: stránky, 404, soukromá data se neukážou, vypnutý web, index.php?s=', function () {
@@ -102,7 +98,7 @@ test('web na serveru: stránky, 404, soukromá data se neukážou, vypnutý web,
     ok(str_contains($r['body'], 'Objevte svět v obrazech') && str_contains($r['body'], 'Příroda') && str_contains($r['body'], '1&nbsp;fotografie') || str_contains($r['body'], "1\u{00A0}fotografie"), 'karta kategorie');
     ok(str_contains($r['body'], 'index.php?p=prehled'), 'přihlášení do administrace');
     ok(!str_contains($r['body'], 'Soukromé') && !str_contains($r['body'], 'Tajné'));
-    ok(str_contains($r['body'], 'Prostor pro reklamní sdělení'));
+    ok(!str_contains($r['body'], 'class="reklama') && !str_contains($r['body'], 'data-cookies'), 'bez kódu žádná reklama ani lišta');
     $r = $anon->jdi('verejne.php?s=galerie&k=' . $ver . '-priroda');
     eq(200, $r['code']);
     ok(str_contains($r['body'], 'Les') && !str_contains($r['body'], 'Bez odkazu') && !str_contains($r['body'], 'Archiv') && !str_contains($r['body'], 'klip'));
@@ -117,7 +113,7 @@ test('web na serveru: stránky, 404, soukromá data se neukážou, vypnutý web,
     eq([302, 'index.php'], [$r['code'], $r['location']]);
     // administrace: stránka Veřejný web a kategorie
     eq(200, $b->jdi('index.php?p=web')['code']);
-    $r = $b->odesli('index.php?p=web', ['akce' => 'ulozit', 'zapnuto' => '1', 'nazev' => 'Galerie X', 'nadpis' => 'N', 'tlacitko' => 'T', 'vybrane_nadpis' => 'V', 'vybrane_pocet' => '4', 'uvod_id' => (string)$ids['ok']]);
+    $r = $b->odesli('index.php?p=web', ['akce' => 'zaklad', 'zapnuto' => '1', 'nazev' => 'Galerie X', 'nadpis' => 'N', 'tlacitko' => 'T', 'vybrane_nadpis' => 'V', 'vybrane_pocet' => '4', 'uvod_id' => (string)$ids['ok']]);
     ok(str_contains($r['body'], 'Nastavení webu uloženo'));
     ok(str_contains($anon->jdi('verejne.php')['body'], 'Galerie X'));
     $b->jdi('index.php?p=kategorie&upravit=' . $sou);
@@ -125,70 +121,114 @@ test('web na serveru: stránky, 404, soukromá data se neukážou, vypnutý web,
     ok(str_contains($anon->jdi('verejne.php?s=galerie')['body'], 'Soukromé'), 'zveřejněná kategorie je na webu');
 });
 
-test('web 0.8.2: reklamní plocha jako kód z reklamního systému, kód do hlavičky, ads.txt, CSP', function () {
+test('web 0.8.3: reklama jen jako kód pro pozice, měření, převod nastavení z 0.8.2', function () {
     $app = novaApp();
     $web = $app->web();
+    $adsense = "<ins class=\"adsbygoogle\" data-ad-slot=\"2\"></ins>\r\n<script>(adsbygoogle = window.adsbygoogle || []).push({});</script>";
+    $web->uloz('reklama', ['reklama_zapnuto' => '1', 'reklama_pod_uvodem' => "  $adsense \n", 'reklama_pred_patickou' => '<b>x</b>', 'ads_txt' => "google.com, pub-1, DIRECT\r\n"]);
     $n = $web->nastaveni();
-    eq(['text', '', '', ''], [$n['banner1']['typ'], $n['banner1']['kod'], $n['kod_hlavicka'], $n['ads_txt']], 'starší nastavení = vlastní text');
-    eq(false, Web::maKod($n, ['banner1', 'banner2']));
-    $adsense = "<script async src=\"https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1\" crossorigin=\"anonymous\"></script>\r\n"
-        . "<ins class=\"adsbygoogle\" style=\"display:block\" data-ad-client=\"ca-pub-1\" data-ad-slot=\"2\"></ins>\r\n<script>(adsbygoogle = window.adsbygoogle || []).push({});</script>";
-    $p = ['nazev' => 'G', 'nadpis' => 'N', 'tlacitko' => 'T', 'vybrane_nadpis' => 'V', 'zapnuto' => '1',
-        'banner1_zobrazit' => '1', 'banner1_typ' => 'kod', 'banner1_stitek' => 'Reklama', 'banner1_kod' => "  $adsense \n", 'banner1_text' => 'Starý text',
-        'banner2_zobrazit' => '1', 'banner2_typ' => 'text', 'banner2_text' => 'Vlastní', 'banner2_kod' => '<b>schovaný</b>',
-        'kod_hlavicka' => '<meta name="seznam-wmt" content="abc">', 'ads_txt' => "google.com, pub-1, DIRECT, f08c47fec0942fa0\r\n"];
-    $web->uloz($p);
+    eq([str_replace("\r\n", "\n", $adsense), '', '<b>x</b>', 'google.com, pub-1, DIRECT'], [$n['reklama']['pod_uvodem'], $n['reklama']['pod_galeriemi'], $n['reklama']['pred_patickou'], $n['ads_txt']]);
+    ok(Web::maReklamu($n));
+    eq('', Web::reklamaKod(['reklama_zapnuto' => false] + $n, 'pod_uvodem'), 'vypnutá reklama');
+    eq(['reklama' => 'Reklama'], Web::kategorieSouhlasu($n));
+    try { $web->uloz('reklama', ['reklama_pod_galeriemi' => str_repeat('x', Web::MAX_KOD + 1)]); ok(false); } catch (Chyba) { ok(true); }
+
+    $web->uloz('mereni', ['mereni_zapnuto' => '1', 'mereni_kod' => '<script>/* matomo */</script>', 'mereni_umisteni' => 'hlavicka']);
     $n = $web->nastaveni();
-    eq(['kod', str_replace("\r\n", "\n", $adsense), 'Starý text'], [$n['banner1']['typ'], $n['banner1']['kod'], $n['banner1']['text']], 'kód beze změny, jen konce řádků');
-    eq(['text', '<b>schovaný</b>'], [$n['banner2']['typ'], $n['banner2']['kod']], 'kód zůstane i u textové plochy');
-    eq('google.com, pub-1, DIRECT, f08c47fec0942fa0', $n['ads_txt']);
-    ok(Web::maKod($n, ['banner1']) && Web::maKod($n, []), 'kód v hlavičce stačí');
-    ok(str_contains(Web::csp(true), "script-src 'self' 'unsafe-inline' 'unsafe-eval' https:") && str_contains(Web::csp(true), 'frame-src https:'));
-    ok(str_contains(Web::csp(true), "frame-ancestors 'self'") && str_contains(Web::csp(true), "base-uri 'self'"));
-    eq("default-src 'self'; img-src 'self' https: data:; style-src 'self'; script-src 'self'; frame-ancestors 'self'; base-uri 'self'; form-action 'self'", Web::csp(false));
-    foreach ([['banner1_typ' => 'iframe'], ['banner1_kod' => ''], ['banner1_kod' => str_repeat('x', Web::MAX_KOD + 1)], ['ads_txt' => str_repeat('x', Web::MAX_KOD + 1)]] as $spatne) {
-        try { $web->uloz($spatne + $p); ok(false, json_encode($spatne)); } catch (Chyba) { ok(true); }
-    }
-    $web->uloz(['banner1_zobrazit' => '', 'banner1_kod' => ''] + $p);
-    eq([false, 'kod'], [$web->nastaveni()['banner1']['zobrazit'], $web->nastaveni()['banner1']['typ']], 'skrytá plocha s kódem smí být prázdná');
+    ok(Web::meri($n) && $n['mereni_umisteni'] === 'hlavicka');
+    eq(['mereni' => 'Měření návštěvnosti', 'reklama' => 'Reklama'], Web::kategorieSouhlasu($n));
+    eq([], Web::kategorieSouhlasu(['cookies_souhlas' => false] + $n), 'bez souhlasu se lišta neptá');
+    try { $web->uloz('mereni', ['mereni_umisteni' => 'jinam']); ok(false); } catch (Chyba) { ok(true); }
+    ok(str_contains(Web::csp(true), "script-src 'self' 'unsafe-inline' 'unsafe-eval' https:") && str_contains(Web::csp(true), "frame-ancestors 'self'"));
+    ok(str_contains(Web::csp(false), "script-src 'self';"));
+
+    // nastavení uložené verzí 0.8.2: kód zobrazené plochy → pozice, textové plochy zmizí, kód do hlavičky → měření
+    $app->nastaveni()->uloz('web', json_encode(['nazev' => 'Stará', 'banner1' => ['zobrazit' => true, 'typ' => 'kod', 'kod' => '<i>A</i>'],
+        'banner2' => ['zobrazit' => true, 'typ' => 'text', 'text' => 'Text', 'kod' => '<i>B</i>'], 'kod_hlavicka' => '<meta name="x">', 'ads_txt' => 'a']));
+    $n = $web->nastaveni();
+    eq(['Stará', '<i>A</i>', '', true, '<meta name="x">', 'hlavicka', 'a'], [$n['nazev'], $n['reklama']['pod_uvodem'], $n['reklama']['pod_galeriemi'], $n['mereni_zapnuto'], $n['mereni_kod'], $n['mereni_umisteni'], $n['ads_txt']]);
+    ok(!isset($n['banner1']) && !isset($n['kod_hlavicka']));
 });
 
-test('web 0.8.2 na serveru: kód se vloží bez úprav, volnější CSP jen se kódem, /ads.txt, administrace', function () {
+test('web 0.8.3: GDPR – kontrola údajů, vzorový text zásad podle nastavení, vlastní text', function () {
+    $app = novaApp();
+    $web = $app->web();
+    try { $web->uloz('gdpr', ['zasady_zapnuto' => '1', 'email' => 'a@b.cz']); ok(false, 'zveřejněné zásady chtějí provozovatele'); } catch (Chyba) { ok(true); }
+    foreach ([['ico' => '123'], ['email' => 'neni-email']] as $spatne) {
+        try { $web->uloz('gdpr', $spatne + ['provozovatel' => 'X']); ok(false, json_encode($spatne)); } catch (Chyba) { ok(true); }
+    }
+    $web->uloz('gdpr', ['cookies_souhlas' => '1', 'zasady_zapnuto' => '1', 'provozovatel' => 'Jan Novák', 'ico' => '1234 5678', 'email' => 'jan@example.cz', 'adresa' => 'Hlavní 1, Praha', 'nazev_stranky' => 'galerie.example.cz']);
+    $n = $web->nastaveni();
+    eq('12345678', $n['ico']);
+    $vzor = $web->vzorZasad($n);
+    foreach (['galerie.example.cz', '**Jan Novák**, IČO 12345678, Hlavní 1, Praha', '[jan@example.cz](mailto:jan@example.cz)', Web::COOKIE_SOUHLAS, 'Nastavení cookies', 'uoou.gov.cz'] as $t) ok(str_contains($vzor, $t), $t);
+    ok(!str_contains($vzor, 'Měření návštěvnosti') && !str_contains($vzor, '**Reklama**'), 'bez měření a reklamy o nich vzor nemluví');
+    $web->uloz('mereni', ['mereni_zapnuto' => '1', 'mereni_kod' => '<script></script>']);
+    $web->uloz('reklama', ['reklama_zapnuto' => '1', 'reklama_pod_uvodem' => '<ins></ins>']);
+    $vzor = $web->vzorZasad($web->nastaveni());
+    ok(str_contains($vzor, '**Měření návštěvnosti**') && str_contains($vzor, '**Reklama**') && str_contains($vzor, 'jen s vaším souhlasem'));
+    eq($vzor, $web->textZasad($web->nastaveni()), 'prázdný vlastní text = vzor');
+    $web->uloz('gdpr', ['zasady_zapnuto' => '1', 'provozovatel' => 'Jan Novák', 'email' => 'jan@example.cz', 'zasady_text' => "## Vlastní\n\nText"]);
+    eq("## Vlastní\n\nText", $web->textZasad($web->nastaveni()));
+    eq(false, $web->nastaveni()['cookies_souhlas'], 'neodeslaný vypínač = vypnuto');
+});
+
+test('web 0.8.3 na serveru: pozice reklamy, měření, cookie lišta, zásady, ads.txt, administrace v kartách', function () {
     $s = new TestServer();
     register_shutdown_function(fn() => $s->zastav());
     $b = new Prohlizec($s);
     $b->jdi('install.php');
     $b->jdi('install.php', ['heslo' => 'tajneheslo1', 'heslo2' => 'tajneheslo1']);
     $app = new App(KOREN . '/apps/twb-galerie', ['data_dir' => $s->data . '/data', 'base_url' => $s->url]);
-    webData($app);
+    [, $ver] = webData($app);
     $anon = new Prohlizec($s);
     $csp = fn(Prohlizec $p): string => preg_match('/^Content-Security-Policy:\s*([^\r\n]+)/mi', $p->posledniHlavicky, $m) ? $m[1] : '';
     $anon->jdi('verejne.php');
     ok(str_contains($csp($anon), "script-src 'self';"), 'bez kódu přísná CSP');
     eq(404, $anon->jdi('verejne.php?s=ads.txt')['code'], 'prázdné ads.txt = 404');
+    eq(404, $anon->jdi('verejne.php?s=' . Web::ZASADY)['code'], 'nezveřejněné zásady');
 
-    $b->jdi('index.php?p=web');
     $r = $b->jdi('index.php?p=web');
-    ok(str_contains($r['body'], 'name="banner1_typ"') && str_contains($r['body'], 'name="banner2_kod"') && str_contains($r['body'], 'name="ads_txt"'), 'pole v administraci');
-    $kod = '<div id="ssp-zone-123"></div><script src="https://ssp.seznam.cz/static/js/ssp.js"></script><script>sssp.getAds([{"zoneId":123,"id":"ssp-zone-123","width":728,"height":90}]);</script>';
-    $r = $b->odesli('index.php?p=web', ['akce' => 'ulozit', 'zapnuto' => '1', 'nazev' => 'G', 'nadpis' => 'N', 'tlacitko' => 'T', 'vybrane_nadpis' => 'V', 'vybrane_pocet' => '4',
-        'banner1_zobrazit' => '1', 'banner1_typ' => 'kod', 'banner1_stitek' => 'Reklama', 'banner1_kod' => $kod,
-        'banner2_zobrazit' => '1', 'banner2_typ' => 'text', 'banner2_text' => 'Textová plocha',
-        'kod_hlavicka' => '<script src="https://c.seznam.cz/js/rc.js"></script>', 'ads_txt' => 'seznam.cz, 123, DIRECT']);
-    ok(str_contains($r['body'], 'Nastavení webu uloženo'));
-    ok(str_contains($r['body'], htmlspecialchars($kod)), 'administrace kód ukáže escapovaný v poli');
-    ok(!str_contains($r['body'], $kod), 'administrace kód nespustí');
+    foreach (['role="tablist"', 'name="reklama_pod_uvodem"', 'name="reklama_pod_galeriemi"', 'name="reklama_pred_patickou"', 'name="mereni_kod"', 'name="mereni_umisteni"',
+        'name="cookies_souhlas"', 'name="provozovatel"', 'data-vlozit-vzor'] as $t) ok(str_contains($r['body'], $t), $t);
+    ok(!str_contains($r['body'], '_typ"') && !str_contains($r['body'], 'reklamní plocha'), 'žádná volba text/kód');
+    $kod = '<div id="ssp-zone-1"></div><script src="https://ssp.seznam.cz/static/js/ssp.js"></script>';
+    $r = $b->odesli('index.php?p=web', ['akce' => 'reklama', 'reklama_zapnuto' => '1', 'reklama_pod_uvodem' => $kod, 'reklama_pred_patickou' => '<ins id="dole"></ins>', 'ads_txt' => 'seznam.cz, 1, DIRECT']);
+    ok(str_contains($r['body'], 'Nastavení webu uloženo') && str_contains($r['body'], 'id="karta-reklama" role="tab" aria-controls="reklama" aria-selected="true"'), 'zpět na kartě Reklama');
+    ok(str_contains($r['body'], htmlspecialchars($kod)) && !str_contains($r['body'], $kod), 'administrace kód jen ukáže, nespustí');
+    $b->odesli('index.php?p=web', ['akce' => 'mereni', 'mereni_zapnuto' => '1', 'mereni_kod' => '<script>var _paq=[];</script>', 'mereni_umisteni' => 'konec']);
+    $r = $b->odesli('index.php?p=web', ['akce' => 'gdpr', 'cookies_souhlas' => '1', 'zasady_zapnuto' => '1', 'provozovatel' => 'Jan Novák', 'email' => 'jan@example.cz']);
+    ok(str_contains($r['body'], 'Lišta se bude ptát na: <strong>Měření návštěvnosti, Reklama</strong>'));
+
+    // se souhlasem: kód jen jako neživý <template>, lišta, odkazy v patičce
     $r = $anon->jdi('verejne.php');
-    ok(str_contains($r['body'], '<div class="banner-kod-obsah">' . $kod . '</div>'), 'kód na webu beze změny');
-    ok(str_contains($r['body'], 'Textová plocha'), 'druhá plocha s textem');
-    ok(preg_match('~<script src="https://c\.seznam\.cz/js/rc\.js"></script>\s*</head>~', $r['body']) === 1, 'kód v hlavičce');
+    ok(str_contains($r['body'], '<aside class="reklama reklama-pod-uvodem" aria-label="Reklama"><template data-souhlas="reklama">' . $kod . '</template></aside>'), 'reklama čeká na souhlas');
+    ok(str_contains($r['body'], '<template data-souhlas="reklama"><ins id="dole"></ins></template>'), 'před patičkou');
+    ok(preg_match('~<template data-souhlas="mereni"><script>var _paq=\[\];</script></template>\s*</body>~', $r['body']) === 1, 'měření na konci stránky');
+    ok(str_contains($r['body'], 'data-cookies ') && str_contains($r['body'], 'data-kategorie="mereni,reklama"') && str_contains($r['body'], 'data-cookies-nastaveni'), 'lišta a Nastavení cookies');
+    ok(str_contains($r['body'], 'href="?s=' . Web::ZASADY . '"'), 'odkaz na zásady');
     ok(str_contains($csp($anon), "'unsafe-inline'") && str_contains($csp($anon), 'frame-src https:'), 'volnější CSP');
+    $r = $anon->jdi('verejne.php?s=galerie&k=' . $ver . '-priroda');
+    ok(str_contains($r['body'], 'reklama-pod-uvodem') && str_contains($r['body'], 'reklama-pred-patickou'), 'reklama i v galerii');
+    $r = $anon->jdi('verejne.php?s=' . Web::ZASADY);
+    ok($r['code'] === 200 && str_contains($r['body'], '<b>Jan Novák</b>') && str_contains($r['body'], 'Úřadu pro ochranu osobních údajů'), 'stránka zásad se vzorem');
     $r = $anon->jdi('verejne.php?s=ads.txt');
-    eq([200, 'text/plain', "seznam.cz, 123, DIRECT\n"], [$r['code'], $r['type'], $r['body']]);
-    eq(200, $anon->jdi('index.php?s=ads.txt')['code'], 'i přes index.php');
-    $r = $b->odesli('index.php?p=web', ['akce' => 'ulozit', 'zapnuto' => '1', 'nazev' => 'G', 'nadpis' => 'N', 'tlacitko' => 'T', 'vybrane_nadpis' => 'V', 'vybrane_pocet' => '4',
-        'banner1_zobrazit' => '1', 'banner1_typ' => 'kod', 'banner1_kod' => '']);
-    ok(str_contains($r['body'], 'Vložte kód z reklamního systému'), 'prázdný kód u zobrazené plochy');
+    eq([200, 'text/plain', "seznam.cz, 1, DIRECT\n"], [$r['code'], $r['type'], $r['body']]);
+
+    // bez souhlasu s cookies a s měřením v hlavičce: kód rovnou, žádná lišta
+    $b->odesli('index.php?p=web', ['akce' => 'gdpr', 'zasady_zapnuto' => '1', 'provozovatel' => 'Jan Novák', 'email' => 'jan@example.cz']);
+    $b->odesli('index.php?p=web', ['akce' => 'mereni', 'mereni_zapnuto' => '1', 'mereni_kod' => '<script>var _paq=[];</script>', 'mereni_umisteni' => 'hlavicka']);
+    $r = $anon->jdi('verejne.php');
+    ok(str_contains($r['body'], '<aside class="reklama reklama-pod-uvodem" aria-label="Reklama">' . $kod . '</aside>'), 'reklama rovnou');
+    ok(preg_match('~<script>var _paq=\[\];</script>\s*</head>~', $r['body']) === 1, 'měření v hlavičce');
+    ok(!str_contains($r['body'], 'data-cookies') && !str_contains($r['body'], '<template'), 'bez lišty');
+    // vypnutá reklama a vypnutý web: zásady a ads.txt dál fungují
+    $b->odesli('index.php?p=web', ['akce' => 'reklama', 'reklama_pod_uvodem' => $kod, 'ads_txt' => 'seznam.cz, 1, DIRECT']);
+    ok(!str_contains($anon->jdi('verejne.php')['body'], 'class="reklama'), 'vypnutá reklama');
+    $b->odesli('index.php?p=web', ['akce' => 'zaklad', 'nazev' => 'G', 'nadpis' => 'N', 'tlacitko' => 'T', 'vybrane_nadpis' => 'V', 'vybrane_pocet' => '4']);   // bez zapnuto = vypnout
+    eq(302, $anon->jdi('verejne.php')['code']);
+    eq(200, $anon->jdi('verejne.php?s=' . Web::ZASADY)['code'], 'zásady i s vypnutým webem');
+    eq(200, $anon->jdi('index.php?s=ads.txt')['code']);
 });
 
 test('komprese: úloha jen z obrázků, kroky, souhrn, bez originálu uvolní místo', function () {

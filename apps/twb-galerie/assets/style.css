@@ -425,7 +425,17 @@ body.vybirani, body.vybirani * { user-select: none; cursor: crosshair; }
 .hlavicka-karty h3 { margin: 0; }
 @media (max-width: 575.98px) { .karty-nav { margin-left: -1rem; margin-right: -1rem; padding: 0 .5rem; } .karty-nav a { padding: .6rem .75rem; } }
 
-/* ---------- Veřejný web: reklamní plocha jako text nebo kód (0.8.2) ---------- */
-.reklamni-plocha:has(select[name$="_typ"] option[value="kod"]:checked) .jen-text,
-.reklamni-plocha:has(select[name$="_typ"] option[value="text"]:checked) .jen-kod { display: none; }
-.reklamni-plocha textarea.kod { min-height: 9rem; }
+/* ---------- Veřejný web (0.8.3): vypínače, pole zásad ---------- */
+.vypinac { display: inline-flex; align-items: center; gap: .6rem; font-weight: 600; font-size: 1.05rem; cursor: pointer; }
+.vypinac input { appearance: none; -webkit-appearance: none; flex: 0 0 auto; width: 2.6rem; height: 1.4rem; margin: 0; padding: 0; border-radius: 1rem; border: 0;
+  background: var(--okraj-pole); position: relative; cursor: pointer; transition: background .15s; }
+.vypinac input::before { content: ""; position: absolute; top: .2rem; left: .2rem; width: 1rem; height: 1rem; border-radius: 50%; background: #fff; transition: transform .15s; box-shadow: 0 1px 2px rgba(0, 0, 0, .2); }
+.vypinac input:checked { background: var(--hlavni); }
+.vypinac input:checked::before { transform: translateX(1.2rem); }
+.vypinac input:focus-visible { outline: 2px solid var(--zamereni); outline-offset: 2px; }
+.karta-poznamka { margin: 1rem 0 0; padding: .8rem 1rem; border: 1px solid var(--okraj); border-radius: var(--polomer); background: var(--kod); }
+.formular .radek-zasady { grid-template-columns: 2fr 1fr 1fr; }
+.formular .radek-zasady + .radek-zasady { grid-template-columns: 3fr 1fr; }
+@media (max-width: 767.98px) { .formular .radek-zasady, .formular .radek-zasady + .radek-zasady { grid-template-columns: 1fr; } }
+.panel-karty .karta textarea.kod { min-height: 0; }
+.panel-karty > form > .tlacitka { margin-bottom: 1.5rem; }

@@ -8,8 +8,10 @@ namespace MediaGalerie;
  * které nejsou v archivu a mají zapnutý veřejný odkaz (vypnutý odkaz = fotka zmizí i z webu). Obrázky se vydávají
  * přes trvalé adresy náhledů veřejného odkazu (soubor.php/<klíč>/w<px>/…), originál se na webu nenabízí.
  * Texty, úvodní fotka a reklamní plochy jsou v nastavení `web` (JSON, zálohuje se).
- * Reklamní plocha (0.8.2) je buď vlastní text s tlačítkem (`typ` = text), nebo kód z reklamního systému (`typ` = kod: HTML/JS
- * z AdSense, Skliku…), který se na web vloží bez úprav. Kód zadává jen přihlášený správce; stránka s kódem dostane volnější CSP.
+ * Reklama (0.8.3): pro každou pozici (POZICE) jen kód z reklamního systému (HTML/JS), vloží se bez úprav. Měření návštěvnosti:
+ * jeden měřicí kód do hlavičky nebo na konec stránky. Se zapnutým souhlasem s cookies se měřicí ani reklamní kód nenačte,
+ * dokud ho návštěvník nepovolí (na stránce je jen jako neživý <template>, oživí ho assets/verejne.js). Kód zadává jen
+ * přihlášený správce; stránka s kódem dostane volnější CSP. Stránka Zásady ochrany osobních údajů (vlastní Markdown nebo vzor).
  */
 final class Web
 {
@@ -29,16 +31,41 @@ final class Web
         'patka' => '© TWB Galerie',
         'odkaz_administrace' => true,
         'skryt_vyhledavacum' => false,
-        'banner1' => ['zobrazit' => true, 'typ' => 'text', 'stitek' => 'Reklamní banner', 'text' => 'Prostor pro reklamní sdělení', 'tlacitko' => 'Zjistit více', 'odkaz' => '?s=o-galerii', 'kod' => ''],
-        'banner2' => ['zobrazit' => true, 'typ' => 'text', 'stitek' => 'Reklamní plocha', 'text' => 'Vaše reklama může být součástí této stránky', 'tlacitko' => 'Zobrazit nabídku', 'odkaz' => '?s=o-galerii', 'kod' => ''],
-        'kod_hlavicka' => '',
+        // reklama (0.8.3): kód pro každou pozici, prázdná pozice se nezobrazí
+        'reklama_zapnuto' => true,
+        'reklama' => ['pod_uvodem' => '', 'pod_galeriemi' => '', 'pred_patickou' => ''],
         'ads_txt' => '',
+        // měření návštěvnosti
+        'mereni_zapnuto' => false,
+        'mereni_kod' => '',
+        'mereni_umisteni' => 'konec',
+        // GDPR a cookies
+        'cookies_souhlas' => true,
+        'zasady_zapnuto' => false,
+        'provozovatel' => '',
+        'ico' => '',
+        'email' => '',
+        'adresa' => '',
+        'nazev_stranky' => '',
+        'zasady_text' => '',
     ];
-    /** Druhy reklamní plochy. */
-    public const TYPY_BANNERU = ['text' => 'Vlastní text a tlačítko', 'kod' => 'Kód z reklamního systému (AdSense, Sklik…)'];
-    /** Největší délka vloženého kódu (reklamní plocha, hlavička) a obsahu ads.txt. */
+    /** Reklamní pozice: klíč => [název, kde je a na co se hodí]. */
+    public const POZICE = [
+        'pod_uvodem' => ['Pod úvodem', 'Hlavní stránka pod úvodní fotkou, stránka Galerie a galerie kategorie pod nadpisem. Nejvíc zobrazení – vhodné pro banner na šířku (např. 970×250 nebo 728×90, na mobilu 320×100).'],
+        'pod_galeriemi' => ['Pod galeriemi', 'Hlavní stránka pod kartami vybraných galerií, stránka Galerie pod seznamem galerií, galerie kategorie pod mřížkou fotek. Vhodné pro obdélník 300×250 nebo banner na šířku.'],
+        'pred_patickou' => ['Před patičkou', 'Úplně dole na hlavní stránce, v galeriích i na stránce O galerii – dobere návštěvníky, kteří prošli celou stránku.'],
+    ];
+    /** Kam vložit měřicí kód. */
+    public const UMISTENI_MERENI = [
+        'konec' => 'Na konci stránky (před </body>) – bezpečné pro jakýkoli kód včetně <noscript>',
+        'hlavicka' => 'Do hlavičky (<head>) – když to nástroj výslovně chce',
+    ];
+    /** Adresa (?s=…) stránky se zásadami; .htaccess vede i /zasady-ochrany-osobnich-udaju. */
+    public const ZASADY = 'zasady-ochrany-osobnich-udaju';
+    /** Cookie s volbou návštěvníka (assets/verejne.js), platí rok. */
+    public const COOKIE_SOUHLAS = 'twbg_souhlas';
+    /** Největší délka vloženého kódu (reklamní pozice, měření) a obsahu ads.txt. */
     public const MAX_KOD = 20000;
-    public const BANNERY = ['banner1' => 'Reklamní banner (pod úvodní fotkou)', 'banner2' => 'Reklamní plocha (pod galeriemi)'];
     public const NA_STRANKU = 36;
     /** Náhled v kartách a mřížce, velký obrázek v okně a úvodní fotka (delší strana v px, z Media::NAHLEDY). */
     public const PX_NAHLED = 640;
@@ -55,14 +82,44 @@ final class Web
         $n = json_decode((string)$this->app->nastaveni()->dej('web', ''), true);
         $n = is_array($n) ? $n : [];
         $out = array_replace(self::VYCHOZI, array_intersect_key($n, self::VYCHOZI));
-        foreach (array_keys(self::BANNERY) as $b) $out[$b] = array_replace(self::VYCHOZI[$b], is_array($n[$b] ?? null) ? array_intersect_key($n[$b], self::VYCHOZI[$b]) : []);
+        $out['reklama'] = array_replace(self::VYCHOZI['reklama'], is_array($n['reklama'] ?? null) ? array_map('strval', array_intersect_key($n['reklama'], self::VYCHOZI['reklama'])) : []);
+        if (!isset($n['reklama'])) {
+            // nastavení z 0.8.0–0.8.2: z reklamních ploch zůstane jen kód (textové plochy byly jen ukázka), kód do hlavičky → měření
+            foreach (['banner1' => 'pod_uvodem', 'banner2' => 'pod_galeriemi'] as $stary => $pozice) {
+                $b = $n[$stary] ?? null;
+                if (is_array($b) && ($b['typ'] ?? '') === 'kod' && !empty($b['zobrazit'])) $out['reklama'][$pozice] = (string)($b['kod'] ?? '');
+            }
+            if (($n['kod_hlavicka'] ?? '') !== '' && !isset($n['mereni_kod'])) {
+                $out['mereni_zapnuto'] = true;
+                $out['mereni_kod'] = (string)$n['kod_hlavicka'];
+                $out['mereni_umisteni'] = 'hlavicka';
+            }
+        }
+        if (!isset(self::UMISTENI_MERENI[$out['mereni_umisteni']])) $out['mereni_umisteni'] = 'konec';
         return $out;
     }
 
-    /** Uloží nastavení z formuláře (administrace → Veřejný web). @param array<string, mixed> $p */
-    public function uloz(array $p): void
+    /** Části stránky Veřejný web (karty), každá se ukládá svým formulářem. */
+    public const CASTI = ['zaklad' => 'Základ a texty', 'reklama' => 'Reklama', 'mereni' => 'Měření návštěvnosti', 'gdpr' => 'GDPR a cookies'];
+
+    /** Uloží jednu část nastavení z formuláře (administrace → Veřejný web). @param array<string, mixed> $p */
+    public function uloz(string $cast, array $p): void
     {
         $n = $this->nastaveni();
+        match ($cast) {
+            'zaklad' => $this->zaklad($n, $p),
+            'reklama' => $this->reklama($n, $p),
+            'mereni' => $this->mereni($n, $p),
+            'gdpr' => $this->gdpr($n, $p),
+            default => throw new Chyba('Neznámá část nastavení.'),
+        };
+        $this->app->nastaveni()->uloz('web', (string)json_encode($n, JSON_UNESCAPED_UNICODE));
+        $this->app->log('info', 'Nastavení veřejného webu změněno (' . mb_strtolower(self::CASTI[$cast]) . ')' . ($n['zapnuto'] ? '.' : ', web vypnutý.'));
+    }
+
+    /** @param array<string, mixed> $n @param array<string, mixed> $p */
+    private function zaklad(array &$n, array $p): void
+    {
         $n['zapnuto'] = !empty($p['zapnuto']);
         $n['odkaz_administrace'] = !empty($p['odkaz_administrace']);
         $n['skryt_vyhledavacum'] = !empty($p['skryt_vyhledavacum']);
@@ -73,29 +130,127 @@ final class Web
             $n[$k] = (string)Vstup::text($p, $k, $popis, $max, $povinne);
         }
         $n['o_galerii'] = (string)Vstup::text($p, 'o_galerii', 'Text stránky O galerii', 20000, false);
-        $n['kod_hlavicka'] = self::kod($p, 'kod_hlavicka', 'Kód do hlavičky stránky');
-        $n['ads_txt'] = self::kod($p, 'ads_txt', 'Obsah ads.txt');
         $pocet = (int)($p['vybrane_pocet'] ?? 4);
         if ($pocet < 0 || $pocet > 12) throw new Chyba('Počet vybraných galerií musí být 0 až 12.');
         $n['vybrane_pocet'] = $pocet;
         $uvod = (int)($p['uvod_id'] ?? 0);
         if ($uvod > 0 && !$this->muzeBytUvodni($uvod)) throw new Chyba('Úvodní fotka musí být obrázek se zapnutým veřejným odkazem, který není v archivu.');
         $n['uvod_id'] = $uvod > 0 ? $uvod : null;
-        foreach (array_keys(self::BANNERY) as $b) {
-            $v = [];
-            foreach (array_keys(self::VYCHOZI[$b]) as $pole) $v[$pole] = $p["{$b}_{$pole}"] ?? null;
-            $odkaz = trim((string)($v['odkaz'] ?? ''));
-            if ($odkaz !== '' && !self::platnyOdkaz($odkaz)) throw new Chyba('Odkaz reklamní plochy musí začínat https://, http://, mailto:, tel:, / nebo ? (adresa na tomto webu).');
-            $typ = (string)($v['typ'] ?? 'text');
-            if (!isset(self::TYPY_BANNERU[$typ])) throw new Chyba('Neznámý druh reklamní plochy.');
-            $kod = self::kod($v, 'kod', 'Kód reklamní plochy');
-            if ($typ === 'kod' && $kod === '' && !empty($v['zobrazit'])) throw new Chyba('Vložte kód z reklamního systému, nebo plochu přepněte na vlastní text či skryjte.');
-            $n[$b] = ['zobrazit' => !empty($v['zobrazit']), 'typ' => $typ, 'stitek' => (string)Vstup::text($v, 'stitek', 'Štítek reklamní plochy', 40, false),
-                'text' => (string)Vstup::text($v, 'text', 'Text reklamní plochy', 200, false), 'tlacitko' => (string)Vstup::text($v, 'tlacitko', 'Tlačítko reklamní plochy', 40, false),
-                'odkaz' => $odkaz, 'kod' => $kod];
+    }
+
+    /** @param array<string, mixed> $n @param array<string, mixed> $p */
+    private function reklama(array &$n, array $p): void
+    {
+        $n['reklama_zapnuto'] = !empty($p['reklama_zapnuto']);
+        foreach (self::POZICE as $k => [$nazev]) $n['reklama'][$k] = self::kod($p, "reklama_{$k}", "Reklama – {$nazev}");
+        $n['ads_txt'] = self::kod($p, 'ads_txt', 'Obsah ads.txt');
+    }
+
+    /** @param array<string, mixed> $n @param array<string, mixed> $p */
+    private function mereni(array &$n, array $p): void
+    {
+        $n['mereni_zapnuto'] = !empty($p['mereni_zapnuto']);
+        $n['mereni_kod'] = self::kod($p, 'mereni_kod', 'Měřicí kód');
+        $kam = (string)($p['mereni_umisteni'] ?? 'konec');
+        if (!isset(self::UMISTENI_MERENI[$kam])) throw new Chyba('Vyberte, kam měřicí kód vložit.');
+        $n['mereni_umisteni'] = $kam;
+    }
+
+    /** @param array<string, mixed> $n @param array<string, mixed> $p */
+    private function gdpr(array &$n, array $p): void
+    {
+        $n['cookies_souhlas'] = !empty($p['cookies_souhlas']);
+        $n['zasady_zapnuto'] = !empty($p['zasady_zapnuto']);
+        $n['provozovatel'] = (string)Vstup::text($p, 'provozovatel', 'Provozovatel', 120, $n['zasady_zapnuto']);
+        $ico = preg_replace('/\s+/', '', (string)($p['ico'] ?? ''));
+        if ($ico !== '' && !preg_match('/^\d{8}$/', $ico)) throw new Chyba('IČO má 8 číslic.');
+        $n['ico'] = $ico;
+        $n['email'] = (string)Vstup::text($p, 'email', 'Kontaktní e-mail', 120, $n['zasady_zapnuto']);
+        if ($n['email'] !== '' && filter_var($n['email'], FILTER_VALIDATE_EMAIL) === false) throw new Chyba('Kontaktní e-mail nemá správný tvar.');
+        $n['adresa'] = (string)Vstup::text($p, 'adresa', 'Adresa', 200, false);
+        $n['nazev_stranky'] = (string)Vstup::text($p, 'nazev_stranky', 'Název stránky', 80, false);
+        $n['zasady_text'] = (string)Vstup::text($p, 'zasady_text', 'Text zásad', 30000, false);
+    }
+
+    // ---------- reklama, měření, souhlas ----------
+
+    /** Kód reklamní pozice k vložení ('' = pozice se nezobrazí). @param array<string, mixed> $n */
+    public static function reklamaKod(array $n, string $pozice): string
+    {
+        return $n['reklama_zapnuto'] ? (string)($n['reklama'][$pozice] ?? '') : '';
+    }
+
+    /** Měří se? (zapnuto a je kód) @param array<string, mixed> $n */
+    public static function meri(array $n): bool
+    {
+        return $n['mereni_zapnuto'] && $n['mereni_kod'] !== '';
+    }
+
+    /** Je vyplněná aspoň jedna reklamní pozice (a reklama zapnutá)? @param array<string, mixed> $n */
+    public static function maReklamu(array $n): bool
+    {
+        foreach (array_keys(self::POZICE) as $k) if (self::reklamaKod($n, $k) !== '') return true;
+        return false;
+    }
+
+    /** Na co se cookie lišta ptá (prázdné = lišta se neukáže). @param array<string, mixed> $n @return array<string, string> */
+    public static function kategorieSouhlasu(array $n): array
+    {
+        if (!$n['cookies_souhlas']) return [];
+        return array_filter(['mereni' => self::meri($n) ? 'Měření návštěvnosti' : '', 'reklama' => self::maReklamu($n) ? 'Reklama' : '']);
+    }
+
+    /** Název webu v textu zásad: vyplněný „Název stránky“, jinak doména, jinak název webu. @param array<string, mixed> $n */
+    public function nazevStranky(array $n): string
+    {
+        if ($n['nazev_stranky'] !== '') return $n['nazev_stranky'];
+        $host = (string)parse_url($this->app->url(), PHP_URL_HOST);
+        return $host !== '' ? $host : (string)$n['nazev'];
+    }
+
+    /**
+     * Vzorový text zásad (Markdown) sestavený z údajů provozovatele a z toho, co web opravdu dělá: bez registrace a formulářů,
+     * záznamy serveru u hostingu, cookie s volbou souhlasu, měření a reklama podle nastavení. Podklad, ne právní posudek.
+     * @param array<string, mixed> $n
+     */
+    public function vzorZasad(array $n): string
+    {
+        $web = $this->nazevStranky($n);
+        $kdo = $n['provozovatel'] !== '' ? $n['provozovatel'] : '[provozovatel]';
+        $udaje = array_filter([$n['ico'] !== '' ? "IČO {$n['ico']}" : '', $n['adresa']]);
+        $email = $n['email'] !== '' ? $n['email'] : '[e-mail]';
+        $souhlas = $n['cookies_souhlas'];
+        $t = "## Kdo zpracovává vaše údaje\n\nSprávcem osobních údajů na webu {$web} je **{$kdo}**" . ($udaje ? ', ' . implode(', ', $udaje) : '') . ".\n"
+            . "S dotazy k osobním údajům a s uplatněním svých práv se obracejte na e-mail [{$email}](mailto:{$email}).\n\n"
+            . "## Jaké údaje zpracováváme\n\n"
+            . "Web je galerie fotografií. Nemá registraci, přihlášení pro návštěvníky ani formuláře, takže nám sami žádné osobní údaje nezadáváte.\n\n"
+            . "- **Záznamy serveru** – při každé návštěvě server hostingu zaznamená technické údaje (IP adresa, čas, navštívená adresa, typ prohlížeče). "
+            . "Slouží k provozu a ochraně webu před útoky (oprávněný zájem), uchovávají se jen po dobu nutnou pro provoz a bezpečnost.\n"
+            . ($souhlas ? "- **Vaše volba cookies** – v prohlížeči uložíme nezbytnou cookie `" . self::COOKIE_SOUHLAS . "` s tím, co jste povolili. Platí rok a nic jiného neobsahuje.\n" : '');
+        if (self::meri($n)) {
+            $t .= "- **Měření návštěvnosti** – používáme nástroj pro měření návštěvnosti, který může ukládat cookies a zpracovávat údaje o návštěvě "
+                . "(zkrácenou nebo celou IP adresu, prohlížené stránky, zařízení). Výsledky používáme jen souhrnně ke zlepšení webu."
+                . ($souhlas ? " Načte se jen s vaším souhlasem." : '') . "\n";
         }
-        $this->app->nastaveni()->uloz('web', (string)json_encode($n, JSON_UNESCAPED_UNICODE));
-        $this->app->log('info', 'Nastavení veřejného webu změněno' . ($n['zapnuto'] ? '.' : ' (web vypnutý).'));
+        if (self::maReklamu($n)) {
+            $t .= "- **Reklama** – na webu zobrazujeme reklamu z reklamních systémů. Ty mohou ukládat cookies a zpracovávat údaje o zařízení a návštěvě "
+                . "(IP adresu, identifikátory, zobrazené reklamy) pro zobrazení, měření a případně přizpůsobení reklamy; jsou v tom samostatnými správci "
+                . "podle svých zásad." . ($souhlas ? " Reklamní kód se načte jen s vaším souhlasem." : '') . "\n";
+        }
+        $t .= "\n## Cookies\n\n" . ($souhlas
+                ? "Nezbytná cookie s vaší volbou se ukládá vždy. Ostatní cookies (měření, reklama) jen s vaším souhlasem, který můžete kdykoli změnit nebo odvolat odkazem **Nastavení cookies** v patičce webu."
+                : "Cookies můžete kdykoli smazat nebo zakázat v nastavení svého prohlížeče.")
+            . "\n\n## Vaše práva\n\n"
+            . "Máte právo na přístup ke svým údajům, jejich opravu nebo výmaz, omezení zpracování, přenositelnost a právo vznést námitku. "
+            . ($souhlas ? "Souhlas můžete kdykoli odvolat. " : '')
+            . "Pokud se domníváte, že zpracování porušuje předpisy, můžete podat stížnost u Úřadu pro ochranu osobních údajů ([www.uoou.gov.cz](https://www.uoou.gov.cz)).\n";
+        return $t;
+    }
+
+    /** Text stránky zásad: vlastní text, jinak vzor. @param array<string, mixed> $n */
+    public function textZasad(array $n): string
+    {
+        return trim((string)$n['zasady_text']) !== '' ? (string)$n['zasady_text'] : $this->vzorZasad($n);
     }
 
     /** Nastaví úvodní fotku (tlačítko v detailu média). */
@@ -116,17 +271,9 @@ final class Web
         return $s;
     }
 
-    /** Ukáže stránka vložený kód z reklamního systému (plocha s kódem nebo kód v hlavičce)? Pak potřebuje volnější CSP. @param array<string, mixed> $n */
-    public static function maKod(array $n, array $plochy = []): bool
-    {
-        if ($n['kod_hlavicka'] !== '') return true;
-        foreach ($plochy as $b) if ($n[$b]['zobrazit'] && $n[$b]['typ'] === 'kod' && $n[$b]['kod'] !== '') return true;
-        return false;
-    }
-
     /**
-     * CSP veřejného webu. Bez reklamních kódů jen vlastní skripty a styly. S kódem musí projít skripty, rámečky a styly
-     * reklamních systémů (AdSense, Sklik, Etarget… načítají další skripty z různých domén a vkládají vložené skripty a styly),
+     * CSP veřejného webu. Bez reklamního a měřicího kódu jen vlastní skripty a styly. S kódem musí projít skripty, rámečky a styly
+     * reklamních systémů a měřicích nástrojů (AdSense, Sklik, Revive, Matomo… načítají skripty z různých domén a vkládají vložené skripty a styly),
      * proto https: a 'unsafe-inline'; zůstává zákaz vložení stránky do cizího rámu, změny <base> a odeslání formulářů jinam.
      */
     public static function csp(bool $sKodem): string
@@ -134,14 +281,6 @@ final class Web
         if (!$sKodem) return "default-src 'self'; img-src 'self' https: data:; style-src 'self'; script-src 'self'; frame-ancestors 'self'; base-uri 'self'; form-action 'self'";
         return "default-src 'self' https:; img-src 'self' https: data: blob:; style-src 'self' 'unsafe-inline' https:; script-src 'self' 'unsafe-inline' 'unsafe-eval' https:; "
             . "frame-src https:; connect-src 'self' https:; font-src 'self' https: data:; media-src 'self' https:; frame-ancestors 'self'; base-uri 'self'; form-action 'self'";
-    }
-
-    /** Odkaz reklamní plochy: web (http/https), e-mail, telefon nebo adresa na tomto webu. Ne javascript: apod. */
-    public static function platnyOdkaz(string $o): bool
-    {
-        if (preg_match('/[\x00-\x20"<>\\\\]/', $o)) return false;
-        if (preg_match('~^https?://[^/?#]+~i', $o)) return filter_var($o, FILTER_VALIDATE_URL) !== false;
-        return (bool)preg_match('~^(mailto:|tel:|/(?!/)|\?|#|\./)~i', $o);
     }
 
     private function muzeBytUvodni(int $id): bool

@@ -258,3 +258,32 @@ test('obrázek 2×: přesně dvojnásobný rozměr, srcset, b.php, JSON, galerie
     ok(str_contains($app->vykresleni()->html($app->bannery()->radek($e), 1), 'srcset="https://cdn.example.com/a.png 1x, https://cdn.example.com/a@2x.png 2x"'));
     throws(fn() => $app->bannery()->uloz(['name' => 'Ext', 'width' => 300, 'height' => 250, 'image_url' => 'https://cdn.example.com/a.png', 'image2x_url' => 'ftp://x'], $e), 'Adresa obrázku 2×');
 });
+
+test('prázdný rozměr (0.9.1): 728x0 = od 728 px do dalšího širšího rozměru nic', function () {
+    eq(['970x250', '728x0', '300x250'], Zony::rozmeryZTextu('300x250, 728x0, 970x250'));
+    throws(fn() => Zony::rozmeryZTextu('728x0, 728x90'), 'stejnou šířku');
+    throws(fn() => Zony::rozmeryZTextu('728x0'), 'aspoň jeden rozměr banneru');
+    throws(fn() => Zony::rozmeryZTextu('0x0, 300x250'), 'šířka×výška');
+    $app = novaApp();
+    $z = zona9($app, ['sizes' => '970x250, 728x0, 300x250']);
+    eq('responzivní 970×250, 728 px nic, 300×250', Zony::rozmer($z));
+    eq([[970, 250], [300, 250]], Zony::rozmeryBanneru($z));
+    eq([970, 250], $app->zony()->rozmerVlozeni($z));
+    eq([0, 728, 728, 728], [Zony::prazdnaHranice($z, 727), Zony::prazdnaHranice($z, 728), Zony::prazdnaHranice($z, 2000), Zony::prazdnaHranice($z, 0)]);
+    $kid = kampan($app);
+    $b970 = htmlBanner($app, $kid, 970, 250);
+    $b300 = htmlBanner($app, $kid, 300, 250);
+    $app->zony()->prirad((int)$z['id'], [$kid], []);
+    $d = $app->dorucovani();
+    $vyber = fn(int $sirka, array $k = []) => ($b = $d->vyber($z, kontext9($k), [], $sirka)) ? (int)$b['id'] : null;
+    eq([$b970, null, null, $b300, $b300, null], [$vyber(1200), $vyber(969), $vyber(728), $vyber(727), $vyber(300), $vyber(299)]);
+    eq($b970, $vyber(0), 'počítač bez šířky místa: billboard');
+    eq(null, $vyber(0, ['ua' => UA_TABLET]), 'tablet (odhad 768 px) padne do prázdného rozměru');
+    eq($b300, $vyber(0, ['ua' => UA_MOBIL]));
+    // obyčejná logika „rozměr bez bannerů se přeskočí“ prázdný rozměr nepřeskočí
+    $app->bannery()->nastavStav($b970, 'paused');
+    eq(null, $vyber(1200), 'bez billboardu se na široké místo čtverec nepoužije – je za prázdným rozměrem');
+    $prazdne = zona9($app, ['sizes' => '970x250, 500x0, 300x600']);
+    throws(fn() => zona9($app, ['sizes' => '300x0, 300x250']), 'stejnou šířku');
+    ok(!Zony::pasuje($prazdne, ['width' => 300, 'height' => 0]));
+});

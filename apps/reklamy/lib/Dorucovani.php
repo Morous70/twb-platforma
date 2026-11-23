@@ -13,6 +13,7 @@ namespace Reklamy;
  *  2. druh kampaně: exkluzivní mají přednost před standardními, zbytkové přijdou na řadu jen bez jiných;
  *  3. v rámci druhu rozhoduje nejvyšší priorita;
  *  4. responzivní zóna: jen bannery, které se vejdou do šířky místa, a z nich ten nejširší rozměr (banner se nikdy nezmenšuje);
+ *     místo v rozsahu prázdného rozměru (728x0) zůstane prázdné;
  *  5. mezi zbylými se losuje podle váhy kampaně a v ní podle váhy banneru.
  * Banner jen pro některá zařízení (banners.devices) a cílení kampaně na zařízení se řídí Kontext::zarizeni().
  */
@@ -131,7 +132,9 @@ final class Dorucovani
         $kandidati = $this->kandidati($zona, $k, $typy);
         if (Zony::jeResponzivni($zona)) {
             $limit = $sirkaMista > 0 ? $sirkaMista : $k->odhadSirky();
-            if ($limit > 0) $kandidati = array_values(array_filter($kandidati, fn($b) => (int)$b['width'] <= $limit));
+            // prázdný rozměr (728x0): od jeho šířky se užší bannery nepoužijí
+            $hranice = Zony::prazdnaHranice($zona, $limit);
+            $kandidati = array_values(array_filter($kandidati, fn($b) => ($limit === 0 || (int)$b['width'] <= $limit) && (int)$b['width'] > $hranice));
         }
         if (!$kandidati) return null;
         $prvni = $kandidati[0];

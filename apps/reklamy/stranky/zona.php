@@ -78,19 +78,19 @@ foreach (Bannery::ROZMERY as $r => $n) $rozmery[$r] = str_replace('x', '×', $r)
   </table></div>
   <?php endif; ?>
 
-  <?php if ($rz = Zony::rozmery($z)): ?>
+  <?php if ($rz = Zony::rozmery($z)): $nejuzsi = $rz[count($rz) - 1]; ?>
   <h2>Výběr rozměru podle šířky místa</h2>
   <p class="slabe mala">Skript změří, jak široké je místo na stránce, a vybere nejširší rozměr, který se do něj vejde (v rámci druhu a priority kampaně).
     Banner se nikdy nezmenšuje. Když skript šířku nezná (rám, obrázek, volání ze serveru), použije se šířka okna nebo odhad podle zařízení: mobil <?= Reklamy\Kontext::ODHAD_SIRKY['mobil'] ?> px, tablet <?= Reklamy\Kontext::ODHAD_SIRKY['tablet'] ?> px, počítač bez omezení.</p>
   <div class="tabulka-obal"><table>
     <tr><th>Rozměr</th><th>Použije se, když je místo široké</th><th class="cisla">Bannerů</th></tr>
     <?php foreach ($rz as $i => [$rw, $rh]): $pocet = count(array_filter($efektivni, fn($b) => (int)$b['width'] === $rw && (int)$b['height'] === $rh)); ?>
-    <tr><td><?= $rw ?>×<?= $rh ?></td>
+    <tr><td><?= $rh === 0 ? '<b>prázdné</b>' : "{$rw}×{$rh}" ?></td>
       <?php $sirsi = array_values(array_filter(array_column($rz, 0), fn($x) => $x > $rw)); ?>
       <td><?= $sirsi ? "{$rw}–" . (min($sirsi) - 1) . ' px' : "{$rw} px a víc" ?><?= count(array_filter($rz, fn($x) => $x[0] === $rw)) > 1 ? ' <span class="slabe mala">(víc rozměrů této šířky – vyhraje vyšší)</span>' : '' ?></td>
-      <td class="cisla"><?= $pocet ?: '<span class="slabe">0 – přeskočí se</span>' ?></td></tr>
+      <td class="cisla"><?= $rh === 0 ? '<span class="slabe">nic' . ($z['fallback'] ? ' (náhradní HTML)' : '') . '</span>' : ($pocet ?: '<span class="slabe">0 – přeskočí se</span>') ?></td></tr>
     <?php endforeach; ?>
-    <tr><td class="slabe">–</td><td class="slabe">méně než <?= $rz[count($rz) - 1][0] ?> px: nic<?= $z['fallback'] ? ' (náhradní HTML)' : '' ?></td><td></td></tr>
+    <tr><td class="slabe">–</td><td class="slabe">méně než <?= $nejuzsi[0] ?> px: nic<?= $z['fallback'] ? ' (náhradní HTML)' : '' ?></td><td></td></tr>
   </table></div>
   <?php endif; ?>
 
@@ -134,7 +134,7 @@ foreach (Bannery::ROZMERY as $r => $n) $rozmery[$r] = str_replace('x', '×', $r)
     </div>
     <?= Ui::pole('Responzivní zóna – rozměry pro různé šířky', 'sizes', implode(', ', array_map(fn($x) => "{$x[0]}x{$x[1]}", Zony::rozmery($z))),
         ['placeholder' => '970x250, 728x90, 300x250', 'maxlength' => 200],
-        'Pro PC, tablet i mobil: zóna bere bannery všech uvedených rozměrů a na stránce vybere nejširší, který se vejde do místa. Šířku a výšku výše pak nechte prázdné.') ?>
+        'Pro PC, tablet i mobil: zóna bere bannery všech uvedených rozměrů a na stránce vybere nejširší, který se vejde do místa. Šířku a výšku výše pak nechte prázdné. Prázdný rozměr <code>728x0</code> = od 728 px (do dalšího širšího rozměru) nic.') ?>
     <label class="pole"><span>Běžné rozměry</span><select data-rozmery><?php foreach ($rozmery as $k => $t): ?><option value="<?= Ui::h($k) ?>"><?= Ui::h($t) ?></option><?php endforeach; ?></select>
       <small>Prázdný rozměr je libovolný: bez šířky i výšky zóna přijme banner jakékoli velikosti, jen se šířkou (nebo jen s výškou) bannery s touto šířkou (výškou) a libovolným druhým rozměrem. Přímo přiřazené bannery, které po změně nesedí, se odeberou.</small></label>
     <?= Ui::oblast('Náhradní HTML', 'fallback', $z['fallback'], ['class' => 'kod', 'rows' => 4, 'spellcheck' => 'false'], 'Zobrazí se, když zóna nemá žádný banner k dispozici. Prázdné = nic.') ?>

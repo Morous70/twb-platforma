@@ -16,6 +16,7 @@ Aplikace je složená z modulů platformy (`modules/`), vlastní kód je v `lib/
 | 0.7 | Zóna jen se šířkou nebo jen s výškou (druhý rozměr libovolný): přiřazení a výběr bannerů, formulář, kódy pro vložení a náhled | hotovo |
 | 0.8 | Banner ve více kampaních (vazba M:N, doručování, limity a statistiky po kampaních), náhled banneru v modálním okně (oko v seznamu), externí data (vzdálené zdroje JSON/CSV z modulu data) | hotovo |
 | 0.9 | Reklamy podle zařízení: responzivní zóna se seznamem rozměrů (výběr podle šířky místa na stránce, nic se nezmenšuje), banner jen pro některá zařízení, zařízení podle šířky okna (záloha User-Agent), statistiky po zařízeních, obrázek 2× (srcset) | hotovo |
+| 0.9.1 | Prázdný rozměr responzivní zóny (`728x0` = od 728 px do dalšího širšího rozměru nic) | hotovo |
 
 ## Struktura
 ```
@@ -166,3 +167,6 @@ Galerie v této aplikaci obrázky nezmenšuje (`img_auto = 0`), banner má přes
 - **Obrázek 2×**: `banners.media2x_id` (galerie, přesně dvojnásobný rozměr; galerie ho nedovolí smazat) nebo `image2x_url` (obrázek z adresy).
   `Vykresleni::html` přidá `srcset="… 1x, … 2x"`, `d/b.php?x=2`, JSON `obrazek2x`. Vložení odkazem (e-mail) vydává běžný obrázek, slidy 2× nemají.
 - **Převod databáze** (schéma 6): nové sloupce a přestavba `stats` s `device`, opakovatelný (obnovená záloha z 0.8). Test proti zmrazenému schématu 0.8 (`tests/reklamy/original/Schema-0.8.php`).
+- **Prázdný rozměr** (0.9.1): položka s výškou 0 (`728x0`). `Zony::prazdnaHranice` vrátí šířku nejširšího prázdného rozměru, který se do místa vejde;
+  bannery užší nebo stejně široké se pak nepoužijí (širší do šířky místa ano). Bannery a rozměr rámu berou jen skutečné rozměry (`Zony::rozmeryBanneru`).
+  Prázdný rozměr nesmí sdílet šířku s jiným a zóna musí mít aspoň jeden skutečný rozměr.

@@ -22,6 +22,9 @@ i v úzkém postranním sloupci), a vybere nejširší banner, který se do něj
 | 300–727 px | 300×250 |
 | méně | nic (náhradní HTML zóny) |
 
+**Prázdný rozměr**: zápis s výškou 0, např. `970x250, 728x0, 300x250`, znamená „od 728 px nic“ – místo široké 728–969 px zůstane prázdné
+(náhradní HTML), pod 728 px se ukáže čtverec. Užší banner se do rozsahu prázdného rozměru nikdy nedostane, ani když chybí širší banner.
+
 Přesné rozsahy pro vaši zónu ukazuje stránka zóny. Druh a priorita kampaně mají přednost: exkluzivní kampaň jen s rozměrem 300×250 se ukáže i na počítači.
 Na jedné stránce se banner neopakuje, takže druhé místo stejné zóny dostane jiný banner nebo menší rozměr.
 

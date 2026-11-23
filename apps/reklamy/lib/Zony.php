@@ -10,6 +10,7 @@ namespace Reklamy;
  * Responzivní zóna (0.9) má místo jednoho rozměru seznam rozměrů (sloupec sizes, např. 970×250, 728×90, 300×250):
  * bere bannery všech těchto rozměrů a při doručení vybere ten nejširší, který se vejde do šířky místa na stránce
  * (Dorucovani::vyber). Banner se nikdy nezmenšuje – na mobilu se ukáže mobilní rozměr.
+ * Prázdný rozměr (0.9.1) má výšku 0, např. 728x0: od této šířky až po další širší rozměr zóna nic nezobrazí.
  */
 final class Zony
 {
@@ -49,8 +50,29 @@ final class Zony
     /** Je zóna responzivní (seznam rozměrů)? */
     public static function jeResponzivni(array $z): bool { return self::rozmery($z) !== []; }
 
+    /** Rozměry zóny pro bannery (bez prázdných). @return list<array{0:int, 1:int}> */
+    public static function rozmeryBanneru(array $z): array
+    {
+        return array_values(array_filter(self::rozmery($z), fn($x) => $x[1] > 0));
+    }
+
+    /**
+     * Prázdný rozměr, do kterého padne místo dané šířky: šířka nejširšího prázdného rozměru, který se ještě vejde (0 = žádný).
+     * Bannery užší než tato šířka se pak nepoužijí, širší (do šířky místa) ano. $sirka 0 = bez omezení.
+     */
+    public static function prazdnaHranice(array $z, int $sirka): int
+    {
+        $h = 0;
+        foreach (self::rozmery($z) as [$w, $v]) if ($v === 0 && ($sirka === 0 || $w <= $sirka)) $h = max($h, $w);
+        return $h;
+    }
+
+    /** Popis jednoho rozměru: „300×250“, prázdný „728 px nic“. */
+    public static function popisRozmeru(array $r): string { return $r[1] === 0 ? "{$r[0]} px nic" : "{$r[0]}×{$r[1]}"; }
+
     /**
      * Seznam rozměrů z formuláře („970x250, 728×90 300x250“), seřazený od nejširšího; null = prázdné.
+     * Výška 0 (728x0) = prázdný rozměr: od této šířky nic. Jeho šířku nesmí mít jiný rozměr a seznam potřebuje aspoň jeden skutečný rozměr.
      * @return ?list<string>
      */
     public static function rozmeryZTextu(string $s): ?array
@@ -58,12 +80,16 @@ final class Zony
         $out = [];
         foreach (preg_split('/[\s,;]+/u', trim($s)) ?: [] as $c) {
             if ($c === '') continue;
-            if (!preg_match('/^(\d{1,4})[x×X](\d{1,4})$/u', $c, $m) || (int)$m[1] < 1 || (int)$m[2] < 1 || (int)$m[1] > Bannery::MAX_ROZMER || (int)$m[2] > Bannery::MAX_ROZMER) {
-                throw new Chyba("Rozměr „{$c}“ zadejte jako šířka×výška, např. 300x250.");
+            if (!preg_match('/^(\d{1,4})[x×X](\d{1,4})$/u', $c, $m) || (int)$m[1] < 1 || (int)$m[1] > Bannery::MAX_ROZMER || (int)$m[2] > Bannery::MAX_ROZMER) {
+                throw new Chyba("Rozměr „{$c}“ zadejte jako šířka×výška, např. 300x250 (prázdný rozměr 728x0).");
             }
             $out[(int)$m[1] . 'x' . (int)$m[2]] = [(int)$m[1], (int)$m[2]];
         }
         if (!$out) return null;
+        foreach ($out as [$w, $v]) {
+            if ($v === 0 && count(array_filter($out, fn($x) => $x[0] === $w)) > 1) throw new Chyba("Prázdný rozměr {$w}x0 nesmí mít stejnou šířku jako jiný rozměr zóny.");
+        }
+        if (!array_filter($out, fn($x) => $x[1] > 0)) throw new Chyba('Responzivní zóna potřebuje kromě prázdných i aspoň jeden rozměr banneru.');
         if (count($out) > self::MAX_ROZMERU) throw new Chyba('Responzivní zóna může mít nejvýš ' . self::MAX_ROZMERU . ' rozměrů.');
         uasort($out, fn($a, $b) => [$b[0], $b[1]] <=> [$a[0], $a[1]]);
         return array_keys($out);
@@ -72,7 +98,7 @@ final class Zony
     /** Popis rozměru zóny: „300×250“, „1200 × libovolná výška“, „libovolná šířka × 100“, „responzivní 970×250, 300×250“ nebo „libovolný“. */
     public static function rozmer(array $z): string
     {
-        if ($r = self::rozmery($z)) return 'responzivní ' . implode(', ', array_map(fn($x) => "{$x[0]}×{$x[1]}", $r));
+        if ($r = self::rozmery($z)) return 'responzivní ' . implode(', ', array_map(fn($x) => self::popisRozmeru($x), $r));
         $w = $z['width'] ?? null;
         $h = $z['height'] ?? null;
         if ($w !== null && $h !== null) return "{$w}×{$h}";
@@ -90,7 +116,7 @@ final class Zony
     /** Vejde se banner do zóny? Nezadaný rozměr zóny je libovolný. */
     public static function pasuje(array $zona, array $banner): bool
     {
-        if ($r = self::rozmery($zona)) return in_array([(int)$banner['width'], (int)$banner['height']], $r, true);
+        if ($r = self::rozmeryBanneru($zona)) return in_array([(int)$banner['width'], (int)$banner['height']], $r, true);
         return (($zona['width'] ?? null) === null || (int)$zona['width'] === (int)$banner['width'])
             && (($zona['height'] ?? null) === null || (int)$zona['height'] === (int)$banner['height']);
     }
@@ -220,7 +246,7 @@ final class Zony
      */
     public function rozmerVlozeni(array $zona, int $vychoziW = 300, int $vychoziH = 250): array
     {
-        if ($r = self::rozmery($zona)) return [max(array_column($r, 0)), max(array_column($r, 1))];
+        if ($r = self::rozmeryBanneru($zona)) return [max(array_column($r, 0)), max(array_column($r, 1))];
         $w = ($zona['width'] ?? null) !== null ? (int)$zona['width'] : 0;
         $h = ($zona['height'] ?? null) !== null ? (int)$zona['height'] : 0;
         if ((!$w || !$h) && isset($zona['id'])) {

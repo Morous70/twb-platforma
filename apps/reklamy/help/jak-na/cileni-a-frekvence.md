@@ -10,7 +10,7 @@ klicova: cílení, frekvence, zařízení, mobil, jazyk, cookies
 V kampani rozbalte **Cílení a frekvence**. Prázdné pole = bez omezení.
 
 - **Dny v týdnu** a **hodiny od–do** (i přes půlnoc, např. 22–6).
-- **Zařízení**: počítač, mobil, tablet (podle prohlížeče).
+- **Zařízení**: počítač, mobil, tablet (podle šířky okna, bez skriptu podle prohlížeče – viz [Reklama na počítači, tabletu a mobilu](zarizeni)).
 - **Jazyk** prohlížeče: kódy `cs, sk, en`.
 - **Stránka obsahuje / neobsahuje**: části adres, každou na řádek.
 - **Odkud návštěvník přišel**: např. `google.`.

@@ -2,6 +2,7 @@
 declare(strict_types=1);
 // Asynchronní načítání reklam: <ins data-twbr-zona="ID"></ins> + <script async src=".../d/asyn.php"></script>.
 // Skript najde všechny značky na stránce, jedním požadavkem (data.php) načte bannery a vloží je.
+// Posílá šířku každého místa (sirky), šířku okna (sw): responzivní zóna podle nich vybere banner, který se vejde.
 use Reklamy\App;
 
 /** @var App $app */
@@ -20,7 +21,14 @@ echo <<<JS
     var prvky = [].slice.call(d.querySelectorAll('ins[data-twbr-zona]:not([data-twbr-stav])'));
     if (!prvky.length || !w.fetch) return;
     var zony = prvky.map(function (p) { p.setAttribute('data-twbr-stav', 'nacita'); return parseInt(p.getAttribute('data-twbr-zona'), 10) || 0; });
-    var u = zaklad + 'data.php?zony=' + zony.join(',') + '&loc=' + encodeURIComponent(location.href)
+    // šířka místa: značka jako blok zabere celou šířku rodiče (inline-block s pevnou šířkou zůstane, jak je)
+    var sirky = prvky.map(function (p) {
+      try { if (w.getComputedStyle(p).display === 'inline') p.style.display = 'block'; } catch (e) {}
+      return Math.floor(p.getBoundingClientRect().width) || 0;
+    });
+    var sw = w.innerWidth || (d.documentElement && d.documentElement.clientWidth) || 0;
+    var u = zaklad + 'data.php?zony=' + zony.join(',') + '&sirky=' + sirky.join(',') + '&sw=' + sw
+      + '&loc=' + encodeURIComponent(location.href)
       + (d.referrer ? '&ref=' + encodeURIComponent(d.referrer) : '') + '&cb=' + Math.floor(Math.random() * 1e9);
     w.fetch(u, { credentials: 'include' }).then(function (r) { return r.json(); }).then(function (j) {
       prvky.forEach(function (p, i) {

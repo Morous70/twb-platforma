@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 // Nový banner nebo úprava banneru. Proměnné: $app, $ui, $post.
-use Reklamy\{Ui, Bannery, Zony, Chyba, Kampane};
+use Reklamy\{Ui, Bannery, Zony, Chyba, Kampane, Cileni};
 
 $bannery = $app->bannery();
 $id = isset($_GET['id']) ? (int)$_GET['id'] : null;
@@ -46,7 +46,9 @@ if ($post) {
     }
 }
 $z = $b ?? ['name' => '', 'status' => 'active', 'width' => null, 'height' => null, 'weight' => 1, 'media_id' => null, 'image_url' => '', 'html' => '',
-    'target_url' => '', 'target' => '_blank', 'alt' => '', 'note' => ''];
+    'target_url' => '', 'target' => '_blank', 'alt' => '', 'note' => '', 'devices' => null, 'media2x_id' => null, 'image2x_url' => ''];
+$vybranaZarizeni = $post && ($_POST['akce'] ?? '') === 'ulozit' ? array_map('strval', (array)($_POST['zarizeni'] ?? [])) : Bannery::zarizeni($z);
+if (!$vybranaZarizeni) $vybranaZarizeni = array_keys(Cileni::ZARIZENI);
 $rozmery = ['' => 'Běžné rozměry…'];
 foreach (Bannery::ROZMERY as $r => $n) $rozmery[$r] = str_replace('x', '×', $r) . ' – ' . $n;
 $promenneNapoveda = 'Proměnné: <code>{datum}</code>, <code>{den}</code>, <code>{svatek}</code>, <code>{odpocet:24. 12. 2026}</code>, <code>{Skupina:parametr}</code> z tabulky dat a vlastní proměnné '
@@ -91,8 +93,17 @@ $balicek = $typ === 'html5' && $b ? (json_decode((string)$b['content'], true) ?:
             <?= Ui::h($m['nazev']) ?> (<?= (int)$m['sirka'] ?>×<?= (int)$m['vyska'] ?>)</option>
         <?php endforeach; ?>
       </select><small>Rozměr banneru se doplní podle obrázku.</small></label>
+    <label class="pole" for="f-media2x_id"><span>Obrázek pro displeje s vyšší hustotou (2×, nepovinné)</span>
+      <select id="f-media2x_id" name="media2x_id">
+        <option value="">Bez obrázku 2×</option>
+        <?php $vybrany2 = Ui::hodnota('media2x_id', $z['media2x_id']);
+        foreach ($obrazky as $m): ?>
+          <option value="<?= $m['id'] ?>"<?= (string)$m['id'] === $vybrany2 ? ' selected' : '' ?>><?= Ui::h($m['nazev']) ?> (<?= (int)$m['sirka'] ?>×<?= (int)$m['vyska'] ?>)</option>
+        <?php endforeach; ?>
+      </select><small>Stejný banner v dvojnásobném rozměru (např. 600×500 k banneru 300×250). Mobily a displeje Retina si ho vyberou samy a banner je na nich ostrý; rozměr na stránce zůstává stejný.</small></label>
   <?php elseif ($typ === 'external'): ?>
     <?= Ui::pole('Adresa obrázku', 'image_url', $z['image_url'], ['type' => 'url', 'required' => true, 'placeholder' => 'https://…']) ?>
+    <?= Ui::pole('Adresa obrázku 2× (nepovinné)', 'image2x_url', $z['image2x_url'], ['type' => 'url', 'placeholder' => 'https://…'], 'Obrázek v dvojnásobném rozměru pro ostré zobrazení na mobilech a displejích Retina.') ?>
   <?php elseif ($typ === 'html'): ?>
     <?= Ui::oblast('HTML kód', 'html', $z['html'], ['class' => 'kod', 'rows' => 14, 'spellcheck' => 'false', 'required' => true],
         'Kód se zobrazí v izolovaném rámci (iframe) o rozměru banneru. Odkazy: <code>{clickurl}</code> (proklik na cílovou adresu) nebo <code>{clickurl}https://…</code> (proklik na jinou adresu stejné domény nebo uvedenou v kódu). Dále <code>{random}</code>, <code>{timestamp}</code>, <code>{bannerid}</code>, <code>{zoneid}</code>, <code>{width}</code>, <code>{height}</code>, <code>{targeturl}</code>. '
@@ -124,6 +135,16 @@ $balicek = $typ === 'html5' && $b ? (json_decode((string)$b['content'], true) ?:
   <?php if (in_array($typ, Bannery::OBRAZKOVE, true)): ?>
     <?= Ui::pole('Popis obrázku (alt)', 'alt', $z['alt'], ['maxlength' => 255]) ?>
   <?php endif; ?>
+  <fieldset><legend>Zobrazovat na zařízeních</legend>
+    <input type="hidden" name="zarizeni[]" value="">
+    <div class="seznam-voleb">
+      <?php foreach (Cileni::ZARIZENI as $zk => $zn): ?>
+      <label><input type="checkbox" name="zarizeni[]" value="<?= $zk ?>"<?= in_array($zk, $vybranaZarizeni, true) ? ' checked' : '' ?>> <?= Ui::h($zn) ?></label>
+      <?php endforeach; ?>
+    </div>
+    <p class="slabe mala" style="margin-bottom:0">Např. mobilní verze banneru s jiným obsahem nebo odkazem. Zařízení se pozná podle šířky okna (mobil pod <?= Reklamy\Kontext::TABLET_OD ?> px, tablet pod <?= Reklamy\Kontext::POCITAC_OD ?> px),
+      u rámu a obrázku podle prohlížeče. Rozměr podle místa na stránce řeší responzivní zóna.</p>
+  </fieldset>
   <fieldset><legend>Kampaně</legend>
     <p class="slabe mala" style="margin-top:0">Stejný banner může běžet ve více kampaních; v každé se řídí jejím termínem, prioritou, limity a cílením a statistiky se počítají zvlášť.</p>
     <input type="hidden" name="kampane[]" value="0">

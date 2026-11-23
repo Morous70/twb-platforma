@@ -15,6 +15,7 @@ Aplikace je složená z modulů platformy (`modules/`), vlastní kód je v `lib/
 | 0.6 | Nový vzhled administrace podle šablony AdminKit: tmavé postranní menu se skupinami a ikonami (skrytí na počítači, vysunutí na mobilu), horní lišta, karty a dlaždice se stínem, barvy a typografie; funkce beze změny | hotovo |
 | 0.7 | Zóna jen se šířkou nebo jen s výškou (druhý rozměr libovolný): přiřazení a výběr bannerů, formulář, kódy pro vložení a náhled | hotovo |
 | 0.8 | Banner ve více kampaních (vazba M:N, doručování, limity a statistiky po kampaních), náhled banneru v modálním okně (oko v seznamu), externí data (vzdálené zdroje JSON/CSV z modulu data) | hotovo |
+| 0.9 | Reklamy podle zařízení: responzivní zóna se seznamem rozměrů (výběr podle šířky místa na stránce, nic se nezmenšuje), banner jen pro některá zařízení, zařízení podle šířky okna (záloha User-Agent), statistiky po zařízeních, obrázek 2× (srcset) | hotovo |
 
 ## Struktura
 ```
@@ -41,8 +42,8 @@ data/            databáze reklamy.sqlite, galerie (media/), zálohy (backups/),
 ## Doručování (složka `d/`)
 | Soubor | K čemu |
 |---|---|
-| `asyn.php` | asynchronní skript: najde `<ins data-twbr-zona="ID">`, jedním požadavkem načte všechny zóny stránky (banner se na stránce neopakuje) |
-| `data.php` | JSON pro jednu (`?zona=`) nebo víc zón (`?zony=1,2`), používá ho skript i servery; CORS i s cookies |
+| `asyn.php` | asynchronní skript: najde `<ins data-twbr-zona="ID">`, jedním požadavkem načte všechny zóny stránky (banner se na stránce neopakuje); posílá šířku každého místa (`sirky`) a okna (`sw`) |
+| `data.php` | JSON pro jednu (`?zona=`) nebo víc zón (`?zony=1,2`), používá ho skript i servery; CORS i s cookies; volitelně `sirka` / `sirky=300,728` (šířky míst) a `sw` (šířka okna) |
 | `js.php` | klasický JavaScript (`document.write`) |
 | `ram.php` | rám (iframe); HTML banner je přímo obsahem rámu; používá ho i vyskakovací okno |
 | `obr.php` + `klik.php?zona=&n=` | vložení odkazem (e-maily): obrázek a proklik se stejným `n` vedou na stejný banner (tabulka `view_map`, i bez cookies) |
@@ -151,3 +152,17 @@ php tools/sestavit.php reklamy            # dist/twb-reklamy-<verze>-full.zip a 
 ```
 Test vložení do stránky, editoru slidů a HTML5 v rámu běží ve skutečném prohlížeči (Playwright + Chromium); bez nich se přeskočí. Webové testy spouštějí `php -S` s konfigurací z proměnné `REKLAMY_CONFIG` (platí jen pro vestavěný server) a ověřují i to, že žádná stránka nevypíše varování PHP.
 Galerie v této aplikaci obrázky nezmenšuje (`img_auto = 0`), banner má přesný rozměr obrázku.
+
+## Reklamy podle zařízení (0.9)
+- **Responzivní zóna**: `zones.sizes` = JSON seznam rozměrů (`["970x250","728x90","300x250"]`, od nejširšího; `Zony::rozmeryZTextu`), šířka a výška zóny jsou pak prázdné.
+  `Zony::pasuje` bere bannery všech rozměrů seznamu (přiřazení, náhled, zóny banneru; nesedící přímá přiřazení po změně zóny nebo banneru odebere `Zony::odeberNesedici`).
+- **Výběr** (`Dorucovani::vyber($zona, $k, $typy, $sirkaMista)`): u responzivní zóny jen bannery široké nejvýš jako místo; v nejlepší skupině (druh + priorita) vyhraje nejširší rozměr
+  (pak vyšší), mezi bannery tohoto rozměru se losuje. Šířku místa posílá `asyn.php` (`sirky`, značka `<ins>` jako blok přes celou šířku rodiče), JavaScript (`sirka` = šířka rodiče skriptu);
+  když chybí: šířka okna `sw`, jinak odhad podle zařízení (`Kontext::ODHAD_SIRKY`: mobil 360, tablet 768, počítač bez omezení). Banner se nikdy nezmenšuje – nic se nevejde = náhradní HTML.
+- **Zařízení** (`Kontext::zarizeni`): parametr `d` odkazu (proklik a HTML dokument nesou zařízení zobrazení, bez podpisu – jen popisek statistik) → šířka okna `sw`
+  (pod 768 mobil, pod 1024 tablet) → User-Agent. Řídí se jím cílení kampaně i `banners.devices` (čárkami `pocitac,tablet,mobil`, NULL = všechna; `Bannery::proZarizeni`).
+- **Statistiky**: `stats.device` je součástí klíče (`''` = data před 0.9), `clicks.device` a `views.device` – konverze dostane zařízení prokliku nebo zobrazení.
+  Přehled `podle=zarizeni` a filtr `zarizeni` (`Statistiky::prehled`).
+- **Obrázek 2×**: `banners.media2x_id` (galerie, přesně dvojnásobný rozměr; galerie ho nedovolí smazat) nebo `image2x_url` (obrázek z adresy).
+  `Vykresleni::html` přidá `srcset="… 1x, … 2x"`, `d/b.php?x=2`, JSON `obrazek2x`. Vložení odkazem (e-mail) vydává běžný obrázek, slidy 2× nemají.
+- **Převod databáze** (schéma 6): nové sloupce a přestavba `stats` s `device`, opakovatelný (obnovená záloha z 0.8). Test proti zmrazenému schématu 0.8 (`tests/reklamy/original/Schema-0.8.php`).

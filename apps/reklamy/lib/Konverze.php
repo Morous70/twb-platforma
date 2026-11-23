@@ -175,7 +175,7 @@ final class Konverze
             return ['stav' => 'duplicita', 'via' => '', 'banner' => null, 'id' => null];   // souběžné odeslání stejné objednávky
         }
         $id = $db->posledniId();
-        if ($zdroj) $this->app->dorucovani()->konverze((int)$zdroj['banner_id'], (int)$zdroj['zone_id'], $ted, $hodnota, (int)$zdroj['campaign_id']);
+        if ($zdroj) $this->app->dorucovani()->konverze((int)$zdroj['banner_id'], (int)$zdroj['zone_id'], $ted, $hodnota, (int)$zdroj['campaign_id'], (string)($zdroj['device'] ?? ''));
         return ['stav' => 'ok', 'via' => $via, 'banner' => $zdroj ? (int)$zdroj['banner_id'] : null, 'id' => $id];
     }
 

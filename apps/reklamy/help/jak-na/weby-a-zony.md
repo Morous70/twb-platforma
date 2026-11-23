@@ -14,7 +14,8 @@ klicova: zóna, web, rozměr, náhradní
   - šířka i výška (např. 300×250) – jen bannery přesně tohoto rozměru;
   - jen šířka (např. 1200) – bannery široké 1200 px s libovolnou výškou (1200×100, 1200×300 …);
   - jen výška (např. 100) – bannery vysoké 100 px s libovolnou šířkou;
-  - bez rozměru – bannery jakékoli velikosti.
+  - bez rozměru – bannery jakékoli velikosti;
+  - **responzivní** – seznam rozměrů (např. `970x250, 728x90, 300x250`), na stránce se vybere ten, který se vejde do místa ([Reklama na počítači, tabletu a mobilu](zarizeni)).
   Rám (iframe) a vyskakovací okno potřebují oba rozměry: chybějící se v kódu doplní podle největšího banneru zóny.
 - **Náhradní HTML**: zobrazí se, když není co ukázat (např. „Tady může být vaše reklama“).
 - **Přiřazení**: celá kampaň (platí i pro bannery přidané později), nebo jednotlivé bannery.

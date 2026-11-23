@@ -14,7 +14,7 @@ try {
     $z = $v->zona($_GET['zona'] ?? '');
     if ($z) {
         $k = $v->kontext($_GET, (int)$z['id']);
-        $b = $app->dorucovani()->vyber($z, $k);
+        $b = $app->dorucovani()->vyber($z, $k, [], Vydej::sirka($_GET['sirka'] ?? ''));
         if ($b) {
             $app->dorucovani()->zobrazeni((int)$b['id'], (int)$z['id'], $k, (int)$b['campaign_id']);
             Vydej::ulozCookies($k);

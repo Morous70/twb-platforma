@@ -6,10 +6,15 @@ namespace Reklamy;
  * Zóny = místa pro reklamu na webu. Do zóny se přiřazují celé kampaně (platí i pro bannery přidané později)
  * nebo jednotlivé bannery. Zóna může mít pevnou šířku, pevnou výšku, obojí, nebo nic: bere jen bannery,
  * které v zadaných rozměrech sedí (nezadaný rozměr je libovolný).
+ *
+ * Responzivní zóna (0.9) má místo jednoho rozměru seznam rozměrů (sloupec sizes, např. 970×250, 728×90, 300×250):
+ * bere bannery všech těchto rozměrů a při doručení vybere ten nejširší, který se vejde do šířky místa na stránce
+ * (Dorucovani::vyber). Banner se nikdy nezmenšuje – na mobilu se ukáže mobilní rozměr.
  */
 final class Zony
 {
     public const DRUHY = ['banner' => 'Banner na stránce', 'popup' => 'Vyskakovací okno (popup)'];
+    public const MAX_ROZMERU = 10;
 
     public function __construct(private App $app) {}
 
@@ -31,9 +36,43 @@ final class Zony
             ?: throw new Chyba('Zóna nenalezena.');
     }
 
-    /** Popis rozměru zóny: „300×250“, „1200 × libovolná výška“, „libovolná šířka × 100“ nebo „libovolný“. */
+    /** Rozměry responzivní zóny od nejširšího ([[970, 250], [728, 90], …]); prázdné = obyčejná zóna. @return list<array{0:int, 1:int}> */
+    public static function rozmery(array $z): array
+    {
+        $r = json_decode((string)($z['sizes'] ?? ''), true);
+        if (!is_array($r)) return [];
+        $out = [];
+        foreach ($r as $x) if (is_string($x) && preg_match('/^(\d+)x(\d+)$/', $x, $m)) $out[] = [(int)$m[1], (int)$m[2]];
+        return $out;
+    }
+
+    /** Je zóna responzivní (seznam rozměrů)? */
+    public static function jeResponzivni(array $z): bool { return self::rozmery($z) !== []; }
+
+    /**
+     * Seznam rozměrů z formuláře („970x250, 728×90 300x250“), seřazený od nejširšího; null = prázdné.
+     * @return ?list<string>
+     */
+    public static function rozmeryZTextu(string $s): ?array
+    {
+        $out = [];
+        foreach (preg_split('/[\s,;]+/u', trim($s)) ?: [] as $c) {
+            if ($c === '') continue;
+            if (!preg_match('/^(\d{1,4})[x×X](\d{1,4})$/u', $c, $m) || (int)$m[1] < 1 || (int)$m[2] < 1 || (int)$m[1] > Bannery::MAX_ROZMER || (int)$m[2] > Bannery::MAX_ROZMER) {
+                throw new Chyba("Rozměr „{$c}“ zadejte jako šířka×výška, např. 300x250.");
+            }
+            $out[(int)$m[1] . 'x' . (int)$m[2]] = [(int)$m[1], (int)$m[2]];
+        }
+        if (!$out) return null;
+        if (count($out) > self::MAX_ROZMERU) throw new Chyba('Responzivní zóna může mít nejvýš ' . self::MAX_ROZMERU . ' rozměrů.');
+        uasort($out, fn($a, $b) => [$b[0], $b[1]] <=> [$a[0], $a[1]]);
+        return array_keys($out);
+    }
+
+    /** Popis rozměru zóny: „300×250“, „1200 × libovolná výška“, „libovolná šířka × 100“, „responzivní 970×250, 300×250“ nebo „libovolný“. */
     public static function rozmer(array $z): string
     {
+        if ($r = self::rozmery($z)) return 'responzivní ' . implode(', ', array_map(fn($x) => "{$x[0]}×{$x[1]}", $r));
         $w = $z['width'] ?? null;
         $h = $z['height'] ?? null;
         if ($w !== null && $h !== null) return "{$w}×{$h}";
@@ -45,12 +84,13 @@ final class Zony
     /** Má zóna aspoň jeden pevný rozměr? */
     public static function maRozmer(array $z): bool
     {
-        return ($z['width'] ?? null) !== null || ($z['height'] ?? null) !== null;
+        return self::jeResponzivni($z) || ($z['width'] ?? null) !== null || ($z['height'] ?? null) !== null;
     }
 
     /** Vejde se banner do zóny? Nezadaný rozměr zóny je libovolný. */
     public static function pasuje(array $zona, array $banner): bool
     {
+        if ($r = self::rozmery($zona)) return in_array([(int)$banner['width'], (int)$banner['height']], $r, true);
         return (($zona['width'] ?? null) === null || (int)$zona['width'] === (int)$banner['width'])
             && (($zona['height'] ?? null) === null || (int)$zona['height'] === (int)$banner['height']);
     }
@@ -70,6 +110,9 @@ final class Zony
             'note' => Vstup::text($v, 'note', 'Poznámka', 5000, false),
             'updated_at' => time(),
         ];
+        $sizes = self::rozmeryZTextu((string)($v['sizes'] ?? ''));
+        if ($sizes !== null && ($d['width'] !== null || $d['height'] !== null)) throw new Chyba('Responzivní zóna má jen seznam rozměrů – šířku a výšku nechte prázdné.');
+        $d['sizes'] = $sizes !== null ? json_encode($sizes) : null;
         $fb = (string)($v['fallback'] ?? '');
         if (strlen($fb) > Bannery::MAX_HTML) throw new Chyba('Náhradní HTML může mít nejvýš 512 kB.');
         $d['fallback'] = trim($fb) !== '' ? $fb : null;
@@ -83,9 +126,9 @@ final class Zony
         }
         $db->transakce(function () use ($db, $d, $id) {
             $db->q('UPDATE zones SET ' . implode(', ', array_map(fn($k) => "$k = ?", array_keys($d))) . ' WHERE id = ?', [...array_values($d), $id]);
-            if ($d['width'] !== null || $d['height'] !== null) {
-                $db->q('DELETE FROM zone_banners WHERE zone_id = ? AND banner_id IN (SELECT id FROM banners WHERE (? IS NOT NULL AND width <> ?) OR (? IS NOT NULL AND height <> ?))',
-                    [$id, $d['width'], $d['width'], $d['height'], $d['height']]);
+            // přímo přiřazené bannery, které do nového rozměru nesedí, se odeberou
+            foreach ($db->q('SELECT b.id, b.width, b.height FROM banners b JOIN zone_banners zb ON zb.banner_id = b.id WHERE zb.zone_id = ?', [$id])->fetchAll() as $b) {
+                if (!self::pasuje($d, $b)) $db->q('DELETE FROM zone_banners WHERE zone_id = ? AND banner_id = ?', [$id, $b['id']]);
             }
         });
         return $id;
@@ -157,12 +200,27 @@ final class Zony
     }
 
     /**
+     * Odebere banner z přímých přiřazení zón, do kterých po změně rozměru nesedí.
+     * (Zóny s kampaní banner berou podle rozměru samy.)
+     */
+    public function odeberNesedici(int $banner): void
+    {
+        $db = $this->app->db;
+        $b = $db->q('SELECT id, width, height FROM banners WHERE id = ?', [$banner])->fetch();
+        if (!$b) return;
+        foreach ($db->q('SELECT z.* FROM zones z JOIN zone_banners zb ON zb.zone_id = z.id WHERE zb.banner_id = ?', [$banner])->fetchAll() as $z) {
+            if (!self::pasuje($z, $b)) $db->q('DELETE FROM zone_banners WHERE zone_id = ? AND banner_id = ?', [$z['id'], $banner]);
+        }
+    }
+
+    /**
      * Rozměr pro rám, náhled a vyskakovací okno. Nezadaný rozměr zóny se vezme jako největší z bannerů,
      * které zóna může zobrazit (aby se vešel každý), bez bannerů výchozí hodnota.
      * @return array{0:int, 1:int}
      */
     public function rozmerVlozeni(array $zona, int $vychoziW = 300, int $vychoziH = 250): array
     {
+        if ($r = self::rozmery($zona)) return [max(array_column($r, 0)), max(array_column($r, 1))];
         $w = ($zona['width'] ?? null) !== null ? (int)$zona['width'] : 0;
         $h = ($zona['height'] ?? null) !== null ? (int)$zona['height'] : 0;
         if ((!$w || !$h) && isset($zona['id'])) {

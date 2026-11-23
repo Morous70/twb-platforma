@@ -20,4 +20,6 @@ Cílová adresa je povinná u všeho kromě HTML, kde odkazy píšete sami pomoc
 
 Obrázek z galerie, který banner nebo slide používá, nejde smazat.
 
+U obrázku můžete přidat **obrázek 2×** pro ostré zobrazení na mobilech a banner omezit na **zařízení** ([Reklama na počítači, tabletu a mobilu](zarizeni)).
+
 **Náhled**: v seznamu bannerů (i v kampani) otevře tlačítko s okem banner v okně přes stránku. Velký banner se zmenší, aby se vešel; HTML a HTML5 běží izolovaně jako na webu, nic se nezapočítá. Okno zavře Esc, křížek nebo klik vedle.

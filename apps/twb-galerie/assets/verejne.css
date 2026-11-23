@@ -84,7 +84,13 @@ h1, h2, h3 { font-weight: 700; line-height: 1.12; color: #1c1b18; margin: 0; let
 .karta-sipka { position: absolute; right: 1rem; bottom: 1.4rem; color: var(--zlata-text); }
 
 /* ---------- fotky ---------- */
-.fotky { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 220px), 1fr)); gap: .6rem; }
+.fotky { display: grid; grid-template-columns: repeat(var(--sloupce, 2), minmax(0, 1fr)); gap: .6rem; }
+/* 0.8.5: pevný počet sloupců podle šířky obalu (2, 3, 4, 6) – stránka galerie (36) i nejnovější (12) se dělí beze zbytku,
+   takže poslední řádek není kratší o jednu fotku. Dřív auto-fill dal 5 sloupců a z 36 fotek zbyla jedna v posledním řádku. */
+.fotky-obal { container-type: inline-size; }
+@container (min-width: 620px) { .fotky:not(.doporucene) { --sloupce: 3; } }
+@container (min-width: 860px) { .fotky:not(.doporucene) { --sloupce: 4; } }
+@container (min-width: 1180px) { .fotky:not(.doporucene) { --sloupce: 6; } }
 .foto { display: block; aspect-ratio: 4 / 3; overflow: hidden; border-radius: .3rem; background: var(--krem-tmavsi); }
 .foto img { width: 100%; height: 100%; object-fit: cover; transition: transform .35s, opacity .2s; }
 .foto:hover img { transform: scale(1.04); }
@@ -100,6 +106,12 @@ h1, h2, h3 { font-weight: 700; line-height: 1.12; color: #1c1b18; margin: 0; let
 @media (max-width: 860px) { .fotky.doporucene:not(.sloupce-3) { --sloupce: 4; } }
 @media (max-width: 640px) { .fotky.doporucene.doporucene { --sloupce: 3; } }
 @media (max-width: 420px) { .fotky.doporucene.doporucene { --sloupce: 2; } }
+/* 0.8.5: doporučené jen v celých řádcích – server označí fotky navíc pro každé pásmo šířky (Web::viditelneDoporucene) */
+@media (min-width: 1100.02px) { .foto.skryt-d { display: none; } }
+@media (min-width: 860.02px) and (max-width: 1100px) { .foto.skryt-m1100 { display: none; } }
+@media (min-width: 640.02px) and (max-width: 860px) { .foto.skryt-m860 { display: none; } }
+@media (min-width: 420.02px) and (max-width: 640px) { .foto.skryt-m640 { display: none; } }
+@media (max-width: 420px) { .foto.skryt-m420 { display: none; } }
 .strankovani { display: flex; flex-wrap: wrap; justify-content: center; gap: .35rem; margin: 1.6rem 0; }
 .strankovani a, .strankovani span { min-width: 2.4rem; padding: .35rem .6rem; text-align: center; border-radius: .3rem; border: 1px solid var(--okraj); text-decoration: none; background: var(--plocha); }
 .strankovani span { background: var(--zelena); color: #fff; border-color: var(--zelena); }

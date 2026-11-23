@@ -78,16 +78,19 @@ $karty = static function (array $seznam) use ($web, $h, $ikona, $fotografii, $od
     return $out . '</div>';
 };
 /** Mřížka fotek s oknem náhledu (assets/verejne.js); bez JS odkaz vede na velký obrázek. */
-$mrizka = static function (array $fotky, bool $sKategorii = false, string $trida = '') use ($web, $h): string {
-    $out = '<div class="fotky' . ($trida !== '' ? ' ' . $trida : '') . '" data-fotky>';
-    foreach ($fotky as $m) {
+// 0.8.5: obal je kontejner (container query) – počet sloupců volí CSS tak, aby se stránka (36, 12 fotek) dělila beze zbytku.
+// $viditelne (doporučené): kolik fotek ukázat v každém pásmu šířky, aby byly jen celé řádky (Web::viditelneDoporucene).
+$mrizka = static function (array $fotky, bool $sKategorii = false, string $trida = '', array $viditelne = []) use ($web, $h): string {
+    $out = '<div class="fotky-obal"><div class="fotky' . ($trida !== '' ? ' ' . $trida : '') . '" data-fotky>';
+    foreach (array_values($fotky) as $i => $m) {
+        $skryt = implode('', array_map(fn($p) => ' skryt-' . $p, array_keys(array_filter($viditelne, fn($n) => $i >= $n))));
         $uv = Media::uvedeni($m)['text'];
         $popis = implode(' · ', array_filter([$sKategorii ? (string)($m['kategorie_nazev'] ?? '') : '', $uv]));
-        $out .= '<a class="foto" href="' . $h($web->obrazek($m, Web::PX_VELKY)) . '" data-foto data-titulek="' . $h(Web::titulek($m)) . '" data-popis="' . $h($popis) . '">'
+        $out .= '<a class="foto' . $skryt . '" href="' . $h($web->obrazek($m, Web::PX_VELKY)) . '" data-foto data-titulek="' . $h(Web::titulek($m)) . '" data-popis="' . $h($popis) . '">'
             . '<img src="' . $h($web->obrazek($m, Web::PX_NAHLED)) . '" alt="' . $h(Web::titulek($m)) . '" loading="lazy"'
             . ($m['width'] ? ' width="' . (int)$m['width'] . '" height="' . (int)$m['height'] . '"' : '') . '></a>';
     }
-    return $out . '</div>';
+    return $out . '</div></div>';
 };
 $nadpisSekce = static fn(string $nadpis, string $pod = '', string $uroven = 'h2'): string => '<header class="sekce-nadpis"><' . $uroven . '>' . $h($nadpis) . '</' . $uroven . '>'
     . ($pod !== '' ? '<p>' . $h($pod) . '</p>' : '') . '</header>';
@@ -118,7 +121,8 @@ switch ($stranka) {
         if ($doporucene = $web->doporucene()) {
             // 0.8.4: náhodný výběr z doporučených; mřížka sloupce × řádky (třídy v assets/verejne.css, CSP nepovoluje style="")
             $obsah .= '<section class="sekce sekce-doporucene">' . $nadpisSekce($n['doporucene_nadpis'], $n['doporucene_podnadpis'])
-                . $mrizka($doporucene, true, 'doporucene sloupce-' . (int)$n['doporucene_sloupce']) . '</section>';
+                . $mrizka($doporucene, true, 'doporucene sloupce-' . (int)$n['doporucene_sloupce'],
+                    Web::viditelneDoporucene(count($doporucene), (int)$n['doporucene_sloupce'], (int)$n['doporucene_radky'])) . '</section>';
         }
         $obsah .= $reklama('pred_patickou') . '</div>';
         break;

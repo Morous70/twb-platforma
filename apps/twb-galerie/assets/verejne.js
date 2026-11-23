@@ -70,7 +70,8 @@
     if (!skupina) return;
     e.preventDefault();
     if (!okno) vytvor();
-    polozky = Array.prototype.slice.call(skupina.querySelectorAll('a[data-foto]'));
+    // 0.8.5: fotky skryté kvůli celým řádkům (doporučené) do okna nepatří
+    polozky = Array.prototype.slice.call(skupina.querySelectorAll('a[data-foto]')).filter(function (x) { return x.getClientRects().length > 0; });
     predOknem = a;
     okno.hidden = false;
     document.body.classList.add('okno-otevrene');

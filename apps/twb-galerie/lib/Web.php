@@ -73,6 +73,7 @@ final class Web
     public const COOKIE_SOUHLAS = 'twbg_souhlas';
     /** Největší délka vloženého kódu (reklamní pozice, měření) a obsahu ads.txt. */
     public const MAX_KOD = 20000;
+    /** Fotek na stránku galerie na webu. 0.8.5: dělitelné 2, 3, 4 i 6 – počty sloupců v assets/verejne.css (.fotky-obal). */
     public const NA_STRANKU = 36;
     /** Mřížka doporučených fotografií: počet sloupců a řádků. */
     public const SLOUPCE = [3, 8];
@@ -368,6 +369,40 @@ final class Web
         $pocet ??= (int)$n['doporucene_sloupce'] * (int)$n['doporucene_radky'];
         return $this->app->db->q('SELECT m.*, c.name AS kategorie_nazev FROM media m JOIN categories c ON c.id = m.category_id WHERE m.featured = 1 AND ' . self::VEREJNA
             . ' ORDER BY RANDOM() LIMIT ' . max(1, $pocet))->fetchAll();
+    }
+
+    /**
+     * 0.8.5: šířky obrazovky, na kterých mřížka doporučených mění počet sloupců (musí odpovídat assets/verejne.css).
+     * Hodnota = přípona třídy skryt-… (d = nad 1100 px, mNNN = do NNN px).
+     */
+    public const PASMA_DOPORUCENYCH = ['d', 'm1100', 'm860', 'm640', 'm420'];
+
+    /** Kolik sloupců má mřížka doporučených v daném pásmu šířky (stejně jako assets/verejne.css). */
+    public static function sloupceVPasmu(int $sloupce, string $pasmo): int
+    {
+        return match ($pasmo) {
+            'm1100' => min($sloupce, 6),
+            'm860' => $sloupce === 3 ? 3 : 4,
+            'm640' => 3,
+            'm420' => 2,
+            default => $sloupce,
+        };
+    }
+
+    /**
+     * 0.8.5: jen celé řádky – pro každé pásmo šířky kolik fotek z $pocet ukázat (zbytek dostane třídu skryt-<pásmo>).
+     * Ukáže nejvýš sloupce × řádky a vždy násobek sloupců; když fotek nestačí ani na jeden řádek, ukáže všechny.
+     * @return array<string, int>
+     */
+    public static function viditelneDoporucene(int $pocet, int $sloupce, int $radky): array
+    {
+        $out = [];
+        foreach (self::PASMA_DOPORUCENYCH as $pasmo) {
+            $s = self::sloupceVPasmu($sloupce, $pasmo);
+            $n = min($pocet, $s * $radky);
+            $out[$pasmo] = $n >= $s ? intdiv($n, $s) * $s : $pocet;
+        }
+        return $out;
     }
 
     /** Kolik doporučených fotek může web ukázat a kolik je doporučených celkem (i neveřejných). @return array{verejne: int, celkem: int} */

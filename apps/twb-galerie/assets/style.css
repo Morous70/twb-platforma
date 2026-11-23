@@ -441,3 +441,19 @@ body.vybirani, body.vybirani * { user-select: none; cursor: crosshair; }
 @media (max-width: 767.98px) { .formular .radek-zasady, .formular .radek-zasady + .radek-zasady { grid-template-columns: 1fr; } }
 .panel-karty .karta textarea.kod { min-height: 0; }
 .panel-karty > form > .tlacitka { margin-bottom: 1.5rem; }
+
+/* ---------- 0.8.5: mřížka galerie jen v celých řádcích ----------
+   Stránka má 48 médií. Dřív auto-fill zvolil podle šířky třeba 7 sloupců a poslední řádek byl o jedno médium kratší
+   (48 = 6 × 7 + 6). Teď se počet sloupců volí podle šířky obalu jen z dělitelů 48 (2, 3, 4, 6, 8, 12). */
+.galerie-obal { container-type: inline-size; }
+.galerie-obal > .galerie { grid-template-columns: repeat(var(--sloupce, 2), minmax(0, 1fr)); }
+@container (min-width: 648px) { .galerie-obal > .galerie { --sloupce: 3; } }
+@container (min-width: 872px) { .galerie-obal > .galerie { --sloupce: 4; } }
+@container (min-width: 1320px) { .galerie-obal > .galerie { --sloupce: 6; } }
+@container (min-width: 1768px) { .galerie-obal > .galerie { --sloupce: 8; } }
+.galerie-obal > .galerie.zobrazeni-media { --sloupce: 3; }
+@container (min-width: 704px) { .galerie-obal > .galerie.zobrazeni-media { --sloupce: 4; } }
+@container (min-width: 1060px) { .galerie-obal > .galerie.zobrazeni-media { --sloupce: 6; } }
+@container (min-width: 1280px) { .galerie-obal > .galerie.zobrazeni-media { --sloupce: 8; } }
+@container (min-width: 2128px) { .galerie-obal > .galerie.zobrazeni-media { --sloupce: 12; } }
+.galerie-obal > .galerie.zobrazeni-seznam { grid-template-columns: 1fr; }

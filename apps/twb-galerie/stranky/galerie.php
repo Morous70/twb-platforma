@@ -154,7 +154,7 @@ $titulek = $f['archiv'] ? 'Archiv' : 'Galerie';
       <?php foreach (Media::ZOBRAZENI as $k => $t): ?><a class="tlacitko maly<?= $zobrazeni === $k ? ' aktivni' : '' ?>" href="<?= $odkazFiltru(['zobrazeni' => $k]) ?>"<?= $zobrazeni === $k ? ' aria-current="true"' : '' ?> title="<?= Ui::h($t) ?>"><?= Ui::h($t) ?></a><?php endforeach; ?>
     </nav>
   </div>
-  <div class="galerie zobrazeni-<?= $zobrazeni ?>" data-zobrazeni="<?= $zobrazeni ?>" data-okno-skupina>
+  <div class="galerie-obal"><div class="galerie zobrazeni-<?= $zobrazeni ?>" data-zobrazeni="<?= $zobrazeni ?>" data-okno-skupina>
     <?php foreach ($vysledek['polozky'] as $m): $id = (int)$m['id']; $url = $media->verejnaAdresa($m); $v = Ui::h(substr((string)$m['md5'], 0, 8)); ?>
     <figure<?= Ui::okno($m, $url) ?>>
       <label class="vyber-medium" title="Vybrat"><input type="checkbox" name="ids[]" value="<?= $id ?>" aria-label="Vybrat <?= Ui::h($m['original_name']) ?>"></label>
@@ -175,7 +175,7 @@ $titulek = $f['archiv'] ? 'Archiv' : 'Galerie';
       </figcaption>
     </figure>
     <?php endforeach; ?>
-  </div>
+  </div></div>
 </form>
 <?php if ($vysledek['stran'] > 1): ?>
 <nav class="strankovani tlacitka" aria-label="Stránky">

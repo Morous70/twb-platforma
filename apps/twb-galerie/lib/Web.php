@@ -414,6 +414,20 @@ final class Web
         ];
     }
 
+    /**
+     * 0.8.7: doporučená média, která se na webu neukážou, s důvodem (pro přehled v administraci, karta Základ a texty).
+     * @return list<array{id: int, nazev: string, kategorie: string, duvod: string}>
+     */
+    public function doporuceneMimoWeb(): array
+    {
+        $out = [];
+        foreach ($this->app->db->q('SELECT m.*, c.name AS kategorie_nazev FROM media m LEFT JOIN categories c ON c.id = m.category_id WHERE m.featured = 1 ORDER BY m.id DESC')->fetchAll() as $m) {
+            $duvod = $this->procNeniNaWebu($m);
+            if ($duvod !== '') $out[] = ['id' => (int)$m['id'], 'nazev' => (string)$m['original_name'], 'kategorie' => (string)($m['kategorie_nazev'] ?? ''), 'duvod' => $duvod];
+        }
+        return $out;
+    }
+
     /** Proč se doporučená fotka na webu neukáže ('' = ukáže se). @param array<string, mixed> $m */
     public function procNeniNaWebu(array $m): string
     {

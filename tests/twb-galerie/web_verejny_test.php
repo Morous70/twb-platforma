@@ -372,6 +372,28 @@ test('0.8.5 na serveru: obaly mřížek, třídy skryt- u doporučených navíc'
     ok(str_contains($g['body'], '<div class="galerie-obal"><div class="galerie zobrazeni-'), 'obal galerie v administraci');
 });
 
+test('0.8.7: doporučené mimo web – seznam s důvodem v administraci', function () {
+    $s = new TestServer();
+    register_shutdown_function(fn() => $s->zastav());
+    $b = new Prohlizec($s);
+    $b->jdi('install.php');
+    $b->jdi('install.php', ['heslo' => 'tajneheslo1', 'heslo2' => 'tajneheslo1']);
+    $app = new App(KOREN . '/apps/twb-galerie', ['data_dir' => $s->data . '/data', 'base_url' => $s->url]);
+    [, , , $ids] = webData($app);
+    $web = $app->web();
+    eq([], $web->doporuceneMimoWeb(), 'nic doporučeného');
+    ok(!str_contains($b->jdi('index.php?p=web')['body'], 'doporucene-mimo-web'), 'bez seznamu, když není co ukázat');
+    $app->media()->nastavDoporucene(array_values($ids), true);
+    $mimo = $web->doporuceneMimoWeb();
+    eq([$ids['video'], $ids['soukrome'], $ids['archiv'], $ids['bezodkazu']], array_column($mimo, 'id'), 'všechna kromě veřejné, nejnovější první');
+    eq(['Soukromé', 'Příroda'], [$mimo[1]['kategorie'], $mimo[3]['kategorie']]);
+    ok(str_contains($mimo[0]['duvod'], 'jen obrázky') && str_contains($mimo[1]['duvod'], 'není zobrazená') && str_contains($mimo[2]['duvod'], 'archivu') && str_contains($mimo[3]['duvod'], 'veřejný odkaz'));
+    $r = $b->jdi('index.php?p=web');
+    ok(str_contains($r['body'], 'Doporučené, které se na webu neukážou (4)'), 'nadpis seznamu');
+    ok(str_contains($r['body'], 'p=medium&amp;id=' . $ids['bezodkazu']) && str_contains($r['body'], 'Tajné.jpg') && str_contains($r['body'], 'Médium nemá zapnutý veřejný odkaz.'), 'odkaz na detail a důvod');
+    ok(!str_contains($r['body'], 'p=medium&amp;id=' . $ids['ok'] . '"'), 'veřejná v seznamu není');
+});
+
 test('komprese: úloha jen z obrázků, kroky, souhrn, bez originálu uvolní místo', function () {
     [$app, $ver, , $ids] = webData();
     $k = $app->komprese();

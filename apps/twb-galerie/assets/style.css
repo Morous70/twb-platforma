@@ -457,3 +457,9 @@ body.vybirani, body.vybirani * { user-select: none; cursor: crosshair; }
 @container (min-width: 1280px) { .galerie-obal > .galerie.zobrazeni-media { --sloupce: 8; } }
 @container (min-width: 2128px) { .galerie-obal > .galerie.zobrazeni-media { --sloupce: 12; } }
 .galerie-obal > .galerie.zobrazeni-seznam { grid-template-columns: 1fr; }
+
+/* 0.8.7: doporučená média mimo web (Veřejný web → Základ a texty) */
+.doporucene-mimo-web { margin: .6rem 0 0; padding: .6rem 1rem; border: 1px solid var(--okraj); border-radius: var(--polomer); }
+.doporucene-mimo-web summary { cursor: pointer; font-weight: 600; }
+.doporucene-mimo-web ul { margin: .5rem 0 0; padding-left: 1.2rem; display: grid; gap: .4rem; }
+.doporucene-mimo-web a { overflow-wrap: anywhere; }

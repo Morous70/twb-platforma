@@ -23,6 +23,7 @@ $kategorie = $web->kategorie();
 $vsechny = $app->kategorie()->seznam();
 $uvod = $web->uvodni($kategorie);
 $doporucenych = $web->pocetDoporucenych();
+$mimoWeb = $doporucenych['celkem'] > $doporucenych['verejne'] ? $web->doporuceneMimoWeb() : [];
 $rozsah = static fn(array $od_do): array => array_combine(range($od_do[0], $od_do[1]), array_map('strval', range($od_do[0], $od_do[1])));
 // po chybě ukázat odeslaný stav zaškrtávátek jen ve formuláři, který se odesílal (ostatní karty zůstanou podle uloženého nastavení)
 $castPole = ['reklama_zapnuto' => 'reklama', 'mereni_zapnuto' => 'mereni', 'cookies_souhlas' => 'gdpr', 'zasady_zapnuto' => 'gdpr'];
@@ -86,6 +87,17 @@ $adresaZasad = $app->url(Web::ZASADY);
     (veřejná kategorie, zapnutý veřejný odkaz, mimo archiv); bez nich se sekce skryje.</p>
   <p class="karta-poznamka">Doporučených fotografií: <strong><?= $doporucenych['verejne'] ?></strong> na webu<?= $doporucenych['celkem'] > $doporucenych['verejne'] ? ' (dalších ' . ($doporucenych['celkem'] - $doporucenych['verejne']) . ' není veřejných)' : '' ?>
     · <a href="<?= Ui::h(Ui::odkaz('galerie', ['doporucene' => 1])) ?>">zobrazit v Galerii</a></p>
+  <?php if ($mimoWeb): ?>
+  <details class="doporucene-mimo-web" open>
+    <summary>Doporučené, které se na webu neukážou (<?= count($mimoWeb) ?>)</summary>
+    <ul>
+      <?php foreach ($mimoWeb as $d): ?>
+      <li><a href="<?= Ui::h(Ui::odkaz('medium', ['id' => $d['id']])) ?>"><?= Ui::h($d['nazev']) ?></a><?= $d['kategorie'] !== '' ? ' <span class="slabe">· ' . Ui::h($d['kategorie']) . '</span>' : '' ?>
+        <br><span class="slabe"><?= Ui::h($d['duvod']) ?></span></li>
+      <?php endforeach; ?>
+    </ul>
+  </details>
+  <?php endif; ?>
   <?= Ui::pole('Nadpis', 'doporucene_nadpis', $n['doporucene_nadpis'], ['required' => true, 'maxlength' => 80]) ?>
   <?= Ui::pole('Podnadpis', 'doporucene_podnadpis', $n['doporucene_podnadpis'], ['maxlength' => 160]) ?>
   <div class="radek">

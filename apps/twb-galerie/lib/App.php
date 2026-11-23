@@ -23,7 +23,7 @@ final class App
     /** Veřejný klíč Ed25519 TWB Update Serveru (veřejný, smí být v kódu). */
     public const UPDATE_KLIC = 'JTvTWDW+eSP/GtT9zG3t+3UraawTk82vKteb2Dci8Cg=';
     /** Tabulky v pořadí pro obnovu ze zálohy. Passkey, jednorázové tokeny, API klíče a připojení MCP (oauth_*) se nezálohují (obnova by vrátila odebrané zařízení nebo zrušený klíč). */
-    public const TABULKY = ['module_versions', 'settings', 'log', 'categories', 'media'];
+    public const TABULKY = ['module_versions', 'settings', 'log', 'categories', 'media', 'web_files'];
     /** Nastavení, která patří k instalaci a obnova zálohy je nepřepíše. */
     public const MISTNI = ['login_fails', 'login_last_fail', 'reset_last_sent', 'api_fails', 'api_fail_since', 'update_result', 'update_checked_at', 'update_available', 'update_health_key', 'nahled_tajemstvi', 'galerie_zobrazeni', 'komprese_uloha'];
     /** Výchozí odhlášení po nečinnosti v minutách (když není v nastavení ani v config.php). */

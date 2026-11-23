@@ -85,7 +85,7 @@ $nadpisSekce = static fn(string $nadpis, string $pod = '', string $uroven = 'h2'
 // ---------- stránky ----------
 switch ($stranka) {
     case 'domu':
-        $uvod = $web->uvodni($kategorie);
+        $uvod = $web->uvodni($kategorie);   // 0.8.11: náhodně jedna z až pěti úvodních fotek
         $foto = $uvod ? $web->obrazek($uvod, Web::PX_VELKY) : '';
         $obsah .= '<section class="hero' . ($foto === '' ? ' hero-bez-fotky' : '') . '">'
             . ($foto !== '' ? '<img class="hero-fotka" src="' . $h($foto) . '" alt="" fetchpriority="high">' : '')
@@ -197,7 +197,8 @@ if ($souhlas) {
 // ---------- rozvržení ----------
 http_response_code($kod);
 header('Content-Type: text/html; charset=utf-8');
-header('Cache-Control: public, max-age=60');
+// 0.8.11: hlavní stránka (náhodná úvodní fotka z až pěti, náhodné doporučené) se při každém načtení liší – prohlížeč ji vždy ověří u serveru
+header('Cache-Control: ' . ($stranka === 'domu' ? 'no-cache' : 'public, max-age=60'));
 header('X-Frame-Options: SAMEORIGIN');
 header('Content-Security-Policy: ' . Web::csp($kodNaStrance));
 if ($n['skryt_vyhledavacum']) header('X-Robots-Tag: noindex, nofollow');
@@ -219,7 +220,7 @@ $popisStranky = $n['podnadpis'] !== '' ? $n['podnadpis'] : $n['nadpis'];
 <?= $mereniHlavicka ?>
 </head>
 <body>
-<?= VerejneRozvrzeni::zahlavi($n, $aktivni, true, (bool)$n['odkaz_administrace']) ?>
+<?= VerejneRozvrzeni::zahlavi($n, $aktivni, true, (bool)$n['odkaz_administrace'], $web->logoAdresa()) ?>
 <main>
 <?= $obsah ?>
 </main>

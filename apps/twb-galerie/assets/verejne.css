@@ -28,6 +28,9 @@ h1, h2, h3 { font-weight: 700; line-height: 1.12; color: #1c1b18; margin: 0; let
 .logo-znak { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 50%; background: var(--zelena); color: #fff; }
 .logo-znak .ik { width: 30px; height: 30px; }
 .logo-nazev { border-left: 2px solid var(--zlata); padding-left: .9rem; line-height: 1.1; }
+/* 0.8.11: vlastní logo – obrázek do výšky 48 px (na mobilu 40 px), šířka podle poměru stran, ale ne přes polovinu lišty */
+.logo-obrazek { display: block; height: 48px; width: auto; max-width: min(320px, 55vw); object-fit: contain; object-position: left center; }
+.logo-vlastni { min-width: 0; }
 .menu { display: flex; align-items: center; gap: 2.5rem; margin-left: auto; }
 .menu > a:not(.tlacitko) { color: #1c1b18; text-decoration: none; padding: .45rem .7rem; border-bottom: 3px solid transparent; }
 .menu > a.aktivni { font-weight: 700; border-bottom-color: var(--zlata); }
@@ -171,6 +174,7 @@ button.odkaz { font: inherit; color: #1c1b18; background: none; border: 0; paddi
 @media (max-width: 860px) {
   .logo { font-size: 1.4rem; }
   .logo-znak { width: 38px; height: 38px; }
+  .logo-obrazek { height: 40px; }
   .menu-tlacitko { display: block; }
   .menu { display: none; position: absolute; left: 0; right: 0; top: 100%; flex-direction: column; align-items: stretch; gap: 0;
     background: var(--krem); border-bottom: 1px solid var(--okraj); padding: .5rem 1rem 1rem; box-shadow: var(--stin); }

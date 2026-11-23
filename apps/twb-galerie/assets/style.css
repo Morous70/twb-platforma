@@ -52,6 +52,10 @@ pre, .kod-blok { background: var(--kod); border: 1px solid var(--okraj); border-
   transition: margin-left .35s ease-in-out, transform .35s ease-in-out; z-index: 20; scrollbar-width: thin; scrollbar-color: rgba(255,255,255,.15) transparent; }
 .postranni .logo { color: #f8f9fa; padding: 1.15rem 1.5rem; font-size: 1.15rem; }
 .postranni .logo:hover { text-decoration: none; color: #fff; }
+/* 0.8.11: vlastní logo webu v postranním menu – výška 36 px, šířka nejvýš celá šířka menu */
+/* menu je tmavé – logo dostane světlý podklad, aby bylo vidět i tmavé logo */
+.postranni .logo-obrazek { height: 36px; width: auto; max-width: calc(100% - 16px); object-fit: contain; object-position: left center; flex: 0 1 auto; min-width: 0;
+  box-sizing: content-box; padding: 5px 8px; border-radius: 8px; background: rgba(255, 255, 255, .94); }
 .postranni ul { list-style: none; margin: 0; padding: 0 0 1rem; flex: 1; }
 .menu-skupina { padding: 1.5rem 1.5rem .375rem; font-size: .75rem; color: var(--menu-nadpis); }
 .postranni li a { display: flex; align-items: center; gap: .75rem; padding: .625rem 1.625rem .625rem calc(1.625rem - 3px); color: var(--menu-text);
@@ -499,6 +503,20 @@ body.vybirani, body.vybirani * { user-select: none; cursor: crosshair; }
 .uvod-nahled img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .uvod-nahled span { color: #fff; font-size: .8rem; text-align: center; padding: .5rem; }
 @media (max-width: 575.98px) { .uvod-vyber { grid-template-columns: minmax(0, 1fr); } .uvod-nahled { max-width: 240px; } }
+/* 0.8.11: až pět úvodních fotek – sloty vedle sebe (náhled + výběr), vlastní logo s náhledem */
+.uvod-sloty { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fill, minmax(min(100%, 190px), 1fr)); }
+.uvod-slot { display: grid; gap: .5rem; align-content: start; min-width: 0; }
+.uvod-slot .uvod-nahled { max-width: none; }
+.uvod-slot .pole select { width: 100%; min-width: 0; }
+.logo-vyber { display: grid; grid-template-columns: 200px minmax(0, 1fr); gap: 1rem; align-items: start; }
+.logo-nahled { min-height: 88px; padding: .75rem; border-radius: var(--polomer); border: 1px dashed var(--okraj); display: flex; align-items: center; justify-content: center;
+  background: repeating-conic-gradient(#eef0f2 0 25%, #fff 0 50%) 0 0 / 16px 16px; }
+.logo-nahled img { max-width: 100%; max-height: 64px; object-fit: contain; display: block; }
+.logo-nahled-prazdne { background: var(--pozadi); }
+.logo-nahled span { color: var(--slaby); font-size: .8rem; text-align: center; }
+.logo-pole { display: grid; gap: .6rem; min-width: 0; }
+.logo-pole input[type=file] { max-width: 100%; }
+@media (max-width: 575.98px) { .logo-vyber { grid-template-columns: minmax(0, 1fr); } }
 .doporucene-souhrn { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; margin: 0; }
 .doporucene-souhrn a { margin-left: auto; }
 .web-skupina .doporucene-mimo-web { margin: 0; }

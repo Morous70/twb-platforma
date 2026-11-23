@@ -27,14 +27,24 @@ final class VerejneRozvrzeni
             . (self::IKONY[$nazev] ?? '') . '</svg>';
     }
 
+    /** Obsah odkazu loga: vlastní obrázek (s názvem nebo bez), jinak znak a název. @param array<string, mixed> $n */
+    private static function znak(array $n, string $logo): string
+    {
+        if ($logo === '') return '<span class="logo-znak">' . self::ikona('logo', 34) . '</span><span class="logo-nazev">' . self::h($n['nazev']) . '</span>';
+        $sNazvem = !empty($n['logo_nazev']);
+        return '<img class="logo-obrazek" src="' . self::h($logo) . '" alt="' . ($sNazvem ? '' : self::h($n['nazev'])) . '">'
+            . ($sNazvem ? '<span class="logo-nazev">' . self::h($n['nazev']) . '</span>' : '');
+    }
+
     private static function h(mixed $s): string { return htmlspecialchars((string)$s, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'); }
 
     /**
      * Záhlaví: logo a menu Domů / Galerie / O galerii (?s=… funguje i z index.php, ten veřejné stránky předá verejne.php).
      * $menu false = jen logo (vypnutý web). $admin = tlačítko Přihlášení do administrace.
+     * $logo (0.8.11) = adresa vlastního loga (Web::logoAdresa); bez něj znak a název. S logem se název ukáže, jen když je zapnutý logo_nazev.
      * @param array<string, mixed> $n nastavení webu (Web::nastaveni)
      */
-    public static function zahlavi(array $n, string $aktivni = '', bool $menu = true, bool $admin = true): string
+    public static function zahlavi(array $n, string $aktivni = '', bool $menu = true, bool $admin = true, string $logo = ''): string
     {
         $nav = '';
         if ($menu) {
@@ -44,7 +54,7 @@ final class VerejneRozvrzeni
         }
         if ($admin) $nav .= '<a class="tlacitko admin" href="index.php?p=prehled">' . self::ikona('prihlasit', 18) . '<span>Přihlášení do administrace</span></a>';
         return '<header class="hlavicka"><div class="hlavicka-obal">'
-            . '<a class="logo" href="' . ($menu ? './' : 'index.php') . '"><span class="logo-znak">' . self::ikona('logo', 34) . '</span><span class="logo-nazev">' . self::h($n['nazev']) . '</span></a>'
+            . '<a class="logo' . ($logo !== '' ? ' logo-vlastni' : '') . '" href="' . ($menu ? './' : 'index.php') . '">' . self::znak($n, $logo) . '</a>'
             . ($nav !== '' ? '<button type="button" class="menu-tlacitko" aria-label="Menu" aria-expanded="false" aria-controls="hlavni-menu" data-menu>' . self::ikona('menu', 24) . '</button>'
                 . '<nav id="hlavni-menu" class="menu" aria-label="Hlavní menu">' . $nav . '</nav>' : '')
             . '</div></header>';

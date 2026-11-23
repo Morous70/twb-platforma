@@ -143,3 +143,12 @@ JS);
     ok((int)$app->db->q("SELECT COALESCE(SUM(impressions), 0) FROM stats WHERE device = 'pocitac' AND banner_id IN ($b970, $b300)")->fetchColumn() >= 2, 'zobrazení na počítači');
     ok((int)$app->db->q("SELECT COALESCE(SUM(impressions), 0) FROM stats WHERE device = 'mobil' AND banner_id = $b300")->fetchColumn() >= 1, 'zobrazení na mobilu');
 });
+
+test('stránka zóny: prázdný rozměr v tabulce a v poli', function () use ($b, $app, $web) {
+    $id = $app->zony()->uloz(['site_id' => $web, 'name' => 'S mezerou', 'sizes' => '970x250, 728x0, 300x250']);
+    $r = $b->jdi("index.php?p=zona&id=$id");
+    ok(str_contains($r['body'], 'rozměr responzivní 970×250, 728 px nic, 300×250'));
+    ok(str_contains($r['body'], 'value="970x250, 728x0, 300x250"'));
+    ok(str_contains($r['body'], '<td><b>prázdné</b></td>') && str_contains($r['body'], '<td>728–969 px</td>'), 'řádek prázdného rozměru');
+    ok(str_contains($r['body'], '<td>300–727 px</td>'));
+});

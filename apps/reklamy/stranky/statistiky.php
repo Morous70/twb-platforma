@@ -2,7 +2,7 @@
 declare(strict_types=1);
 // Statistiky: období, seskupení (dny, týdny, měsíce, hodiny, kampaně, bannery, zóny, weby), filtr, graf, tabulka a export CSV.
 // Proměnné: $app, $ui, $post.
-use Reklamy\{Ui, Statistiky, Konverze};
+use Reklamy\{Ui, Statistiky, Konverze, Cileni};
 
 $st = $app->statistiky();
 $dnes = new DateTimeImmutable('today');
@@ -27,6 +27,7 @@ $podle = isset(Statistiky::PODLE[$_GET['podle'] ?? '']) ? (string)$_GET['podle']
 $graf = isset(Statistiky::UKAZATELE[$_GET['graf'] ?? '']) ? (string)$_GET['graf'] : 'impressions';
 $filtr = [];
 foreach (['kampan', 'banner', 'zona', 'web'] as $k) if (isset($_GET[$k]) && ctype_digit((string)$_GET[$k]) && (int)$_GET[$k] > 0) $filtr[$k] = (int)$_GET[$k];
+if (is_string($_GET['zarizeni'] ?? null) && isset(Cileni::ZARIZENI[$_GET['zarizeni']])) $filtr['zarizeni'] = $_GET['zarizeni'];
 $rows = $st->prehled($od->format('Y-m-d'), $do->format('Y-m-d'), $podle, $filtr);
 $soucet = Statistiky::soucet($rows);
 
@@ -119,6 +120,7 @@ $svg = function (array $rows, string $u) use ($cas, $fmt): string {
     <?= Ui::vyber('Banner', 'banner', $volby('SELECT id, name FROM banners ORDER BY name'), $filtr['banner'] ?? '') ?>
     <?= Ui::vyber('Web', 'web', $volby('SELECT id, name FROM sites ORDER BY name'), $filtr['web'] ?? '') ?>
     <?= Ui::vyber('Zóna', 'zona', $volby('SELECT id, name FROM zones ORDER BY name'), $filtr['zona'] ?? '') ?>
+    <?= Ui::vyber('Zařízení', 'zarizeni', ['' => 'vše'] + Cileni::ZARIZENI, $filtr['zarizeni'] ?? '') ?>
   </div>
   <div class="tlacitka"><button type="submit" class="hlavni">Zobrazit</button>
     <a class="tlacitko" href="<?= Ui::h(Ui::odkaz('statistiky', $parametry + ['csv' => 1])) ?>">Stáhnout CSV</a>
@@ -152,6 +154,8 @@ $svg = function (array $rows, string $u) use ($cas, $fmt): string {
   <?php foreach ($rows as $r): if ($cas && $podle !== 'hodina' && !$r['impressions'] && !$r['clicks'] && !$r['conversions'] && count($rows) > 60) continue; ?>
   <tr><td><?php if ($r['odkaz']): ?><a href="<?= Ui::h(Ui::odkaz(...$r['odkaz'])) ?>"><?= Ui::h($r['popis']) ?></a>
       <a class="mala" href="<?= Ui::h(Ui::odkaz('statistiky', [$podle => (int)$r['klic'], 'podle' => 'den'] + $parametry)) ?>" title="Statistiky jen pro tuto položku">po dnech</a>
+    <?php elseif ($podle === 'zarizeni' && $r['klic'] !== ''): ?><?= Ui::h($r['popis']) ?>
+      <a class="mala" href="<?= Ui::h(Ui::odkaz('statistiky', ['zarizeni' => $r['klic'], 'podle' => 'den'] + $parametry)) ?>" title="Statistiky jen pro toto zařízení">po dnech</a>
     <?php else: ?><?= Ui::h($r['popis']) ?><?php endif; ?></td>
     <td class="cisla"><?= Ui::cislo($r['impressions']) ?></td><td class="cisla"><?= Ui::cislo($r['clicks']) ?></td>
     <td class="cisla"><?= Statistiky::ctr($r['impressions'], $r['clicks']) ?></td><td class="cisla"><?= Ui::cislo($r['conversions']) ?></td>

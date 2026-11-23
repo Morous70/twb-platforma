@@ -38,7 +38,7 @@ if ($post) {
 }
 $seznam = array_values(array_filter($galerie->vypis(), fn($m) => $m['druh'] === 'image'));
 $pouziti = [];
-foreach ($app->db->q('SELECT media_id, COUNT(*) AS n FROM banners WHERE media_id IS NOT NULL GROUP BY media_id')->fetchAll() as $r) $pouziti[(int)$r['media_id']] = (int)$r['n'];
+foreach ($app->db->q('SELECT m AS media_id, COUNT(*) AS n FROM (SELECT media_id AS m FROM banners WHERE media_id IS NOT NULL UNION ALL SELECT media2x_id FROM banners WHERE media2x_id IS NOT NULL) GROUP BY m')->fetchAll() as $r) $pouziti[(int)$r['media_id']] = (int)$r['n'];
 $max = ini_get('upload_max_filesize');
 ?>
 <form method="post" enctype="multipart/form-data" class="karta tlacitka">

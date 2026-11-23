@@ -25,12 +25,27 @@ final class Vykresleni
     /**
      * Adresa prokliku (podepsaná trojice banner–zóna–kampaň). Cíl se bere z banneru, ne z adresy.
      * Kampaň (`campaign_id` řádku z doručování) určuje, které kampani se proklik započítá.
+     * Zařízení zobrazení (`zarizeni`) jde do parametru d (bez podpisu – jen popisek pro statistiky), aby se proklik započítal stejnému zařízení.
      */
     public function klik(array $banner, int $zona): string
     {
         $b = (int)$banner['id'];
         $c = (int)($banner['campaign_id'] ?? 0);
-        return $this->adresa('klik.php', ['b' => $b, 'z' => $zona, 'c' => $c, 'k' => $this->dorucovani->podpis("klik|$b|$zona|$c")]);
+        return $this->adresa('klik.php', ['b' => $b, 'z' => $zona, 'c' => $c, 'k' => $this->dorucovani->podpis("klik|$b|$zona|$c")] + self::zarizeniOdkazu($banner));
+    }
+
+    /** Parametr d se zařízením zobrazení (prázdné pole, když zařízení neznáme). @return array<string, string> */
+    private static function zarizeniOdkazu(array $banner): array
+    {
+        $d = (string)($banner['zarizeni'] ?? '');
+        return isset(Cileni::ZARIZENI[$d]) ? ['d' => $d] : [];
+    }
+
+    /** Zařízení z parametru d odkazu (pro dokument HTML banneru, který dál vytváří odkazy na proklik). @param array<string, mixed> $get */
+    public static function zarizeniZOdkazu(array $get): string
+    {
+        $d = $get['d'] ?? '';
+        return is_string($d) && isset(Cileni::ZARIZENI[$d]) ? $d : '';
     }
 
     /**
@@ -52,9 +67,18 @@ final class Vykresleni
         return [(int)$z, $this->dorucovani->hlavniKampan((int)$b)];
     }
 
-    /** Adresa obrázku banneru (galerie a slidy přes d/b.php, jinak vlastní adresa). */
-    public function obrazek(array $banner): string
+    /**
+     * Adresa obrázku banneru (galerie a slidy přes d/b.php, jinak vlastní adresa).
+     * $x2: obrázek pro displeje s vyšší hustotou (2×), null když ho banner nemá.
+     */
+    public function obrazek(array $banner, bool $x2 = false): ?string
     {
+        if ($x2) {
+            if (!Bannery::maRetinu($banner)) return null;
+            if ($banner['type'] === 'external') return (string)$banner['image2x_url'];
+            $v = substr((string)$this->app->db->q('SELECT md5 FROM media WHERE id = ?', [$banner['media2x_id']])->fetchColumn(), 0, 8);
+            return $this->adresa('b.php', ['b' => (int)$banner['id'], 'v' => $v, 'x' => 2]);
+        }
         if ($banner['type'] === 'external') return (string)$banner['image_url'];
         $v = $banner['type'] === 'slide' ? $this->app->slideBannery()->klic($banner)
             : substr((string)$this->app->db->q('SELECT md5 FROM media WHERE id = ?', [$banner['media_id']])->fetchColumn(), 0, 8);
@@ -74,7 +98,7 @@ final class Vykresleni
     {
         $b = (int)$banner['id'];
         $c = (int)($banner['campaign_id'] ?? 0);
-        $p = ['b' => $b, 'z' => $zona, 'c' => $c, 'k' => $this->dorucovani->podpis("html|$b|$zona|$c"), 'cb' => random_int(1, PHP_INT_MAX)];
+        $p = ['b' => $b, 'z' => $zona, 'c' => $c, 'k' => $this->dorucovani->podpis("html|$b|$zona|$c")] + self::zarizeniOdkazu($banner) + ['cb' => random_int(1, PHP_INT_MAX)];
         if ($banner['type'] === 'html5') {
             $c = self::balicek($banner);
             return $this->adresa('h5.php/' . $c['zip'] . '/' . implode('/', array_map('rawurlencode', explode('/', $c['index']))), $p);
@@ -97,7 +121,10 @@ final class Vykresleni
         $w = (int)$banner['width'];
         $h = (int)$banner['height'];
         if (in_array($banner['type'], Bannery::OBRAZKOVE, true)) {
-            $img = '<img src="' . self::h($this->obrazek($banner)) . '" width="' . $w . '" height="' . $h . '" alt="' . self::h($banner['alt'] ?? '')
+            // obrázek 2×: prohlížeč s hustším displejem si ho vybere sám (srcset), rozměr zůstává rozměrem banneru
+            $x2 = $this->obrazek($banner, true);
+            $img = '<img src="' . self::h($this->obrazek($banner)) . '"' . ($x2 !== null ? ' srcset="' . self::h($this->obrazek($banner)) . ' 1x, ' . self::h($x2) . ' 2x"' : '')
+                . ' width="' . $w . '" height="' . $h . '" alt="' . self::h($banner['alt'] ?? '')
                 . '" style="border:0;display:block;max-width:100%;height:auto">';
             return $this->odkaz($banner, $zona, $img);
         }

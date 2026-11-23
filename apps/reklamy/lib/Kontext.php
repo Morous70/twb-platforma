@@ -3,11 +3,20 @@ declare(strict_types=1);
 namespace Reklamy;
 
 /**
- * Okolnosti jednoho zobrazení reklamy: stránka, odkud návštěvník přišel, prohlížeč, jazyk, čas.
+ * Okolnosti jednoho zobrazení reklamy: stránka, odkud návštěvník přišel, prohlížeč, jazyk, čas, šířka okna.
  * Z nich se rozhoduje o cílení a o tom, zda se zobrazení počítá (roboti ne).
+ *
+ * Zařízení (počítač, tablet, mobil): přednost má zařízení uvedené v odkazu (parametr d – proklik se tak započítá stejnému zařízení
+ * jako zobrazení), pak šířka okna, kterou posílá skript (sw), a když chybí (rám, obrázek, volání ze serveru), prohlížeč (User-Agent).
  */
 final class Kontext
 {
+    /** Šířka okna (CSS px), od které je zařízení tablet, a od které počítač. */
+    public const TABLET_OD = 768;
+    public const POCITAC_OD = 1024;
+    /** Odhad šířky místa podle zařízení, když skript šířku neposlal (0 = bez omezení). */
+    public const ODHAD_SIRKY = ['mobil' => 360, 'tablet' => 768, 'pocitac' => 0];
+
     /** Roboti a nástroje, jejichž zobrazení a prokliky se nepočítají. */
     private const ROBOTI = '~bot\b|crawl|spider|slurp|mediapartners|facebookexternalhit|embedly|preview|headless|lighthouse|pingdom|uptime|monitor|curl/|wget|python-|go-http|java/|okhttp|httpclient|scrapy|semrush|ahrefs|seznambot|petalbot|bingpreview~i';
 
@@ -31,6 +40,10 @@ final class Kontext
         public readonly string $ip = '',
         public readonly int $cas = 0,
         public readonly bool $pocitat = true,
+        /** Šířka okna prohlížeče v CSS px (parametr sw ze skriptu), 0 = neznámá. */
+        public readonly int $sirkaOkna = 0,
+        /** Zařízení uvedené v odkazu (parametr d), prázdné = určí se ze šířky okna nebo prohlížeče. */
+        public readonly string $zarizeniOdkazu = '',
     ) {}
 
     /** Kontext z HTTP požadavku. Stránku posílá skript (loc), jinak se vezme z hlavičky Referer. @param array<string, mixed> $get @param array<string, mixed> $server */
@@ -45,6 +58,8 @@ final class Kontext
             ip: $s($server['REMOTE_ADDR'] ?? ''),
             cas: (int)($server['REQUEST_TIME'] ?? 0) ?: time(),
             pocitat: $pocitat,
+            sirkaOkna: is_scalar($get['sw'] ?? null) && ctype_digit((string)$get['sw']) ? min(20000, (int)$get['sw']) : 0,
+            zarizeniOdkazu: is_string($get['d'] ?? null) && isset(self::ZARIZENI[$get['d']]) ? $get['d'] : '',
         );
     }
 
@@ -96,8 +111,24 @@ final class Kontext
         return implode('.', array_slice($out, -60));
     }
 
-    /** Zařízení podle prohlížeče: mobil, tablet, pocitac. */
+    private const ZARIZENI = ['pocitac' => true, 'tablet' => true, 'mobil' => true];
+
+    /** Zařízení návštěvníka: pocitac, tablet, mobil (odkaz → šířka okna → prohlížeč). */
     public function zarizeni(): string
+    {
+        if ($this->zarizeniOdkazu !== '') return $this->zarizeniOdkazu;
+        if ($this->sirkaOkna > 0) return $this->sirkaOkna >= self::POCITAC_OD ? 'pocitac' : ($this->sirkaOkna >= self::TABLET_OD ? 'tablet' : 'mobil');
+        return $this->zarizeniProhlizece();
+    }
+
+    /** Šířka, do které se musí banner responzivní zóny vejít, když skript neposlal šířku místa: šířka okna, jinak odhad podle zařízení (0 = bez omezení). */
+    public function odhadSirky(): int
+    {
+        return $this->sirkaOkna > 0 ? $this->sirkaOkna : self::ODHAD_SIRKY[$this->zarizeni()];
+    }
+
+    /** Zařízení podle prohlížeče (User-Agent): mobil, tablet, pocitac. */
+    public function zarizeniProhlizece(): string
     {
         $u = $this->prohlizec;
         if (preg_match('~iPad|Tablet|PlayBook|Silk|Kindle|(Android(?!.*Mobile))~i', $u)) return 'tablet';

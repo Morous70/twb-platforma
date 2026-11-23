@@ -30,7 +30,7 @@ try {
             if ($rel === Vykresleni::balicek($b)['index']) {
                 $o = (string)($_GET['b'] ?? '') === (string)$b['id'] ? $app->vykresleni()->overOdkaz('html', $_GET) : null;
                 $zona = $o[0] ?? null;
-                if ($o) $b['campaign_id'] = $o[1];
+                if ($o) { $b['campaign_id'] = $o[1]; $b['zarizeni'] = Vykresleni::zarizeniZOdkazu($_GET); }
                 Vydej::bezCache();
                 echo $app->vykresleni()->html5Index($b, (string)file_get_contents($soubor), $zona);
                 exit;

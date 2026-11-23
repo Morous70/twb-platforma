@@ -1,6 +1,6 @@
 <?php
 declare(strict_types=1);
-// Obsah banneru: ?b=ID&v=VERZE – obrázek z galerie nebo vykreslený slide (dlouhá mezipaměť),
+// Obsah banneru: ?b=ID&v=VERZE[&x=2] – obrázek z galerie (x=2 = obrázek 2× pro hustší displeje) nebo vykreslený slide (dlouhá mezipaměť),
 // ?b=ID&z=ZONA&c=KAMPAN&k=PODPIS – HTML dokument banneru pro iframe (izolovaný: vlastní původ díky CSP sandbox).
 use Reklamy\{App, Vydej};
 
@@ -12,7 +12,8 @@ try {
     $id = (string)($_GET['b'] ?? '');
     $b = $v->pripraveno && ctype_digit($id) ? ($app->db->q('SELECT * FROM banners WHERE id = ?', [(int)$id])->fetch() ?: null) : null;
     if ($b && $b['type'] === 'image' && isset($_GET['v'])) {
-        $f = $app->galerie()->soubor((int)$b['media_id']);
+        // ?x=2: obrázek pro displeje s vyšší hustotou (když ho banner nemá, hlavní obrázek)
+        $f = $app->galerie()->soubor((int)(($_GET['x'] ?? '') === '2' && $b['media2x_id'] ? $b['media2x_id'] : $b['media_id']));
         $etag = '"' . ($f['md5'] ?? md5_file($f['cesta'])) . '"';
         header('Cache-Control: public, max-age=31536000, immutable');
         header('ETag: ' . $etag);
@@ -39,6 +40,7 @@ try {
         header('Content-Type: text/html; charset=utf-8');
         header('Content-Security-Policy: ' . Vydej::SANDBOX);
         $b['campaign_id'] = $o[1];   // proklik z dokumentu se započítá kampani, ve které se banner zobrazil
+        $b['zarizeni'] = Reklamy\Vykresleni::zarizeniZOdkazu($_GET);   // … a zařízení, na kterém se zobrazil
         echo $app->vykresleni()->dokumentHtml($b, $o[0]);
         exit;
     }

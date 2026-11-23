@@ -49,8 +49,8 @@ test('převod z 0.7: vazby do kampaní, zón i statistiky zůstanou, banner už 
     $app = new App(KOREN . '/apps/reklamy', ['data_dir' => $dir]);
     ok($app->migruj());
     $db = $app->db;
-    eq(5, (new Migrace($db))->verze('reklamy'));
-    eq('5', $app->nastaveni()->dej('schema_version'));
+    eq(Schema::verze(), (new Migrace($db))->verze('reklamy'), 'převod proběhne až do nejnovější verze');
+    eq((string)Schema::verze(), $app->nastaveni()->dej('schema_version'));
     eq([[1, 1], [1, 2], [2, 3]], array_map(fn($r) => [(int)$r['campaign_id'], (int)$r['banner_id']], $db->q('SELECT * FROM campaign_banners ORDER BY banner_id')->fetchAll()));
     eq([1], array_map('intval', $db->q('SELECT banner_id FROM zone_banners')->fetchAll(PDO::FETCH_COLUMN)), 'přiřazení banneru do zóny přestavba tabulky nesmaže');
     eq([[1, 1, 100], [3, 2, 40], [99, 0, 7]], array_map(fn($r) => [(int)$r['banner_id'], (int)$r['campaign_id'], (int)$r['impressions']],

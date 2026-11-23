@@ -33,18 +33,20 @@ final class Kody
         $rozmer = " width=\"$w\" height=\"$hh\"";
         switch ($zpusob) {
             case 'asyn':
-                $styl = ' style="display:inline-block' . ($zw ? ";width:{$zw}px" : '') . ($zh ? ";height:{$zh}px" : '') . '"';
+                // responzivní zóna: značka přes celou šířku místa, skript podle ní vybere rozměr banneru
+                $styl = Zony::jeResponzivni($zona) ? ' style="display:block"' : ' style="display:inline-block' . ($zw ? ";width:{$zw}px" : '') . ($zh ? ";height:{$zh}px" : '') . '"';
                 return "<ins data-twbr-zona=\"$id\"$styl></ins>\n<script async src=\"" . self::h($this->u('asyn.php')) . "\"></script>";
             case 'js':
                 $u = $this->u('js.php') . "?zona=$id";
-                return "<script>\n(function () {\n  var u = " . json_encode($u, JSON_UNESCAPED_SLASHES) . " + '&cb=' + Math.floor(Math.random() * 1e9) + '&loc=' + encodeURIComponent(location.href)\n"
-                    . "    + (document.referrer ? '&ref=' + encodeURIComponent(document.referrer) : '');\n  document.write('<scr' + 'ipt src=\"' + u + '\"></scr' + 'ipt>');\n})();\n</script>";
+                return "<script>\n(function () {\n  var s = document.currentScript, m = s && s.parentNode ? s.parentNode.clientWidth : 0;\n"
+                    . "  var u = " . json_encode($u, JSON_UNESCAPED_SLASHES) . " + '&cb=' + Math.floor(Math.random() * 1e9) + '&loc=' + encodeURIComponent(location.href)\n"
+                    . "    + '&sw=' + (window.innerWidth || 0) + (m ? '&sirka=' + m : '') + (document.referrer ? '&ref=' + encodeURIComponent(document.referrer) : '');\n  document.write('<scr' + 'ipt src=\"' + u + '\"></scr' + 'ipt>');\n})();\n</script>";
             case 'iframe':
                 return '<iframe src="' . self::h($this->u('ram.php') . "?zona=$id") . "\"$rozmer frameborder=\"0\" scrolling=\"no\" style=\"border:0;overflow:hidden\" title=\"Reklama\" loading=\"lazy\"></iframe>";
             case 'odkaz':
                 return '<a href="' . self::h($this->u('klik.php') . "?zona=$id&n=NAHODNE") . "\" target=\"_blank\" rel=\"sponsored noopener\">"
                     . '<img src="' . self::h($this->u('obr.php') . "?zona=$id&n=NAHODNE") . '"' . ($zw ? " width=\"$zw\"" : '') . ($zh ? " height=\"$zh\"" : '')
-                    . ($zw || $zh ? '' : $rozmer) . ' border="0" alt="Reklama"></a>';
+                    . ($zw || $zh || Zony::jeResponzivni($zona) ? '' : $rozmer) . ' border="0" alt="Reklama"></a>';
             case 'okno':
                 [$ow, $oh] = $this->app->zony()->rozmerVlozeni($zona, 800, 600);
                 return '<script src="' . self::h($this->u('okno.php') . "?zona=$id" . ($zw ? '' : "&sirka=$ow") . ($zh ? '' : "&vyska=$oh")) . '"></script>';

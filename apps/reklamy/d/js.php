@@ -13,7 +13,7 @@ try {
     $z = $v->zona($_GET['zona'] ?? '');
     if ($z) {
         $k = $v->kontext($_GET, (int)$z['id']);
-        $html = $v->proZonu($z, $k)['html'];
+        $html = $v->proZonu($z, $k, [], Vydej::sirka($_GET['sirka'] ?? ''))['html'];
         Vydej::ulozCookies($k);
     }
 } catch (Throwable $e) {

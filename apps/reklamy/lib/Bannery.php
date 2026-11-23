@@ -31,6 +31,34 @@ final class Bannery
 
     public function __construct(private App $app) {}
 
+    /** Zařízení, na kterých se banner zobrazuje (prázdné = všechna). @return list<string> */
+    public static function zarizeni(array $banner): array
+    {
+        $z = trim((string)($banner['devices'] ?? ''));
+        return $z === '' ? [] : array_values(array_intersect(array_keys(Cileni::ZARIZENI), explode(',', $z)));
+    }
+
+    /** Smí se banner zobrazit na zařízení? */
+    public static function proZarizeni(array $banner, string $zarizeni): bool
+    {
+        $z = self::zarizeni($banner);
+        return !$z || in_array($zarizeni, $z, true);
+    }
+
+    /** Zařízení z formuláře (pole zarizeni[]) do sloupce devices; všechna = NULL, žádné = chyba. @param array<string, mixed> $v */
+    public static function zarizeniZFormulare(array $v): ?string
+    {
+        $z = array_values(array_intersect(array_keys(Cileni::ZARIZENI), array_map('strval', (array)($v['zarizeni'] ?? []))));
+        if (!$z) throw new Chyba('Vyberte aspoň jedno zařízení, na kterém se banner zobrazí.');
+        return count($z) < count(Cileni::ZARIZENI) ? implode(',', $z) : null;
+    }
+
+    /** Má banner obrázek pro displeje s vyšší hustotou (2×)? */
+    public static function maRetinu(array $banner): bool
+    {
+        return ($banner['type'] === 'image' && !empty($banner['media2x_id'])) || ($banner['type'] === 'external' && !empty($banner['image2x_url']));
+    }
+
     /**
      * Bannery kampaně, nebo všechny bannery mimo ty, které jsou jen v archivovaných kampaních.
      * Každý řádek má `kampane` (seznam [id, name, status]); `campaign_id` a `campaign_name` jsou kampaň ze zadání, jinak první kampaň banneru.
@@ -150,7 +178,8 @@ final class Bannery
             'width' => Vstup::cislo($v, 'width', 'Šířka', 1, self::MAX_ROZMER),
             'height' => Vstup::cislo($v, 'height', 'Výška', 1, self::MAX_ROZMER),
             'weight' => Vstup::cislo($v, 'weight', 'Váha', 1, 1000) ?? 1,
-            'media_id' => null, 'image_url' => null, 'html' => null, 'content' => null,
+            'media_id' => null, 'image_url' => null, 'html' => null, 'content' => null, 'media2x_id' => null, 'image2x_url' => null,
+            'devices' => array_key_exists('zarizeni', $v) ? self::zarizeniZFormulare($v) : ($stary['devices'] ?? null),
             'target_url' => Vstup::adresa($v, 'target_url', 'Cílová adresa'),
             'target' => Vstup::volba($v, 'target', 'Otevřít', self::CILE, '_blank'),
             'alt' => Vstup::text($v, 'alt', 'Popis obrázku (alt)', 255, false),
@@ -165,9 +194,21 @@ final class Bannery
                 $d['media_id'] = $mid;
                 $d['width'] ??= $m['sirka'] !== null ? (int)$m['sirka'] : null;
                 $d['height'] ??= $m['vyska'] !== null ? (int)$m['vyska'] : null;
+                // volitelný obrázek pro displeje s vyšší hustotou: přesně dvojnásobný rozměr (prohlížeč ho zobrazí v rozměru banneru)
+                $m2 = (int)(array_key_exists('media2x_id', $v) ? $v['media2x_id'] : ($stary['media2x_id'] ?? 0));
+                if ($m2 > 0) {
+                    try { $r2 = $this->app->galerie()->radek($m2); } catch (\RuntimeException) { throw new Chyba('Vybraný obrázek 2× v galerii není.'); }
+                    if ($r2['druh'] !== 'image') throw new Chyba('Obrázek 2× musí být obrázek, ne video ani PDF.');
+                    if ($m2 === $mid) throw new Chyba('Obrázek 2× musí být jiný soubor než hlavní obrázek.');
+                    if ($d['width'] !== null && $d['height'] !== null && ((int)$r2['sirka'] !== 2 * $d['width'] || (int)$r2['vyska'] !== 2 * $d['height'])) {
+                        throw new Chyba('Obrázek 2× musí mít přesně dvojnásobný rozměr banneru: ' . (2 * $d['width']) . '×' . (2 * $d['height']) . " px (vybraný má {$r2['sirka']}×{$r2['vyska']}).");
+                    }
+                    $d['media2x_id'] = $m2;
+                }
                 break;
             case 'external':
                 $d['image_url'] = Vstup::adresa($v, 'image_url', 'Adresa obrázku', true);
+                $d['image2x_url'] = array_key_exists('image2x_url', $v) ? Vstup::adresa($v, 'image2x_url', 'Adresa obrázku 2×') : ($stary['image2x_url'] ?? null);
                 break;
             case 'html':
                 $html = (string)($v['html'] ?? '');
@@ -213,11 +254,8 @@ final class Bannery
             if ($kampane !== null) $this->nastavKampane($id, $kampane);
             $db->transakce(function () use ($db, $d, $id, $stary) {
                 $db->q('UPDATE banners SET ' . implode(', ', array_map(fn($k) => "$k = ?", array_keys($d))) . ' WHERE id = ?', [...array_values($d), $id]);
-                // změna rozměru: přímá přiřazení do zón s jiným pevným rozměrem už neplatí
-                if ((int)$stary['width'] !== $d['width'] || (int)$stary['height'] !== $d['height']) {
-                    $db->q('DELETE FROM zone_banners WHERE banner_id = ? AND zone_id IN (SELECT id FROM zones WHERE (width IS NOT NULL AND width <> ?) OR (height IS NOT NULL AND height <> ?))',
-                        [$id, $d['width'], $d['height']]);
-                }
+                // změna rozměru: přímá přiřazení do zón s jiným rozměrem už neplatí
+                if ((int)$stary['width'] !== $d['width'] || (int)$stary['height'] !== $d['height']) $this->app->zony()->odeberNesedici($id);
             });
         }
         if ($stary !== null && $typ === 'html5' && $stary['content'] !== $d['content']) $this->app->html5()->uklid($this->balickyHtml5());

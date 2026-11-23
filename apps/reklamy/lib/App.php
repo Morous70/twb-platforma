@@ -162,13 +162,13 @@ final class App
         return $this->sluzba('galerie', fn() => new Galerie($this->host, $this->data . '/media',
             povolene: array_intersect_key(Galerie::POVOLENE, array_flip(['jpg', 'jpeg', 'png', 'gif', 'webp'])),
             priSmazani: function (array $r): void {
-                $n = (int)$this->db->q('SELECT COUNT(*) FROM banners WHERE media_id = ?', [$r['id']])->fetchColumn();
+                $n = (int)$this->db->q('SELECT COUNT(*) FROM banners WHERE media_id = ? OR media2x_id = ?', [$r['id'], $r['id']])->fetchColumn();
                 if ($n > 0) throw new \RuntimeException("Obrázek „{$r['nazev']}“ používá banner ({$n}×), nejdřív ho z banneru odeberte.");
                 $s = $this->slideBannery()->pouzivajiObrazek((int)$r['id']);
                 if ($s) throw new \RuntimeException("Obrázek „{$r['nazev']}“ je ve slidu " . implode(', ', array_map(fn($x) => "„{$x}“", array_slice($s, 0, 3))) . ', nejdřív ho ze slidu odeberte.');
             },
             pouziti: fn(int $id) => [
-                ...array_map(fn($b) => 'Banner: ' . $b['name'], $this->db->q('SELECT name FROM banners WHERE media_id = ?', [$id])->fetchAll()),
+                ...array_map(fn($b) => 'Banner: ' . $b['name'] . ((int)$b['media_id'] === $id ? '' : ' (obrázek 2×)'), $this->db->q('SELECT name, media_id FROM banners WHERE media_id = ? OR media2x_id = ?', [$id, $id])->fetchAll()),
                 ...array_map(fn($n) => 'Slide: ' . $n, $this->slideBannery()->pouzivajiObrazek($id)),
             ]));
     }

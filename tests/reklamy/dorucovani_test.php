@@ -123,9 +123,10 @@ test('počítání: po hodinách, roboti a náhled se nepočítají', function (
     $d->zobrazeni(7, 3, kontext(['cas' => $t, 'ua' => 'Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)']));
     $d->zobrazeni(7, 3, kontext(['cas' => $t, 'ua' => '']));
     $d->zobrazeni(7, 3, kontext(['cas' => $t, 'pocitat' => false]));
-    $d->konverze(7, 3, $t, 12345);
+    $d->konverze(7, 3, $t, 12345, null, 'pocitac');
     eq([['2026-11-21', 14, 2, 1, 1, 12345], ['2026-11-21', 15, 1, 0, 0, 0]],
         array_map('array_values', $app->db->q('SELECT day, hour, impressions, clicks, conversions, revenue FROM stats ORDER BY hour')->fetchAll()));
+    eq(['pocitac'], array_values(array_unique($app->db->q('SELECT device FROM stats')->fetchAll(PDO::FETCH_COLUMN))), 'zařízení podle prohlížeče');
 });
 
 test('podpisy odkazů a vložení odkazem (n → banner)', function () {

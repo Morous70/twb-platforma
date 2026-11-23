@@ -58,12 +58,13 @@ final class Vydej
 
     /**
      * Vybere banner pro zónu, započítá zobrazení a vrátí HTML pro stránku.
+     * $sirkaMista = šířka místa na stránce ze skriptu (responzivní zóny), 0 = neznámá.
      * @param list<string> $typy
      * @return array{banner: ?array<string, mixed>, html: string}
      */
-    public function proZonu(array $zona, Kontext $k, array $typy = []): array
+    public function proZonu(array $zona, Kontext $k, array $typy = [], int $sirkaMista = 0): array
     {
-        $b = $this->app->dorucovani()->vyber($zona, $k, $typy);
+        $b = $this->app->dorucovani()->vyber($zona, $k, $typy, $sirkaMista);
         if (!$b) return ['banner' => null, 'html' => Vykresleni::nahradni($zona)];
         $this->app->dorucovani()->zobrazeni((int)$b['id'], (int)$zona['id'], $k, (int)$b['campaign_id']);
         return ['banner' => $b, 'html' => $this->app->vykresleni()->html($b, (int)$zona['id'])];
@@ -78,6 +79,8 @@ final class Vydej
             'sirka' => (int)$b['width'], 'vyska' => (int)$b['height'], 'alt' => (string)($b['alt'] ?? ''),
             'klik' => !empty($b['target_url']) ? $v->klik($b, $zona) : null,
             'obrazek' => in_array($b['type'], Bannery::OBRAZKOVE, true) ? $v->obrazek($b) : null,
+            'obrazek2x' => in_array($b['type'], Bannery::OBRAZKOVE, true) ? $v->obrazek($b, true) : null,
+            'zarizeni' => (string)($b['zarizeni'] ?? ''),
             'dokument' => in_array($b['type'], Bannery::OBRAZKOVE, true) ? null : $v->dokument($b, $zona),
         ];
     }
@@ -114,6 +117,19 @@ final class Vydej
             }
         } catch (\Throwable) {
         }
+    }
+
+    /** Šířka místa z parametru (číslo v px), 0 = neznámá. */
+    public static function sirka(mixed $v): int
+    {
+        return is_scalar($v) && ctype_digit((string)$v) ? min(20000, (int)$v) : 0;
+    }
+
+    /** Šířky míst z parametru „sirky“ (ve stejném pořadí jako zóny), nebo „sirka“ pro jednu zónu. @param array<string, mixed> $get @return list<int> */
+    public static function sirkyZParametru(array $get): array
+    {
+        if (is_string($get['sirky'] ?? null)) return array_map(fn($c) => self::sirka(trim($c)), array_slice(explode(',', $get['sirky']), 0, self::MAX_ZON));
+        return [self::sirka($get['sirka'] ?? '')];
     }
 
     /** Seznam zón z parametru „zony“ (1,2,3) nebo „zona“. @param array<string, mixed> $get @return list<int> */

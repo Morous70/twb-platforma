@@ -11,7 +11,7 @@ use TWB\Jadro\{Db, ModulMigrace};
  */
 final class Schema implements ModulMigrace
 {
-    public static function verze(): int { return 5; }
+    public static function verze(): int { return 6; }
 
     /** Tabulky, které musí existovat dřív než cokoli jiného (nastavení a protokol). */
     public static function zakladniTabulky(Db $db): void
@@ -151,6 +151,42 @@ final class Schema implements ModulMigrace
             $db->q('CREATE INDEX IF NOT EXISTS conversions_click ON conversions (tracker_id, click_id)');
         }
         if ($zVerze < 5) self::bannerVeViceKampanich($db);
+        if ($zVerze < 6) self::zarizeni($db);
+    }
+
+    /**
+     * Verze 6 (0.9): reklamy podle zařízení.
+     *  - zones.sizes: responzivní zóna = seznam rozměrů (JSON ["970x250", "728x90", …]), vybere se banner, který se vejde do šířky místa;
+     *  - banners.devices: banner jen pro některá zařízení (čárkami „pocitac,tablet,mobil“, NULL = všechna);
+     *  - banners.media2x_id / image2x_url: obrázek pro displeje s vyšší hustotou (2×);
+     *  - stats.device (součást klíče), clicks.device, views.device: statistiky po zařízeních ('' = neznámé, data ze starších verzí).
+     * Převod je opakovatelný (obnovená záloha z 0.8 má tabulky už v novém tvaru).
+     */
+    private static function zarizeni(Db $db): void
+    {
+        self::pridejSloupec($db, 'zones', 'sizes', 'TEXT NULL');
+        self::pridejSloupec($db, 'banners', 'devices', 'VARCHAR(30) NULL');
+        self::pridejSloupec($db, 'banners', 'media2x_id', 'INTEGER NULL');
+        self::pridejSloupec($db, 'banners', 'image2x_url', 'TEXT NULL');
+        self::pridejSloupec($db, 'clicks', 'device', "VARCHAR(8) NOT NULL DEFAULT ''");
+        self::pridejSloupec($db, 'views', 'device', "VARCHAR(8) NOT NULL DEFAULT ''");
+        if (!self::maSloupec($db, 'stats', 'device')) {
+            $db->q("CREATE TABLE stats_nova (
+                day CHAR(10) NOT NULL, hour INTEGER NOT NULL,
+                banner_id INTEGER NOT NULL, zone_id INTEGER NOT NULL DEFAULT 0, campaign_id INTEGER NOT NULL DEFAULT 0,
+                device VARCHAR(8) NOT NULL DEFAULT '',             -- pocitac | tablet | mobil | '' (neznámé, starší data)
+                impressions INTEGER NOT NULL DEFAULT 0, clicks INTEGER NOT NULL DEFAULT 0,
+                conversions INTEGER NOT NULL DEFAULT 0, revenue INTEGER NOT NULL DEFAULT 0,
+                PRIMARY KEY (day, hour, banner_id, zone_id, campaign_id, device)
+            )");
+            $db->q('INSERT INTO stats_nova (day, hour, banner_id, zone_id, campaign_id, impressions, clicks, conversions, revenue)
+                SELECT day, hour, banner_id, zone_id, campaign_id, impressions, clicks, conversions, revenue FROM stats');
+            $db->q('DROP TABLE stats');
+            $db->q('ALTER TABLE stats_nova RENAME TO stats');
+        }
+        $db->q('CREATE INDEX IF NOT EXISTS stats_banner ON stats (banner_id, day)');
+        $db->q('CREATE INDEX IF NOT EXISTS stats_campaign ON stats (campaign_id, day)');
+        $db->q('CREATE INDEX IF NOT EXISTS banners_media2x ON banners (media2x_id)');
     }
 
     /**

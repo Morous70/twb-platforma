@@ -12,7 +12,9 @@ namespace Reklamy;
  *     a další filtry (pridejFiltr);
  *  2. druh kampaně: exkluzivní mají přednost před standardními, zbytkové přijdou na řadu jen bez jiných;
  *  3. v rámci druhu rozhoduje nejvyšší priorita;
- *  4. mezi zbylými se losuje podle váhy kampaně a v ní podle váhy banneru.
+ *  4. responzivní zóna: jen bannery, které se vejdou do šířky místa, a z nich ten nejširší rozměr (banner se nikdy nezmenšuje);
+ *  5. mezi zbylými se losuje podle váhy kampaně a v ní podle váhy banneru.
+ * Banner jen pro některá zařízení (banners.devices) a cílení kampaně na zařízení se řídí Kontext::zarizeni().
  */
 final class Dorucovani
 {
@@ -67,7 +69,9 @@ final class Dorucovani
               AND (c.starts_at IS NULL OR c.starts_at <= ?) AND (c.ends_at IS NULL OR c.ends_at > ?)
               AND (b.id IN (SELECT banner_id FROM zone_banners WHERE zone_id = ?) OR cb.campaign_id IN (SELECT campaign_id FROM zone_campaigns WHERE zone_id = ?))
             ORDER BY b.id, cb.campaign_id", [$ted, $ted, $zona['id'], $zona['id']])->fetchAll();
-        $rows = array_filter($rows, fn($b) => Zony::pasuje($zona, $b) && !isset($k->vynechat[(int)$b['id']]) && (!$typy || in_array($b['type'], $typy, true)));
+        $zarizeni = $k->zarizeni();
+        $rows = array_filter($rows, fn($b) => Zony::pasuje($zona, $b) && !isset($k->vynechat[(int)$b['id']]) && (!$typy || in_array($b['type'], $typy, true))
+            && Bannery::proZarizeni($b, $zarizeni));
         $rows = $this->bezVycerpanych(array_values($rows), $ted);
         $cileni = [];
         $rows = array_values(array_filter($rows, function ($b) use ($k, &$cileni) {
@@ -116,17 +120,28 @@ final class Dorucovani
     }
 
     /**
-     * Vybere banner pro zónu (nebo null). Vybraný banner se přidá do $k->vynechat.
+     * Vybere banner pro zónu (nebo null). Vybraný banner se přidá do $k->vynechat a dostane klíč `zarizeni` (zařízení zobrazení pro odkazy).
+     * U responzivní zóny rozhoduje šířka místa ($sirkaMista ze skriptu; 0 = neznámá → šířka okna, nebo odhad podle zařízení):
+     * vejít se musí šířka banneru, v rámci druhu a priority vyhraje nejširší rozměr, mezi bannery tohoto rozměru se losuje.
      * @param list<string> $typy
      * @return ?array<string, mixed>
      */
-    public function vyber(array $zona, Kontext $k, array $typy = []): ?array
+    public function vyber(array $zona, Kontext $k, array $typy = [], int $sirkaMista = 0): ?array
     {
         $kandidati = $this->kandidati($zona, $k, $typy);
+        if (Zony::jeResponzivni($zona)) {
+            $limit = $sirkaMista > 0 ? $sirkaMista : $k->odhadSirky();
+            if ($limit > 0) $kandidati = array_values(array_filter($kandidati, fn($b) => (int)$b['width'] <= $limit));
+        }
         if (!$kandidati) return null;
         $prvni = $kandidati[0];
         $skupina = array_values(array_filter($kandidati, fn($b) => $b['campaign_kind'] === $prvni['campaign_kind'] && (int)$b['campaign_priority'] === (int)$prvni['campaign_priority']));
+        if (Zony::jeResponzivni($zona)) {
+            $nej = max(array_map(fn($b) => [(int)$b['width'], (int)$b['height']], $skupina));
+            $skupina = array_values(array_filter($skupina, fn($b) => [(int)$b['width'], (int)$b['height']] === $nej));
+        }
         $vybrany = $this->losuj($skupina);
+        $vybrany['zarizeni'] = $k->zarizeni();
         $k->vynechat[(int)$vybrany['id']] = true;
         return $vybrany;
     }
@@ -167,11 +182,11 @@ final class Dorucovani
 
     // ---------- počítání ----------
 
-    private function pricti(int $banner, int $zona, int $kampan, string $sloupec, int $cas, int $kolik = 1, int $hodnota = 0): void
+    private function pricti(int $banner, int $zona, int $kampan, string $sloupec, int $cas, string $zarizeni = '', int $kolik = 1, int $hodnota = 0): void
     {
-        $this->app->db->q("INSERT INTO stats (day, hour, banner_id, zone_id, campaign_id, $sloupec, revenue) VALUES (?, ?, ?, ?, ?, ?, ?)
-            ON CONFLICT (day, hour, banner_id, zone_id, campaign_id) DO UPDATE SET $sloupec = $sloupec + excluded.$sloupec, revenue = revenue + excluded.revenue",
-            [date('Y-m-d', $cas), (int)date('G', $cas), $banner, $zona, $kampan, $kolik, $hodnota]);
+        $this->app->db->q("INSERT INTO stats (day, hour, banner_id, zone_id, campaign_id, device, $sloupec, revenue) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT (day, hour, banner_id, zone_id, campaign_id, device) DO UPDATE SET $sloupec = $sloupec + excluded.$sloupec, revenue = revenue + excluded.revenue",
+            [date('Y-m-d', $cas), (int)date('G', $cas), $banner, $zona, $kampan, $zarizeni, $kolik, $hodnota]);
     }
 
     /**
@@ -212,12 +227,12 @@ final class Dorucovani
     {
         if (!$k->zapocitat()) return;
         $kampan ??= $this->hlavniKampan($banner);
-        $this->pricti($banner, $zona, $kampan, 'impressions', $k->ted());
+        $this->pricti($banner, $zona, $kampan, 'impressions', $k->ted(), $k->zarizeni());
         if (!$k->cookies) return;
         $c = $this->frekvence($kampan);
         if ($c['cap']) $k->zapisFrekvenci($kampan, $c['hodin']);
         if ($this->zobrazeniProKonverze()) {
-            $this->app->db->q('INSERT INTO views (visitor, banner_id, zone_id, campaign_id, at) VALUES (?, ?, ?, ?, ?)', [$k->navstevnik(), $banner, $zona, $kampan, $k->ted()]);
+            $this->app->db->q('INSERT INTO views (visitor, banner_id, zone_id, campaign_id, device, at) VALUES (?, ?, ?, ?, ?, ?)', [$k->navstevnik(), $banner, $zona, $kampan, $k->zarizeni(), $k->ted()]);
         }
     }
 
@@ -226,16 +241,16 @@ final class Dorucovani
     {
         if (!$k->zapocitat()) return null;
         $kampan ??= $this->hlavniKampan($banner);
-        $this->pricti($banner, $zona, $kampan, 'clicks', $k->ted());
-        $this->app->db->q('INSERT INTO clicks (visitor, banner_id, zone_id, campaign_id, at) VALUES (?, ?, ?, ?, ?)',
-            [$k->cookies ? $k->navstevnik() : null, $banner, $zona, $kampan, $k->ted()]);
+        $this->pricti($banner, $zona, $kampan, 'clicks', $k->ted(), $k->zarizeni());
+        $this->app->db->q('INSERT INTO clicks (visitor, banner_id, zone_id, campaign_id, device, at) VALUES (?, ?, ?, ?, ?, ?)',
+            [$k->cookies ? $k->navstevnik() : null, $banner, $zona, $kampan, $k->zarizeni(), $k->ted()]);
         return $this->app->db->posledniId();
     }
 
-    /** Konverze do statistiky (hodnota v haléřích). */
-    public function konverze(int $banner, int $zona, int $cas, int $hodnota = 0, ?int $kampan = null): void
+    /** Konverze do statistiky (hodnota v haléřích); zařízení prokliku nebo zobrazení, ke kterému se konverze přiřadila. */
+    public function konverze(int $banner, int $zona, int $cas, int $hodnota = 0, ?int $kampan = null, string $zarizeni = ''): void
     {
-        $this->pricti($banner, $zona, $kampan ?? $this->hlavniKampan($banner), 'conversions', $cas, 1, $hodnota);
+        $this->pricti($banner, $zona, $kampan ?? $this->hlavniKampan($banner), 'conversions', $cas, $zarizeni, 1, $hodnota);
     }
 
     // ---------- vložení odkazem (obrázek a proklik se stejným n) ----------

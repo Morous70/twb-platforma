@@ -31,20 +31,21 @@ final class Statistiky
     }
 
     /** Seskupení přehledu statistik: klíč => popis. */
-    public const PODLE = ['den' => 'Dny', 'tyden' => 'Týdny', 'mesic' => 'Měsíce', 'hodina' => 'Hodiny dne', 'kampan' => 'Kampaně', 'banner' => 'Bannery', 'zona' => 'Zóny', 'web' => 'Weby'];
+    public const PODLE = ['den' => 'Dny', 'tyden' => 'Týdny', 'mesic' => 'Měsíce', 'hodina' => 'Hodiny dne', 'kampan' => 'Kampaně', 'banner' => 'Bannery', 'zona' => 'Zóny', 'web' => 'Weby', 'zarizeni' => 'Zařízení'];
     /** Ukazatele: klíč => popis. */
     public const UKAZATELE = ['impressions' => 'Zobrazení', 'clicks' => 'Prokliky', 'conversions' => 'Konverze', 'revenue' => 'Hodnota'];
 
     /**
      * Přehled seskupený podle času nebo podle kampaní, bannerů, zón a webů.
      * Časové řady mají i dny (týdny, měsíce, hodiny) bez provozu; ostatní seskupení jen řádky s provozem, seřazené podle zobrazení.
-     * @param array{kampan?: ?int, banner?: ?int, zona?: ?int, web?: ?int} $filtr
+     * Zařízení (0.9): počítač, tablet, mobil; data ze starších verzí jsou „neznámé zařízení“.
+     * @param array{kampan?: ?int, banner?: ?int, zona?: ?int, web?: ?int, zarizeni?: ?string} $filtr
      * @return list<array{klic: string, popis: string, odkaz: ?array{0:string,1:array<string,int>}, impressions: int, clicks: int, conversions: int, revenue: int}>
      */
     public function prehled(string $od, string $do, string $podle, array $filtr = []): array
     {
         if (!isset(self::PODLE[$podle])) throw new Chyba('Neznámé seskupení statistik.');
-        [$kde, $p] = $this->podminky($od, $do, $filtr['kampan'] ?? null, $filtr['banner'] ?? null, $filtr['zona'] ?? null, $filtr['web'] ?? null);
+        [$kde, $p] = $this->podminky($od, $do, $filtr['kampan'] ?? null, $filtr['banner'] ?? null, $filtr['zona'] ?? null, $filtr['web'] ?? null, $filtr['zarizeni'] ?? null);
         $sum = 'SUM(s.impressions) AS impressions, SUM(s.clicks) AS clicks, SUM(s.conversions) AS conversions, SUM(s.revenue) AS revenue';
         $db = $this->app->db;
         $cisla = fn(array $r) => ['impressions' => (int)$r['impressions'], 'clicks' => (int)$r['clicks'], 'conversions' => (int)$r['conversions'], 'revenue' => (int)$r['revenue']];
@@ -71,6 +72,13 @@ final class Statistiky
             }
             return array_map(fn($k) => ['klic' => $k[0], 'popis' => $k[1], 'odkaz' => null] + ($data[$k[0]] ?? $nula), $klice);
         }
+        if ($podle === 'zarizeni') {
+            $data = [];
+            foreach ($db->q("SELECT s.device AS k, $sum FROM stats s$kde GROUP BY s.device ORDER BY impressions DESC, clicks DESC, s.device", $p)->fetchAll() as $r) $data[(string)$r['k']] = $cisla($r);
+            $out = [];
+            foreach ($data as $k => $c) $out[] = ['klic' => $k, 'popis' => self::popisZarizeni($k), 'odkaz' => null] + $c;
+            return $out;
+        }
         [$sloupec, $nazev, $stranka] = match ($podle) {
             'kampan' => ['s.campaign_id', 'SELECT name FROM campaigns WHERE id = x.k', 'kampan'],
             'banner' => ['s.banner_id', 'SELECT name FROM banners WHERE id = x.k', 'banner'],
@@ -85,6 +93,12 @@ final class Statistiky
             $popis = $r['nazev'] ?? ($id === 0 ? ($podle === 'kampan' ? 'neznámá kampaň (starší data smazaných bannerů)' : 'bez zóny (vložení ze serveru)') : "#$id (smazáno)");
             return ['klic' => (string)$id, 'popis' => (string)$popis, 'odkaz' => $r['nazev'] !== null ? [$stranka, ['id' => $id]] : null] + $cisla($r);
         }, $rows);
+    }
+
+    /** Popis zařízení ve statistikách. */
+    public static function popisZarizeni(string $z): string
+    {
+        return Cileni::ZARIZENI[$z] ?? 'neznámé (data před verzí 0.9)';
     }
 
     /** Klíč období pro den Y-m-d: den, týden (ISO, „2026-W47“) nebo měsíc („2026-11“). */
@@ -139,9 +153,10 @@ final class Statistiky
     }
 
     /** @return array{0: string, 1: list<mixed>} */
-    private function podminky(?string $od, ?string $do, ?int $kampan, ?int $banner, ?int $zona, ?int $web = null): array
+    private function podminky(?string $od, ?string $do, ?int $kampan, ?int $banner, ?int $zona, ?int $web = null, ?string $zarizeni = null): array
     {
         $k = []; $p = [];
+        if ($zarizeni !== null) { $k[] = 's.device = ?'; $p[] = $zarizeni; }
         if ($web !== null) { $k[] = 's.zone_id IN (SELECT id FROM zones WHERE site_id = ?)'; $p[] = $web; }
         if ($od !== null) { $k[] = 's.day >= ?'; $p[] = $od; }
         if ($do !== null) { $k[] = 's.day <= ?'; $p[] = $do; }

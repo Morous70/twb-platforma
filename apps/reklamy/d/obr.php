@@ -12,7 +12,7 @@ try {
     $z = $v->zona($_GET['zona'] ?? '');
     if ($z) {
         $k = $v->kontext($_GET, (int)$z['id']);
-        $b = $app->dorucovani()->vyber($z, $k, Bannery::OBRAZKOVE);
+        $b = $app->dorucovani()->vyber($z, $k, Bannery::OBRAZKOVE, Vydej::sirka($_GET['sirka'] ?? ''));
         if ($b) {
             $n = is_string($_GET['n'] ?? null) && $_GET['n'] !== '' ? mb_substr($_GET['n'], 0, 64) : '';
             if ($n !== '') $app->dorucovani()->zapamatuj($n, (int)$z['id'], (int)$b['id'], $k->ted(), (int)$b['campaign_id']);

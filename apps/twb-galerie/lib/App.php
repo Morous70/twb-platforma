@@ -25,7 +25,7 @@ final class App
     /** Tabulky v pořadí pro obnovu ze zálohy. Passkey, jednorázové tokeny, API klíče a připojení MCP (oauth_*) se nezálohují (obnova by vrátila odebrané zařízení nebo zrušený klíč). */
     public const TABULKY = ['module_versions', 'settings', 'log', 'categories', 'media'];
     /** Nastavení, která patří k instalaci a obnova zálohy je nepřepíše. */
-    public const MISTNI = ['login_fails', 'login_last_fail', 'reset_last_sent', 'api_fails', 'api_fail_since', 'update_result', 'update_checked_at', 'update_available', 'update_health_key', 'nahled_tajemstvi', 'galerie_zobrazeni'];
+    public const MISTNI = ['login_fails', 'login_last_fail', 'reset_last_sent', 'api_fails', 'api_fail_since', 'update_result', 'update_checked_at', 'update_available', 'update_health_key', 'nahled_tajemstvi', 'galerie_zobrazeni', 'komprese_uloha'];
     /** Výchozí odhlášení po nečinnosti v minutách (když není v nastavení ani v config.php). */
     public const NECINNOST_MIN = 120;
     /** Největší nahrávaný soubor (skládá se po částech, limit PHP pro jeden požadavek nevadí). */
@@ -188,6 +188,8 @@ final class App
     public function kategorie(): Kategorie { return $this->sluzba('kategorie', fn() => new Kategorie($this)); }
     public function apiKlice(): ApiKlice { return $this->sluzba('apiKlice', fn() => new ApiKlice($this)); }
     public function mcp(): Mcp { return $this->sluzba('mcp', fn() => new Mcp($this)); }
+    public function komprese(): Komprese { return $this->sluzba('komprese', fn() => new Komprese($this)); }
+    public function web(): Web { return $this->sluzba('web', fn() => new Web($this)); }
 
     /** OAuth 2.1 server pro MCP konektory (Claude, ChatGPT). Adresa MCP serveru je {base_url}/mcp.php. */
     public function oauth(): \TWB\Mcp\OAuth

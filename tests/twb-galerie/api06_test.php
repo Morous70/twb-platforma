@@ -114,7 +114,7 @@ test('licence: kód z metadat při nahrání, nastavení s ověřením, atribuce
 
 test('schéma 6: převod dosavadního textu licence na kód, limit požadavků v tabulce klíčů', function () {
     $app = novaApp();
-    eq(6, Schema::verze());
+    ok(Schema::verze() >= 6);
     $app->db->q("INSERT INTO media (filename, original_name, kind, mime, size, md5, created_at, license, license_url) VALUES
         ('a', 'a.jpg', 'image', 'image/jpeg', 1, 'x', '2026-01-01 00:00:00', 'CC BY 4.0', NULL),
         ('b', 'b.jpg', 'image', 'image/jpeg', 1, 'y', '2026-01-01 00:00:00', NULL, 'https://creativecommons.org/publicdomain/zero/1.0/'),

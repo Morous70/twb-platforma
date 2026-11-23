@@ -159,7 +159,9 @@ final class Obrazky
      * Zkomprimuje obrázek ze souboru. Vrací null (není potřeba / nevyplatí se) nebo
      * ['data', 'ext', 'mime', 'w', 'h', 'ow', 'oh']. $vynutit: i když nepřekračuje limity (ruční tlačítko).
      * Při nedostatku paměti hodí RuntimeException.
-     * @param array{max_w: int, max_h: int, quality: int, min_kb: int} $s
+     * Volitelně (0.2.0): `format` 'jpg' (výchozí; obrázek s průhledností jako PNG) nebo 'webp' (i s průhledností; bez podpory WebP v GD
+     * se použije jpg), `metadata` true = JPEG → JPEG přenese EXIF (orientace nastavená na 1), XMP, IPTC a barevný profil.
+     * @param array{max_w: int, max_h: int, quality: int, min_kb: int, format?: string, metadata?: bool} $s
      * @return array{data: string, ext: string, mime: string, w: int, h: int, ow: int, oh: int}|null
      */
     public static function komprimuj(string $cesta, array $s, bool $vynutit = false): ?array
@@ -201,8 +203,11 @@ final class Obrazky
         imagecopyresampled($dst, $src, 0, 0, 0, 0, $nw, $nh, imagesx($src), imagesy($src));
 
         $alfa = self::muzeMitPruhlednost($cesta, $typ) && self::maPruhlednost($dst);
+        $webp = ($s['format'] ?? 'jpg') === 'webp' && function_exists('imagewebp');
         ob_start();
-        if ($alfa) {
+        if ($webp) {
+            imagewebp($dst, null, $s['quality']);
+        } elseif ($alfa) {
             imagepng($dst, null, 9);
         } else {
             // bez průhlednosti → JPG (případné poloprůhledné okraje na černém podkladu)
@@ -212,11 +217,75 @@ final class Obrazky
             imagejpeg($flat, null, $s['quality']);
         }
         $data = (string)ob_get_clean();
+        if (!$webp && !$alfa && !empty($s['metadata']) && $typ === IMAGETYPE_JPEG && $data !== '') {
+            $data = self::vlozMetadataJpeg($data, self::metadataJpeg($cesta));
+        }
 
         // nevyplatí se → nechat originál (výjimka: fotka otočená podle EXIF, i kdyby byla o kousek větší)
         if ($data === '' || (strlen($data) >= $velikost && $orient === 1)) return null;
-        return ['data' => $data, 'ext' => $alfa ? 'png' : 'jpg', 'mime' => $alfa ? 'image/png' : 'image/jpeg',
+        [$ext, $mime] = $webp ? ['webp', 'image/webp'] : ($alfa ? ['png', 'image/png'] : ['jpg', 'image/jpeg']);
+        return ['data' => $data, 'ext' => $ext, 'mime' => $mime,
                 'w' => $nw, 'h' => $nh, 'ow' => $rw, 'oh' => $rh];
+    }
+
+    /** Segmenty JPEG, které se při kompresi přenášejí: APP1 (EXIF, XMP), APP2 (barevný profil ICC), APP13 (IPTC). */
+    private const SEGMENTY_METADAT = [0xE1, 0xE2, 0xED];
+
+    /**
+     * Metadata z JPEG souboru jako hotové segmenty (EXIF, XMP, ICC, IPTC) k vložení do nového JPEG. Orientace v EXIF se nastaví na 1,
+     * protože komprese obrázek podle ní už otočila. Jiný soubor než JPEG nebo bez metadat = prázdný řetězec.
+     */
+    public static function metadataJpeg(string $cesta): string
+    {
+        $fh = @fopen($cesta, 'rb');
+        if (!$fh) return '';
+        try {
+            if ((string)fread($fh, 2) !== "\xFF\xD8") return '';
+            $out = '';
+            while (true) {
+                $h = (string)fread($fh, 4);
+                if (strlen($h) < 4 || $h[0] !== "\xFF") break;
+                $marker = ord($h[1]);
+                if ($marker === 0xDA || $marker === 0xD9) break;                 // začátek obrazových dat
+                $delka = unpack('n', substr($h, 2, 2))[1];
+                if ($delka < 2) break;
+                if (!in_array($marker, self::SEGMENTY_METADAT, true)) { fseek($fh, $delka - 2, SEEK_CUR); continue; }
+                $obsah = $delka > 2 ? (string)fread($fh, $delka - 2) : '';
+                if (strlen($obsah) !== $delka - 2) break;
+                if ($marker === 0xE1 && str_starts_with($obsah, "Exif\0\0")) $obsah = "Exif\0\0" . self::orientaceNaJedna(substr($obsah, 6));
+                $out .= "\xFF" . chr($marker) . pack('n', $delka) . $obsah;
+            }
+            return $out;
+        } finally {
+            fclose($fh);
+        }
+    }
+
+    /** V bloku TIFF (EXIF) nastaví značku orientace 0x0112 v IFD0 na 1. Poškozený blok vrátí beze změny. */
+    private static function orientaceNaJedna(string $tiff): string
+    {
+        if (strlen($tiff) < 8) return $tiff;
+        $le = substr($tiff, 0, 2) === 'II';
+        if (!$le && substr($tiff, 0, 2) !== 'MM') return $tiff;
+        $u16 = fn(int $o) => unpack($le ? 'v' : 'n', substr($tiff, $o, 2))[1];
+        $ifd = unpack($le ? 'V' : 'N', substr($tiff, 4, 4))[1];
+        if ($ifd + 2 > strlen($tiff)) return $tiff;
+        $n = $u16($ifd);
+        for ($i = 0; $i < $n; $i++) {
+            $e = $ifd + 2 + $i * 12;
+            if ($e + 12 > strlen($tiff)) break;
+            if ($u16($e) === 0x0112) return substr_replace($tiff, pack($le ? 'v' : 'n', 1), $e + 8, 2);
+        }
+        return $tiff;
+    }
+
+    /** Vloží segmenty metadat do JPEG (za úvodní APP0 JFIF, jinak hned za začátek souboru). */
+    public static function vlozMetadataJpeg(string $jpeg, string $segmenty): string
+    {
+        if ($segmenty === '' || substr($jpeg, 0, 2) !== "\xFF\xD8") return $jpeg;
+        $p = 2;
+        if (substr($jpeg, 2, 2) === "\xFF\xE0" && strlen($jpeg) > 6) $p = 4 + unpack('n', substr($jpeg, 4, 2))[1];
+        return substr($jpeg, 0, $p) . $segmenty . substr($jpeg, $p);
     }
 
     /** Název s jinou příponou (zachová jméno, které uživatel zvolil). */

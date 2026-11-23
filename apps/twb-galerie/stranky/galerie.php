@@ -2,7 +2,7 @@
 declare(strict_types=1);
 // Galerie: nahrávání (po částech, přetažením), filtry, zobrazení mřížka / seznam / jen média, větší náhled v okně, hromadné akce.
 // Proměnné: $app, $ui, $post.
-use MediaGalerie\{App, Ui, Chyba, Media};
+use MediaGalerie\{App, Ui, Chyba, Media, Komprese};
 
 $galerie = $app->galerie();
 $media = $app->media();
@@ -28,7 +28,7 @@ $zpet = Ui::odkaz('galerie', array_filter($f, fn($v) => $v !== '' && $v !== 'nov
 if ($post) {
     $akce = (string)($_POST['akce'] ?? '');
     $zprava = 'Uloženo.';
-    if ($ui->zpracuj(function () use ($akce, $app, $galerie, $media, &$zprava) {
+    if ($ui->zpracuj(function () use ($akce, $app, $galerie, $media, $ui, $zpet, &$zprava) {
         $ids = array_values(array_filter(array_map('intval', (array)($_POST['ids'] ?? []))));
         if (!$ids) throw new Chyba('Vyberte aspoň jedno médium.');
         switch ($akce) {
@@ -49,6 +49,10 @@ if ($post) {
                 $n = count($galerie->archivuj($ids, $akce === 'archivovat'));
                 $zprava = $akce === 'archivovat' ? "Do archivu přesunuto: {$n}." : "Z archivu vráceno: {$n}.";
                 break;
+            case 'komprimovat':
+                // po krocích na stránce Komprimovat obrázky (časový limit sdíleného hostingu)
+                $app->komprese()->zaloz($ids, Komprese::volby($_POST), $zpet);
+                $ui->presmeruj(Ui::odkaz('komprese'));
             case 'smazat':
                 $n = count($galerie->smaz($ids));
                 $media->uklidNahledy();
@@ -117,11 +121,21 @@ $titulek = $f['archiv'] ? 'Archiv' : 'Galerie';
       <option value="tag-pridat">Přidat tag</option>
       <option value="tag-odebrat">Odebrat tag</option>
       <?php if ($f['archiv']): ?><option value="vratit">Vrátit z archivu</option><?php else: ?><option value="archivovat">Přesunout do archivu</option><?php endif; ?>
+      <option value="komprimovat">Komprimovat obrázky</option>
       <option value="smazat">Smazat</option>
     </select>
     <select name="kategorie" aria-label="Kategorie" data-pro="kategorie" hidden><option value="">— bez kategorie —</option>
       <?php foreach ($kategorie as $id => $n): ?><option value="<?= $id ?>"><?= Ui::h($n) ?></option><?php endforeach; ?></select>
     <input name="tag" list="seznam-tagu" placeholder="Tag" aria-label="Tag" data-pro="tag-pridat tag-odebrat" hidden>
+    <span class="komprese-volby" data-pro="komprimovat" hidden>
+      <select name="komprese_format" aria-label="Formát" title="Formát výsledku. JPEG: obrázky s průhledností zůstanou PNG. WebP: menší soubory, průhlednost zůstane.">
+        <?php foreach (Komprese::FORMATY as $k => $t): if ($k === 'webp' && !function_exists('imagewebp')) continue; ?><option value="<?= $k ?>"<?= $k === Komprese::VYCHOZI['format'] ? ' selected' : '' ?>><?= Ui::h($t) ?></option><?php endforeach; ?></select>
+      <label class="mala" title="Kvalita 40–95 (doporučeno 75–85)">Kvalita <input type="number" name="komprese_kvalita" min="40" max="95" value="<?= Komprese::VYCHOZI['kvalita'] ?>" style="width:5.5em"></label>
+      <select name="komprese_rozmer" aria-label="Největší rozměr" title="Delší strana po zmenšení">
+        <?php foreach (Komprese::ROZMERY as $k => $t): ?><option value="<?= $k ?>"<?= $k === Komprese::VYCHOZI['rozmer'] ? ' selected' : '' ?>><?= Ui::h($k ? 'Nejvýš ' . $t : $t) ?></option><?php endforeach; ?></select>
+      <label class="zaskrtavatko mala" title="Originál zůstane na disku a v detailu média ho vrátíte. Místo na disku se tím neuvolní."><input type="checkbox" name="komprese_ponechat" value="1" checked> <span>Ponechat originál</span></label>
+      <label class="zaskrtavatko mala" title="U JPEG zůstane v souboru EXIF, XMP, IPTC a barevný profil. Autor, licence a tagy v galerii zůstávají vždy."><input type="checkbox" name="komprese_metadata" value="1" checked> <span>Zachovat metadata</span></label>
+    </span>
     <button type="submit" class="hlavni" data-hromadne-odeslat disabled>Provést</button>
   </div>
   <div class="galerie-lista">

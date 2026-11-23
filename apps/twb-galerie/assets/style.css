@@ -403,3 +403,9 @@ body.vybirani, body.vybirani * { user-select: none; cursor: crosshair; }
   .galerie .nahled-medium, .galerie .nahled-medium img, .galerie .nahled-medium video { height: 120px; }
   .galerie figcaption { padding: .5rem; font-size: .8rem; }
 }
+
+/* ---------- hromadná komprese (0.8.0) ---------- */
+.komprese-volby { display: inline-flex; flex-wrap: wrap; align-items: center; gap: .5rem; }
+.komprese-volby[hidden] { display: none; }
+.komprese-volby label { display: inline-flex; align-items: center; gap: .3rem; }
+.komprese progress { accent-color: var(--hlavni); }

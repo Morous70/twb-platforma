@@ -255,3 +255,37 @@ test('uid s cizími znaky nemůže vyjít ze složky', function () {
     eq(realpath($dir), realpath(dirname((string)$hotovo)), 'soubor zůstal ve své složce');
     ok(!glob(dirname($dir) . '/*.part'), 'nic nevzniklo o úroveň výš');
 });
+
+test('0.2.0: komprimujPodrobne – vlastní nastavení, velikosti a originál ponechaný', function () {
+    [$h, $g] = galerie(['img_auto' => '0']);
+    $id = $g->uloz(obrazek(3000, 2000), 'foto.jpg')['id'];
+    $pred = (int)$g->radek($id)['velikost'];
+    $s = ['max_w' => 1200, 'max_h' => 1200, 'quality' => 70, 'min_kb' => 0];
+    $v = $g->komprimujPodrobne($id, $s);
+    ok($v !== null);
+    eq([$pred, true], [$v['pred'], $v['original']]);
+    ok($v['po'] < $pred);
+    eq($v['po'] + $pred, $v['disk_po'], 'originál zůstal na disku');
+    eq(1200, (int)$g->radek($id)['sirka']);
+    eq(2, count(soubory($h->datovaSlozka . '/media')));
+    // znovu se stejným nastavením a jenMensi: výsledek není menší než současný soubor → beze změny
+    eq(null, $g->komprimujPodrobne($id, $s, true, true, true));
+    eq(2, count(soubory($h->datovaSlozka . '/media')), 'nic nového na disku');
+});
+
+test('0.2.0: komprimujPodrobne bez originálu uvolní místo a návrat už nejde; WebP změní příponu', function () {
+    [$h, $g] = galerie(['img_auto' => '0']);
+    $id = $g->uloz(obrazek(3000, 2000), 'foto.jpg')['id'];
+    $g->komprimuj($id, true);                               // nejdřív s originálem (výchozí nastavení)
+    $m = $g->radek($id);
+    $disk = array_sum(array_map('filesize', glob($h->datovaSlozka . '/media/*')));
+    $v = $g->komprimujPodrobne($id, ['max_w' => 1000, 'max_h' => 1000, 'quality' => 60, 'min_kb' => 0, 'format' => 'webp'], true, false);
+    ok($v !== null);
+    eq($disk, $v['disk_pred']);
+    eq($v['po'], $v['disk_po']);
+    $m2 = $g->radek($id);
+    eq([null, 'foto.webp', 'image/webp', 1000], [$m2['pvSoubor'], $m2['nazev'], $m2['mime'], (int)$m2['sirka']]);
+    eq([basename((string)$m2['soubor'])], soubory($h->datovaSlozka . '/media'), 'originál i předchozí verze smazány');
+    eq(false, $g->obnovPuvodni($id));
+    ok(!in_array($m['pvSoubor'], soubory($h->datovaSlozka . '/media'), true));
+});

@@ -13,7 +13,7 @@ use TWB\Licence\Licence;
  */
 final class Schema implements ModulMigrace
 {
-    public static function verze(): int { return 6; }
+    public static function verze(): int { return 7; }
 
     /** Tabulky, které musí existovat dřív než cokoli jiného (nastavení a protokol). */
     public static function zakladniTabulky(Db $db): void
@@ -89,6 +89,13 @@ final class Schema implements ModulMigrace
             $sloupce = array_column($db->q('PRAGMA table_info(api_keys)')->fetchAll(), 'name');
             if (!in_array('rate_window', $sloupce, true)) $db->q('ALTER TABLE api_keys ADD COLUMN rate_window INTEGER NULL');
             if (!in_array('rate_count', $sloupce, true)) $db->q('ALTER TABLE api_keys ADD COLUMN rate_count INTEGER NOT NULL DEFAULT 0');
+        }
+        if ($zVerze < 7) {
+            // 0.8: veřejný web – kategorie zobrazená na webu, popis, obálka a pořadí (výchozí: nic není veřejné)
+            $sloupce = array_column($db->q('PRAGMA table_info(categories)')->fetchAll(), 'name');
+            foreach (['web_public' => 'INTEGER NOT NULL DEFAULT 0', 'web_description' => 'TEXT NULL', 'web_cover_id' => 'INTEGER NULL', 'web_order' => 'INTEGER NOT NULL DEFAULT 0'] as $sl => $typ) {
+                if (!in_array($sl, $sloupce, true)) $db->q("ALTER TABLE categories ADD COLUMN $sl $typ");
+            }
         }
     }
 }

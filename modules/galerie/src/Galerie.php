@@ -325,9 +325,25 @@ final class Galerie
     // ---------- komprese ----------
 
     /**
-     * Zkomprimuje obrázek (vždy z originálu, pokud existuje). Vrací popis změny, nebo null, když se nic nezměnilo.
+     * Zkomprimuje obrázek (vždy z originálu, pokud existuje) podle nastavení aplikace a originál ponechá.
+     * Vrací popis změny, nebo null, když se nic nezměnilo.
      */
     public function komprimuj(int $id, bool $vynutit): ?string
+    {
+        $v = $this->komprimujPodrobne($id, Obrazky::nastaveni($this->host->nastaveni), $vynutit);
+        return $v['popis'] ?? null;
+    }
+
+    /**
+     * Komprese s vlastním nastavením (hromadná akce): $s jako u Obrazky::komprimuj (i `format`, `metadata`).
+     * $ponechatOriginal false = originál i dosavadní soubor se smažou a návrat už nejde (uvolní místo na disku).
+     * $jenMensi = výsledek musí být menší než dosavadní soubor (u už komprimovaného obrázku se jinak nic nezmění).
+     * Vrací null (není obrázek / nevyplatí se) nebo popis a velikosti: pred/po = soubor, který se vydává;
+     * disk_pred/disk_po = všechny soubory položky na disku (s originálem).
+     * @param array{max_w: int, max_h: int, quality: int, min_kb: int, format?: string, metadata?: bool} $s
+     * @return ?array{popis: string, pred: int, po: int, disk_pred: int, disk_po: int, original: bool}
+     */
+    public function komprimujPodrobne(int $id, array $s, bool $vynutit = true, bool $ponechatOriginal = true, bool $jenMensi = false): ?array
     {
         if (!$this->sloupce->maKompresi()) return null;
         $r = $this->radek($id);
@@ -335,22 +351,50 @@ final class Galerie
         $zdroj = $r['pvSoubor'] ?: $r['soubor'];
         $zdrojCesta = $this->slozka . '/' . basename((string)$zdroj);
         if (!is_file($zdrojCesta)) return null;
-        $v = Obrazky::komprimuj($zdrojCesta, Obrazky::nastaveni($this->host->nastaveni), $vynutit);
+        $v = Obrazky::komprimuj($zdrojCesta, $s, $vynutit);
         if (!$v) return null;
+        $velikost = strlen($v['data']);
+        $soucasna = $this->slozka . '/' . basename((string)$r['soubor']);
+        $pred = is_file($soucasna) ? (int)filesize($soucasna) : (int)$r['velikost'];
+        if ($jenMensi && $velikost >= $pred) return null;
+        $pvCesta = $r['pvSoubor'] ? $this->slozka . '/' . basename((string)$r['pvSoubor']) : null;
+        $pvVelikost = $pvCesta && $r['pvSoubor'] !== $r['soubor'] && is_file($pvCesta) ? (int)filesize($pvCesta) : 0;
+        $diskPred = $pred + $pvVelikost;
 
         $soubor = bin2hex(random_bytes(12)) . '.' . $v['ext'];
-        file_put_contents($this->slozka . "/$soubor", $v['data']);
+        if (file_put_contents($this->slozka . "/$soubor", $v['data']) !== $velikost) {
+            @unlink($this->slozka . "/$soubor");
+            throw new RuntimeException('Zkomprimovaný soubor se nepodařilo uložit (plný disk?).');
+        }
         $puvodniVelikost = $r['pvSoubor'] ? (int)$r['pvVelikost'] : (int)$r['velikost'];
-        $nove = ['soubor' => $soubor, 'mime' => $v['mime'], 'velikost' => strlen($v['data']), 'md5' => md5($v['data']),
+        $nove = ['soubor' => $soubor, 'mime' => $v['mime'], 'velikost' => $velikost, 'md5' => md5($v['data']),
                  'nazev' => Obrazky::nazevSPriponou((string)$r['nazev'], $v['ext']), 'sirka' => $v['w'], 'vyska' => $v['h']];
-        if ($r['pvSoubor']) {
+        $smazat = [];
+        if (!$ponechatOriginal) {
+            // bez návratu: dosavadní soubor i originál pryč (až po uložení řádku)
+            $smazat[] = (string)$r['soubor'];
+            if ($r['pvSoubor']) $smazat[] = (string)$r['pvSoubor'];
+            $nove += ['pvSoubor' => null, 'pvMime' => null, 'pvVelikost' => null, 'pvSirka' => null, 'pvVyska' => null];
+            $diskPo = $velikost;
+        } elseif ($r['pvSoubor']) {
             // už komprimovaný → starou zmenšenou verzi nahradit, originál zůstává
-            if ($r['soubor'] !== $r['pvSoubor']) @unlink($this->slozka . '/' . basename((string)$r['soubor']));
+            if ($r['soubor'] !== $r['pvSoubor']) $smazat[] = (string)$r['soubor'];
+            $diskPo = $velikost + $pvVelikost;
         } else {
             $nove += ['pvSoubor' => $r['soubor'], 'pvMime' => $r['mime'], 'pvVelikost' => (int)$r['velikost'], 'pvSirka' => $v['ow'], 'pvVyska' => $v['oh']];
+            $diskPo = $velikost + $pred;
         }
-        $this->uprav($id, $nove);
-        return sprintf('%s: %s → %s, %d×%d → %d×%d', $r['nazev'], Obrazky::velikost($puvodniVelikost), Obrazky::velikost(strlen($v['data'])), $v['ow'], $v['oh'], $v['w'], $v['h']);
+        try {
+            $this->uprav($id, $nove);
+        } catch (\Throwable $e) {
+            @unlink($this->slozka . "/$soubor");
+            throw $e;
+        }
+        foreach (array_unique($smazat) as $f) @unlink($this->slozka . '/' . basename($f));
+        return [
+            'popis' => sprintf('%s: %s → %s, %d×%d → %d×%d', $r['nazev'], Obrazky::velikost($puvodniVelikost), Obrazky::velikost($velikost), $v['ow'], $v['oh'], $v['w'], $v['h']),
+            'pred' => $pred, 'po' => $velikost, 'disk_pred' => $diskPred, 'disk_po' => $diskPo, 'original' => $ponechatOriginal,
+        ];
     }
 
     /** Vrátí původní (nekomprimovaný) soubor. */

@@ -12,6 +12,8 @@
       "titulek": "Jak na…",
       "stranky": [
         "nahravani",
+        "verejny-web",
+        "komprese",
         "verejne-odkazy",
         "kategorie-a-tagy",
         "autor-a-licence"
@@ -40,6 +42,8 @@
     "protokol": "prihlaseni",
     "medium": "verejne-odkazy",
     "kategorie": "kategorie-a-tagy",
-    "api": "api"
+    "api": "api",
+    "web": "verejny-web",
+    "komprese": "komprese"
   }
 }

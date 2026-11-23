@@ -10,13 +10,14 @@ final class Ui
         'galerie' => 'Galerie',
         'kategorie' => 'Kategorie',
         'nastaveni' => 'Nastavení',
+        'web' => 'Veřejný web',
         'api' => 'API a MCP',
     ];
 
     /** Skupiny postranního menu (nadpis => stránky). Nápověda je v menu navíc, nemá vlastní titulek v MENU. */
     public const SKUPINY = [
         'Média' => ['prehled', 'galerie', 'kategorie'],
-        'Správa' => ['nastaveni', 'api', 'napoveda'],
+        'Správa' => ['web', 'nastaveni', 'api', 'napoveda'],
     ];
 
     /** Ikony ve stylu Feather Icons (MIT, viz assets/LICENCE.txt): obsah prvku <svg viewBox="0 0 24 24">. */
@@ -25,6 +26,7 @@ final class Ui
         'galerie' => '<path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>',
         'kategorie' => '<path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/>',
         'api' => '<polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/>',
+        'web' => '<circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>',
         'nastaveni' => '<line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/>',
         'napoveda' => '<circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/>',
         'odhlasit' => '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>',

@@ -27,6 +27,7 @@ Nahrajte ZIP stejně jako jiný soubor. Aplikace ho rozbalí a každý obrázek 
 ## Komprese obrázků
 Obrázky se ve výchozím stavu nahrávají beze změny. V **Nastavení → Komprese obrázků** můžete zapnout zmenšení velkých obrázků hned po nahrání.
 U jednotlivého obrázku je v detailu tlačítko **Zkomprimovat**. Originál se vždy uchová a tlačítko **Vrátit původní soubor** ho obnoví.
+Víc obrázků najednou zkomprimuje hromadná akce **Komprimovat obrázky** v galerii (formát, kvalita, rozměr, s originálem i bez) – viz [Komprimovat obrázky](komprese).
 
 ## Nahrazení souboru
 V detailu média je rámeček **Nahradit soubor**. Nový soubor musí být stejného druhu (obrázek za obrázek, video za video).

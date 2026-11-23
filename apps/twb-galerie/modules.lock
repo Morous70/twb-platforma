@@ -2,12 +2,12 @@
     "app": "twb-galerie",
     "moduly": {
         "aktualizace": "0.1.0",
-        "galerie": "0.1.1",
+        "galerie": "0.2.0",
         "jadro": "0.1.0",
         "licence": "0.1.0",
         "mcp": "0.1.0",
         "napoveda": "0.2.0",
-        "obrazky": "0.1.0",
+        "obrazky": "0.2.0",
         "prihlaseni": "0.1.0",
         "tagy": "0.1.0",
         "zalohy": "0.1.0"

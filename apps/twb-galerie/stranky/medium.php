@@ -49,6 +49,10 @@ if ($post) {
                 $media->zrusOdkaz($id);
                 $zprava = 'Veřejný odkaz je vypnutý.';
                 break;
+            case 'web-uvodni':
+                $app->web()->nastavUvodni($id);
+                $zprava = 'Obrázek je teď úvodní fotkou veřejného webu.';
+                break;
             case 'komprimovat':
                 $z = $galerie->komprimuj($id, true);
                 $zprava = $z ? 'Zkomprimováno: ' . $z : 'Obrázek už je dost malý, komprese ho nezmenší.';
@@ -113,6 +117,7 @@ $src = 'media.php?id=' . $id . '&v=' . substr((string)$m['md5'], 0, 8);
       <a class="tlacitko maly" href="<?= Ui::h($src . '&stahnout=1') ?>">Stáhnout</a>
       <?php if ($m['kind'] === 'image' && !$m['orig_filename']): ?><?= $ui->tlacitko('Zkomprimovat', 'komprimovat', [], 'maly') ?><?php endif; ?>
       <?php if ($m['orig_filename']): ?><?= $ui->tlacitko('Vrátit původní soubor', 'original', [], 'maly', 'Vrátit původní (nekomprimovaný) soubor?') ?><?php endif; ?>
+      <?php if ($m['kind'] === 'image' && $m['public_key'] && !$m['archived_at']): ?><?= $ui->tlacitko((int)($app->web()->nastaveni()['uvod_id'] ?? 0) === (int)$m['id'] ? 'Je úvodní fotkou webu' : 'Úvodní fotka webu', 'web-uvodni', [], 'maly') ?><?php endif; ?>
     </div>
   </div>
 </section>

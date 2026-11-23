@@ -20,6 +20,7 @@ Hosting Wedos NoLimit, PHP 8.5 (kód běží od 8.1), SQLite, bez Composeru.
 | 0.6.2 | Galerie v administraci: přepínač zobrazení **Mřížka / Seznam / Jen média** (zapamatuje se), větší náhled obrázku (1920 px) nebo přehrání videa v modálním okně s listováním šipkami; `media.php?nahled=<px>` | hotovo |
 | 0.6.3 | Okno náhledu jednotně v celé aplikaci (galerie, přehled, detail včetně originálu, PDF a veřejného odkazu); nic se neotevírá v nové kartě, Ctrl i prostřední klik otevřou okno; v okně Stáhnout místo Původní soubor | hotovo |
 | 0.6.4 | Ctrl/Cmd+klik a prostřední klik na náhled otevře **detail média ve stejné kartě** (ne zvětšený obrázek ani novou kartu); v detailu, kde detail není kam otevřít, otevře okno | hotovo |
+| 0.8.0 | **Veřejný web** na kořeni domény (`verejne.php` přes `DirectoryIndex`, administrace zůstává na `index.php`): hlavní stránka podle návrhu (logo, menu Domů / Galerie / O galerii, tlačítko Přihlášení do administrace, úvodní fotka s nadpisem a tlačítkem, dvě reklamní plochy, karty Vybrané galerie s obálkou a počtem fotografií, patička), stránky Galerie (veřejné kategorie, nejnovější fotky), galerie kategorie (mřížka, stránkování, okno náhledu) a O galerii. Ukazuje jen kategorie označené jako veřejné a v nich obrázky s veřejným odkazem mimo archiv. Stránka administrace **Veřejný web** (texty, úvodní fotka, reklamní plochy, O galerii, vypnutí), u kategorie zveřejnění, popis, obálka a pořadí, v detailu tlačítko Úvodní fotka webu. **Hromadná akce Komprimovat obrázky** (JPEG/WebP, kvalita, největší rozměr, ponechat originál, zachovat metadata) po dávkách se souhrnem ušetřeného místa. Moduly obrazky 0.2.0 (WebP, přenos metadat JPEG) a galerie 0.2.0 (`komprimujPodrobne`) | hotovo |
 | 0.7.2 | **MCP a ZIP:** `nahraj_medium` se ZIPem zapíše autora, licenci a údaje o AI (`ai_model` → autor a licence „Vygenerováno AI“) každému rozbalenému obrázku, ne jen tagy, kategorii a poznámku. Popis nástroje ZIP zmiňuje, takže ho AI klient zná. Nápověda „Připojení AI (MCP)“ má oddíl ZIP s obrázky | hotovo |
 | 0.7.1 | **Oprava:** nahrání přes API, MCP i v aplikaci už nespadne na „Nepodporovaný typ souboru .“, když jiná aplikace pošle jako `nazev` jen titulek bez přípony (např. „Čelní pohled 30°“) nebo soubor jako `application/octet-stream`. Přípona se vezme z názvu poslaného souboru, jinak podle obsahu (finfo, bez něj první bajty) – jen z povolených typů. Hláška uvádí zjištěný typ obsahu | hotovo |
 | 0.7.0 | **MCP server** (`mcp.php`) pro Claude, ChatGPT a další AI klienty: médium vytvořené AI jde poslat rovnou do galerie (z adresy nebo base64) s názvem, tagy, kategorií, autorem, licencí, modelem a promptem; hledání, detail, úprava údajů, kategorie, licence a tagy. Přihlášení OAuth 2.1 (konektor v Claude.ai / ChatGPT, souhlas v administraci) nebo API klíčem (Claude Code). Nový modul platformy `mcp`. Stránka **API a MCP** s adresou a seznamem připojení, nápověda „Připojení AI (MCP)“ | hotovo |
@@ -27,6 +28,7 @@ Hosting Wedos NoLimit, PHP 8.5 (kód běží od 8.1), SQLite, bez Composeru.
 
 ## Struktura
 ```
+verejne.php      veřejný web (kořen domény přes DirectoryIndex): ?s=domu | galerie [&k=<id-název>&strana=] | o-galerii; index.php?s=… sem předá také
 index.php        administrace (?p=stránka), přihlášení, zapomenuté heslo (?zapomenute), nové heslo z e-mailu (?reset=token)
 install.php      první spuštění: config.php (když chybí), databáze, heslo, e-mail pro obnovu hesla
 google.php       přihlášení / propojení Google účtu (OpenID Connect)
@@ -41,10 +43,10 @@ api.php          JSON API api.php/v1/… (klíč v Authorization: Bearer nebo X-
 mcp.php          MCP server pro AI klienty (Streamable HTTP, OAuth token tgoa_… nebo API klíč tgk_…), popis help/sprava/mcp.md
 oauth.php        OAuth 2.1 pro MCP konektory: ?akce=metadata|metadata-zdroje|register|authorize|token|revoke
 .well-known/     oauth-authorization-server a oauth-protected-resource (přepis v .htaccess na PHP soubory → oauth.php)
-lib/             App (služby a moduly), Schema, Media (i náhledy a podpisy), Hledani, Metadata, Kategorie, Vydej, Api, ApiKlice, Mcp (nástroje MCP), ZAdresy, Ui, Vstup, Http, ProtokolDb, Chyba, autoload, bootstrap
-stranky/         prehled, galerie, medium (detail), kategorie, api (klíče a připojení MCP), nastaveni, protokol, napoveda, prihlaseni, souhlas (OAuth)
+lib/             App (služby a moduly), Schema, Web (veřejný web), Komprese (hromadná komprese), Media (i náhledy a podpisy), Hledani, Metadata, Kategorie, Vydej, Api, ApiKlice, Mcp (nástroje MCP), ZAdresy, Ui, Vstup, Http, ProtokolDb, Chyba, autoload, bootstrap
+stranky/         prehled, galerie, medium (detail), komprese (průběh hromadné komprese), kategorie, web (Veřejný web), api (klíče a připojení MCP), nastaveni, protokol, napoveda, prihlaseni, souhlas (OAuth)
 help/            nápověda v Markdownu (_obsah.json + sekce/stránka.md), vykresluje modul napoveda
-assets/          style.css, app.js (nahrávání, štítky tagů `input[data-stitky]`, výběr tažením, okno náhledu, Passkey…), ikona.svg
+assets/          verejne.css a verejne.js (veřejný web), style.css, app.js (nahrávání, štítky tagů `input[data-stitky]`, výběr tažením, okno náhledu, Passkey…), ikona.svg
 data/            databáze galerie.sqlite, média (media/), náhledy (nahledy/, dají se kdykoli vytvořit znovu), části nahrávání (tmp/),
                  zálohy (backups/) – chráněno .htaccess
 ```
@@ -162,6 +164,35 @@ data/            databáze galerie.sqlite, média (media/), náhledy (nahledy/, 
 - Každý zápis přes MCP je v protokolu i s klientem (`MCP (Claude): nahraj_medium`).
 - **Připojení v Claude**: Nastavení → Konektory → Přidat vlastní konektor → adresa `https://galerie.kazbo.eu/mcp.php` (OAuth Client ID nechat prázdné) → přihlásit se do galerie
   a povolit. Claude Code: `claude mcp add --transport http galerie https://galerie.kazbo.eu/mcp.php --header "Authorization: Bearer tgk_…"`.
+
+## Veřejný web (0.8)
+- **Adresy**: `.htaccess` má `DirectoryIndex verejne.php index.php`, takže `https://galerie.kazbo.eu/` je veřejný web a administrace zůstává
+  na `index.php` (přihlášení, `?p=…`, odkaz obnovy hesla, Google, OAuth – vše míří na `index.php` výslovně). Odkazy webu jsou `./`, `?s=galerie`,
+  `?s=galerie&k=<id>-<název>` a `?s=o-galerii`; `index.php` s `s=` a bez `p=` (jen GET) předá na `verejne.php`, kdyby hosting `DirectoryIndex` nepoužil.
+  Tlačítko Přihlášení do administrace vede na `index.php?p=prehled`.
+- **Co je veřejné** (`MediaGalerie\Web`, podmínka `VEREJNA`): kategorie s `categories.web_public = 1` a v ní média `kind = image`, `archived_at IS NULL`,
+  `public_key IS NOT NULL`. Výchozí stav po aktualizaci: žádná kategorie veřejná, web ukáže „Galerie se připravuje“. Vypnutý veřejný odkaz
+  fotku z webu odebere. Videa, PDF a originály se na webu neukazují.
+- **Obrázky** jsou trvalé náhledy veřejného odkazu (`Media::adresyNahledu`, 640 px v kartách a mřížce, 1920 px úvodní fotka a okno náhledu),
+  takže je drží mezipaměť prohlížeče a nová podepsaná adresa není potřeba.
+- **Schéma 7**: `categories.web_public`, `web_description`, `web_cover_id` (obálka; když není veřejná, nejnovější fotka), `web_order` (pořadí, pak název).
+- **Nastavení** `web` (JSON, je v zálohách): zapnuto, název, štítek, nadpis, podnadpis, tlačítko, poznámka, `uvod_id` (úvodní fotka – obrázek
+  s veřejným odkazem mimo archiv; bez ní obálka první veřejné kategorie), vybrané galerie (nadpis, podnadpis, počet 0–12), `banner1` a `banner2`
+  (zobrazit, štítek, text, tlačítko, odkaz – jen http(s), mailto, tel nebo adresa na webu), text O galerii (Markdown modulu napoveda), patička,
+  tlačítko administrace, `noindex`. Vypnutý web přesměruje na `index.php`.
+- **Hlavičky**: `Cache-Control: public, max-age=60`, CSP jen vlastní skripty a styly, `X-Frame-Options: SAMEORIGIN`. Skript `assets/verejne.js` (menu na mobilu, okno
+  náhledu se šipkami, Esc a posunem prstu), styl `assets/verejne.css` (bez externích písem).
+
+## Hromadná komprese (0.8)
+- Galerie → hromadná akce **Komprimovat obrázky**: formát JPEG (průhledné zůstanou PNG) nebo WebP, kvalita 40–95, největší rozměr (`Komprese::ROZMERY`),
+  **Ponechat originál** (výchozí) a **Zachovat metadata** (JPEG → JPEG: EXIF s orientací 1, XMP, IPTC, ICC; modul obrazky 0.2.0).
+- **Po krocích** (`MediaGalerie\Komprese`): úloha v místním nastavení `komprese_uloha`, stránka `?p=komprese` volá `akce=krok` (JSON, `Accept: application/json`)
+  dokud není hotovo; krok trvá nejvýš 8 s a aspoň jeden obrázek, `set_time_limit(120)`, `ignore_user_abort`. Před každým obrázkem se zapíše `rozpracovano`;
+  kdyby PHP spadlo (paměť), další krok obrázek přeskočí jako chybu. Bez JS tlačítko Pokračovat. Přerušit = už hotové zůstanou.
+- **Originály**: s ponecháním zůstává `orig_filename` (návrat v detailu, další komprese vždy z originálu), takže místo na disku přibude zmenšená kopie.
+  Bez ponechání se originál i předchozí verze smažou (`Galerie::komprimujPodrobne(..., ponechatOriginal: false)`) a místo se uvolní; aplikace se předem zeptá.
+  Výsledek, který není menší než dosavadní soubor, se zahodí (`jenMensi`).
+- **Souhrn**: počet zkomprimovaných, přeskočených a chyb, velikost vydávaných souborů před a po, změna místa na disku; zapíše se do protokolu.
 
 ## Zálohy, aktualizace a cron (0.4)
 - **Zálohy** (modul zalohy, `App::zalohy`): šifrovaný ZIP `twb-galerie-…zip` v `data/backups/` s tabulkami `App::TABULKY` a skupinou souborů `media`

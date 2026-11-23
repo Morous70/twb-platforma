@@ -115,3 +115,51 @@ test('název s jinou příponou a velikost česky', function () {
     eq('230 kB', Obrazky::velikost(235520));
     eq('1 kB', Obrazky::velikost(10));
 });
+
+/** JPEG s EXIF orientací (IFD0: 0x0112), XMP a ICC segmentem; obrazová data ze šumu. */
+function jpegSMetadaty(string $cesta, int $orientace, int $w = 2400, int $h = 1600): void
+{
+    ob_start(); imagejpeg(sumovy($w, $h), null, 95); $jpg = (string)ob_get_clean();
+    $tiff = "II*\0" . pack('V', 8) . pack('v', 1) . pack('vvVvv', 0x0112, 3, 1, $orientace, 0) . pack('V', 0);
+    $exif = "Exif\0\0" . $tiff;
+    $xmp = "http://ns.adobe.com/xap/1.0/\0<x:xmpmeta xmlns:x=\"adobe:ns:meta/\">Autor: Jana</x:xmpmeta>";
+    $icc = "ICC_PROFILE\0\x01\x01" . str_repeat('p', 40);
+    $seg = fn(int $m, string $d) => "\xFF" . chr($m) . pack('n', strlen($d) + 2) . $d;
+    file_put_contents($cesta, "\xFF\xD8" . $seg(0xE1, $exif) . $seg(0xE1, $xmp) . $seg(0xE2, $icc) . substr($jpg, 2));
+}
+
+test('0.2.0: JPEG → JPEG přenese EXIF, XMP a ICC; orientace se nastaví na 1', function () use ($S, $TMP) {
+    $p = "$TMP/meta.jpg"; jpegSMetadaty($p, 6);
+    $r = Obrazky::komprimuj($p, ['metadata' => true] + $S, true);
+    ok($r !== null);
+    eq(["jpg", 720, 1080], [$r["ext"], $r["w"], $r["h"]], "otočeno podle EXIF a zmenšeno");
+    ok(str_contains($r['data'], 'Autor: Jana'), 'XMP zůstal');
+    ok(str_contains($r['data'], 'ICC_PROFILE'), 'barevný profil zůstal');
+    $f = "$TMP/vysledek.jpg"; file_put_contents($f, $r['data']);
+    eq(1, Obrazky::exifOrientace($f), 'orientace 1 – obrázek se znovu neotočí');
+    ok(@imagecreatefromstring($r['data']) !== false, 'platný JPEG');
+    eq([720, 1080], array_slice((array)getimagesize($f), 0, 2));
+    $bez = Obrazky::komprimuj($p, $S, true);
+    ok(!str_contains($bez['data'], 'Autor: Jana'), 'bez volby metadata se nepřenášejí (dosavadní chování)');
+});
+
+test('0.2.0: výstup WebP (i s průhledností), bez podpory se použije JPG', function () use ($S, $TMP) {
+    if (!function_exists('imagewebp')) { ok(true); return; }
+    $p = "$TMP/w.png"; ulozPng(sumovy(2400, 1600), $p);
+    $r = Obrazky::komprimuj($p, ['format' => 'webp', 'quality' => 70] + $S, true);
+    eq(['webp', 'image/webp', 1620, 1080], [$r['ext'], $r['mime'], $r['w'], $r['h']]);
+    eq('RIFF', substr($r['data'], 0, 4));
+    $p = "$TMP/wa.png"; ulozPng(sumovy(600, 400, true), $p);
+    $r = Obrazky::komprimuj($p, ['format' => 'webp', 'quality' => 80] + $S, true);
+    $im = imagecreatefromstring($r['data']);
+    ok(Obrazky::maPruhlednost($im), 'průhlednost zůstala');
+});
+
+test('0.2.0: vložení metadat do JPEG bez APP0 i s ním; jiný soubor beze změny', function () use ($TMP) {
+    $seg = "\xFF\xE1\x00\x06Exif";
+    eq("\xFF\xD8" . $seg . "\xFF\xDB", Obrazky::vlozMetadataJpeg("\xFF\xD8\xFF\xDB", $seg));
+    eq("\xFF\xD8\xFF\xE0\x00\x04ab" . $seg . "\xFF\xDB", Obrazky::vlozMetadataJpeg("\xFF\xD8\xFF\xE0\x00\x04ab\xFF\xDB", $seg));
+    eq('PNG', Obrazky::vlozMetadataJpeg('PNG', $seg));
+    file_put_contents("$TMP/x.png", 'neni jpeg');
+    eq('', Obrazky::metadataJpeg("$TMP/x.png"));
+});

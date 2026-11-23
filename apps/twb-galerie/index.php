@@ -7,6 +7,8 @@ use MediaGalerie\{App, Ui};
 $app = require __DIR__ . '/lib/bootstrap.php';
 if (!$app->nainstalovano()) { header('Location: install.php'); exit; }
 $app->migruj();
+// veřejný web (0.8.0): ?s=… bez ?p= vede na verejne.php (záloha, kdyby hosting nepoužil DirectoryIndex z .htaccess)
+if (isset($_GET['s']) && !isset($_GET['p']) && $_SERVER['REQUEST_METHOD'] !== 'POST') { require __DIR__ . '/verejne.php'; exit; }
 $relace = $app->relace();
 $ui = new Ui($app);
 $p = (string)($_GET['p'] ?? 'prehled');
@@ -34,10 +36,10 @@ if ($p === 'odhlasit') {
     $ui->presmeruj('index.php');
 }
 
-$stranky = ['prehled', 'galerie', 'medium', 'kategorie', 'api', 'napoveda', 'nastaveni', 'protokol'];
+$stranky = ['prehled', 'galerie', 'medium', 'komprese', 'kategorie', 'web', 'api', 'napoveda', 'nastaveni', 'protokol'];
 if (!in_array($p, $stranky, true)) { http_response_code(404); $p = 'prehled'; }
-$menu = ['protokol' => 'nastaveni', 'medium' => 'galerie'][$p] ?? $p;
-$titulek = Ui::MENU[$p] ?? ['protokol' => 'Protokol'][$p] ?? '';
+$menu = ['protokol' => 'nastaveni', 'medium' => 'galerie', 'komprese' => 'galerie'][$p] ?? $p;
+$titulek = Ui::MENU[$p] ?? ['protokol' => 'Protokol', 'komprese' => 'Komprimovat obrázky'][$p] ?? '';
 $kontext = $p;   // stránky smějí $p přepsat
 ob_start();
 try {

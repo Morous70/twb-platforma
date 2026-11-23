@@ -75,8 +75,43 @@
     hromadne.addEventListener('submit', function (e) {
       var n = boxy().filter(function (b) { return b.checked; }).length;
       if (akce.value === 'smazat' && !window.confirm('Smazat ' + n + ' vybraných souborů? Veřejné odkazy přestanou fungovat.')) e.preventDefault();
+      var ponechat = hromadne.querySelector('[name="komprese_ponechat"]');
+      if (akce.value === 'komprimovat' && ponechat && !ponechat.checked
+        && !window.confirm('Zkomprimovat ' + n + ' vybraných médií bez ponechání originálů? Původní soubory se smažou a nepůjde je vrátit.')) e.preventDefault();
     });
     obnov();
+  }
+
+  // ---------- Hromadná komprese (0.8.0): kroky po několika sekundách, dokud není hotovo ----------
+  var komprese = document.querySelector('[data-komprese]');
+  if (komprese && window.fetch) {
+    var prubeh = komprese.querySelector('[data-komprese-prubeh]');
+    var textKomprese = komprese.querySelector('[data-komprese-text]');
+    var pokracovat = komprese.querySelector('[data-komprese-pokracovat]');
+    if (pokracovat) pokracovat.hidden = true;
+    var pokusu = 0;
+    var krok = function () {
+      var fd = new FormData();
+      fd.append('csrf', komprese.dataset.csrf);
+      fd.append('akce', 'krok');
+      fetch(window.location.href, { method: 'POST', body: fd, credentials: 'same-origin', headers: { 'Accept': 'application/json' } })
+        .then(function (r) { return r.json(); })
+        .then(function (j) {
+          if (!j.ok) throw new Error(j.error || 'Chyba');
+          pokusu = 0;
+          prubeh.max = j.celkem; prubeh.value = j.zpracovano;
+          if (j.hotovo) { window.location.reload(); return; }
+          textKomprese.textContent = 'Zpracováno ' + j.zpracovano + ' z ' + j.celkem + ' obrázků, zatím ušetřeno ' + j.usetreno_text + '. Nechte stránku otevřenou, obrázky se zpracovávají po dávkách.';
+          krok();
+        })
+        .catch(function () {
+          // výpadek spojení nebo spadlý krok: zkusit znovu (spadlý obrázek server příště přeskočí), po 5 pokusech nechat na uživateli
+          if (++pokusu <= 5) { setTimeout(krok, 2000 * pokusu); return; }
+          textKomprese.textContent = 'Zpracování se zastavilo (spojení nebo server). Klikněte na Pokračovat.';
+          if (pokracovat) pokracovat.hidden = false;
+        });
+    };
+    krok();
   }
 
   // ---------- Okno náhledu (celá aplikace): obrázek, video, PDF v modálním okně. Šipky listují, Esc zavře. ----------

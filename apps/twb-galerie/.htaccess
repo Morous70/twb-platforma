@@ -1,5 +1,7 @@
 # TWB Media galerie – Apache (Wedos NoLimit)
 Options -Indexes
+# kořen domény = veřejný web (0.8.0); administrace zůstává na index.php
+DirectoryIndex verejne.php index.php
 <FilesMatch "^(VERSION|modules\.lock|build\.json|BUILD\.json|config\.php|config\.sample\.php|README\.md)$">
     Require all denied
 </FilesMatch>

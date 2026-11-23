@@ -13,6 +13,7 @@ final class Media
 {
     public const DRUHY = ['image' => 'Obrázky', 'video' => 'Videa', 'pdf' => 'PDF'];
     public const RAZENI = ['nove' => 'Nejnovější', 'stare' => 'Nejstarší', 'nazev' => 'Název', 'velikost' => 'Největší'];
+    /** Médií na stránku v administraci. 0.8.5: dělitelné 2, 3, 4, 6, 8 i 12 – počty sloupců mřížky v assets/style.css (.galerie-obal). */
     public const NA_STRANKU = 48;
     /** Náhled v mřížce: nejdelší strana v px. */
     public const NAHLED_PX = 480;

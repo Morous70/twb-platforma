@@ -322,6 +322,55 @@ test('web 0.8.4 na serveru: doporučení v detailu a hromadně, sekce na hlavní
     ok(str_contains($b->odesli('index.php?p=galerie', ['akce' => 'nedoporucit', 'ids' => [$ids['soukrome']]])['body'], 'Doporučení zrušeno: 1.'));
 });
 
+test('0.8.5: mřížky jen v celých řádcích – velikosti stránek, doporučené v pásmech šířky', function () {
+    // administrace: 48 dělitelné všemi počty sloupců z assets/style.css; web: 36 a 12 dělitelné 2, 3, 4, 6
+    foreach ([2, 3, 4, 6, 8, 12] as $s) eq(0, \MediaGalerie\Media::NA_STRANKU % $s, "administrace $s sloupců");
+    foreach ([2, 3, 4, 6] as $s) { eq(0, Web::NA_STRANKU % $s, "web $s sloupců"); eq(0, 12 % $s, "nejnovější $s sloupců"); }
+    $css = (string)file_get_contents(KOREN . '/apps/twb-galerie/assets/style.css');
+    preg_match_all('~\.galerie-obal > \.galerie(?:\.zobrazeni-media)? \{ --sloupce: (\d+); \}~', $css, $m);
+    ok(count($m[1]) >= 8, 'sloupce galerie v CSS');
+    foreach ($m[1] as $s) eq(0, \MediaGalerie\Media::NA_STRANKU % (int)$s, "CSS administrace $s");
+    $vcss = (string)file_get_contents(KOREN . '/apps/twb-galerie/assets/verejne.css');
+    preg_match_all('~\.fotky:not\(\.doporucene\) \{ --sloupce: (\d+); \}~', $vcss, $m);
+    eq(['3', '4', '6'], $m[1]);
+    ok(preg_match('~^\.fotky \{[^}]*auto-fill~m', $vcss) === 0, 'fotky bez auto-fill');
+    foreach (Web::PASMA_DOPORUCENYCH as $p) ok(str_contains($vcss, ".foto.skryt-$p { display: none; }"), "CSS pásmo $p");
+    // doporučené: 5 × 2 a 10 fotek → desktop 10, ≤1100 10, ≤860 (4 sl.) 8, ≤640 (3 sl.) 6, ≤420 (2 sl.) 4
+    eq(['d' => 10, 'm1100' => 10, 'm860' => 8, 'm640' => 6, 'm420' => 4], Web::viditelneDoporucene(10, 5, 2));
+    // jen 9 doporučených pro 5 × 2: neúplný řádek se neukáže
+    eq(['d' => 5, 'm1100' => 5, 'm860' => 8, 'm640' => 6, 'm420' => 4], Web::viditelneDoporucene(9, 5, 2));
+    // méně než jeden řádek: všechny
+    eq(['d' => 2, 'm1100' => 2, 'm860' => 2, 'm640' => 2, 'm420' => 2], Web::viditelneDoporucene(2, 5, 2));
+    eq(['d' => 24, 'm1100' => 18, 'm860' => 12, 'm640' => 9, 'm420' => 6], Web::viditelneDoporucene(24, 8, 3));
+    eq(['d' => 3, 'm1100' => 3, 'm860' => 3, 'm640' => 3, 'm420' => 2], Web::viditelneDoporucene(3, 3, 1));
+});
+
+test('0.8.5 na serveru: obaly mřížek, třídy skryt- u doporučených navíc', function () {
+    $s = new TestServer();
+    register_shutdown_function(fn() => $s->zastav());
+    $b = new Prohlizec($s);
+    $b->jdi('install.php');
+    $b->jdi('install.php', ['heslo' => 'tajneheslo1', 'heslo2' => 'tajneheslo1']);
+    $app = new App(KOREN . '/apps/twb-galerie', ['data_dir' => $s->data . '/data', 'base_url' => $s->url]);
+    [, $ver, , $ids] = webData($app);
+    $m = $app->media();
+    $nove = [$ids['ok']];
+    for ($i = 0; $i < 4; $i++) $nove[] = $m->nahraj(fotka(320, 200, 30 + $i), "Rad{$i}.jpg", [], $ver)['id'];
+    $m->nastavDoporucene($nove, true);   // 5 veřejných doporučených, výchozí 4 × 2
+    $anon = new Prohlizec($s);
+    $r = $anon->jdi('verejne.php');
+    ok(str_contains($r['body'], '<div class="fotky-obal"><div class="fotky doporucene sloupce-4" data-fotky>'), 'obal doporučených');
+    // 5 fotek ve 4 sloupcích: desktop 4 (pátá skryta), ≤640 3, ≤420 4
+    eq(1, substr_count($r['body'], 'skryt-d '), 'na desktopu jedna navíc');
+    eq(1, substr_count($r['body'], 'skryt-m1100'));
+    eq(2, substr_count($r['body'], 'skryt-m640'));
+    eq(1, substr_count($r['body'], 'skryt-m420'));
+    $k = $anon->jdi('verejne.php?s=galerie&k=' . $ver);
+    ok(str_contains($k['body'], '<div class="fotky-obal"><div class="fotky" data-fotky>') && !str_contains($k['body'], 'skryt-'), 'galerie kategorie bez skrývání');
+    $g = $b->jdi('index.php?p=galerie');
+    ok(str_contains($g['body'], '<div class="galerie-obal"><div class="galerie zobrazeni-'), 'obal galerie v administraci');
+});
+
 test('komprese: úloha jen z obrázků, kroky, souhrn, bez originálu uvolní místo', function () {
     [$app, $ver, , $ids] = webData();
     $k = $app->komprese();

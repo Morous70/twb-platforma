@@ -231,6 +231,97 @@ test('web 0.8.3 na serveru: pozice reklamy, měření, cookie lišta, zásady, a
     eq(200, $anon->jdi('index.php?s=ads.txt')['code']);
 });
 
+test('web 0.8.4: doporučené – jen veřejné, náhodně, počet sloupce × řádky, nastavení 3–8 a 1–5', function () {
+    [$app, $ver, $sou, $ids] = webData();
+    $web = $app->web();
+    $m = $app->media();
+    $n = $web->nastaveni();
+    eq(['Doporučené fotografie', 4, 2], [$n['doporucene_nadpis'], $n['doporucene_sloupce'], $n['doporucene_radky']], 'výchozí');
+    eq([], $web->doporucene(), 'nic doporučeného');
+    eq(5, $m->nastavDoporucene(array_values($ids), true), 'označí všechna');
+    eq(0, $m->nastavDoporucene([$ids['ok']], true), 'už doporučená se nepočítá');
+    eq([$ids['ok']], array_map(fn($r) => (int)$r['id'], $web->doporucene()), 'jen veřejný obrázek (ne bez odkazu, archiv, soukromá kategorie, video)');
+    eq(['verejne' => 1, 'celkem' => 5], $web->pocetDoporucenych());
+    eq('', $web->procNeniNaWebu($m->radek($ids['ok'])));
+    ok(str_contains($web->procNeniNaWebu($m->radek($ids['soukrome'])), 'není zobrazená'), 'důvod: neveřejná kategorie');
+    ok(str_contains($web->procNeniNaWebu($m->radek($ids['archiv'])), 'archivu'), 'důvod: archiv');
+    ok(str_contains($web->procNeniNaWebu($m->radek($ids['bezodkazu'])), 'veřejný odkaz'), 'důvod: bez odkazu');
+    // víc veřejných doporučených než míst: počet = sloupce × řádky, pořadí náhodné
+    $nove = [];
+    for ($i = 0; $i < 7; $i++) $nove[] = $m->nahraj(fotka(320, 200, 10 + $i), "Dop{$i}.jpg", [], $ver)['id'];
+    $m->nastavDoporucene($nove, true);
+    $p = ['nazev' => 'G', 'nadpis' => 'N', 'tlacitko' => 'T', 'vybrane_nadpis' => 'V', 'vybrane_pocet' => '4', 'zapnuto' => '1'];
+    $web->uloz('zaklad', $p + ['doporucene_nadpis' => 'To nejlepší', 'doporucene_podnadpis' => 'Pod', 'doporucene_sloupce' => '3', 'doporucene_radky' => '1']);
+    $n = $web->nastaveni();
+    eq(['To nejlepší', 'Pod', 3, 1], [$n['doporucene_nadpis'], $n['doporucene_podnadpis'], $n['doporucene_sloupce'], $n['doporucene_radky']]);
+    eq(3, count($web->doporucene()));
+    $poradi = [];
+    for ($i = 0; $i < 25; $i++) $poradi[implode(',', array_map(fn($r) => $r['id'], $web->doporucene(8)))] = true;
+    ok(count($poradi) > 1, 'výběr je náhodný');
+    foreach ([['doporucene_sloupce' => '2'], ['doporucene_sloupce' => '9'], ['doporucene_radky' => '0'], ['doporucene_radky' => '6'], ['doporucene_radky' => 'x'], ['doporucene_nadpis' => '']] as $spatne) {
+        try { $web->uloz('zaklad', $spatne + $p); ok(false, json_encode($spatne)); } catch (Chyba) { ok(true); }
+    }
+    $web->uloz('zaklad', $p);   // formulář bez polí doporučených: zůstanou
+    eq(['To nejlepší', 3, 1], [$web->nastaveni()['doporucene_nadpis'], $web->nastaveni()['doporucene_sloupce'], $web->nastaveni()['doporucene_radky']]);
+    $app->nastaveni()->uloz('web', json_encode(['doporucene_sloupce' => 20, 'doporucene_radky' => -1]));
+    eq([8, 1], [$web->nastaveni()['doporucene_sloupce'], $web->nastaveni()['doporucene_radky']], 'ručně pokažené nastavení se srovná do rozsahu');
+    eq(7, $m->nastavDoporucene($nove, false));
+    eq([$ids['ok'], $ids['bezodkazu'], $ids['soukrome'], $ids['video']], array_map(fn($r) => (int)$r['id'], array_reverse($m->seznam(['doporucene' => '1'])['polozky'])), 'filtr Jen doporučené (aktivní, ne archiv)');
+});
+
+test('web 0.8.4 na serveru: doporučení v detailu a hromadně, sekce na hlavní stránce, nastavení, API', function () {
+    $s = new TestServer();
+    register_shutdown_function(fn() => $s->zastav());
+    $b = new Prohlizec($s);
+    $b->jdi('install.php');
+    $b->jdi('install.php', ['heslo' => 'tajneheslo1', 'heslo2' => 'tajneheslo1']);
+    $app = new App(KOREN . '/apps/twb-galerie', ['data_dir' => $s->data . '/data', 'base_url' => $s->url]);
+    [, $ver, $sou, $ids] = webData($app);
+    $anon = new Prohlizec($s);
+    ok(!str_contains($anon->jdi('verejne.php')['body'], 'sekce-doporucene'), 'bez doporučených sekce není');
+
+    $r = $b->jdi('index.php?p=medium&id=' . $ids['ok']);
+    ok(str_contains($r['body'], 'Označit jako doporučenou'));
+    $r = $b->odesli('index.php?p=medium&id=' . $ids['ok'], ['akce' => 'doporucit']);
+    ok(str_contains($r['body'], 'Fotografie je doporučená.') && str_contains($r['body'], 'Doporučená – zrušit'));
+    $r = $anon->jdi('verejne.php');
+    ok(str_contains($r['body'], '<section class="sekce sekce-doporucene">') && str_contains($r['body'], 'Doporučené fotografie')
+        && str_contains($r['body'], 'class="fotky doporucene sloupce-4" data-fotky') && str_contains($r['body'], 'data-titulek="Les"'), 'sekce na hlavní stránce');
+    ok(str_contains($r['body'], "script-src 'self';") || !str_contains($anon->posledniHlavicky, 'unsafe-inline'), 'přísná CSP zůstává (bez style=)');
+    ok(!preg_match('~sekce-doporucene.*style="~s', $r['body']), 'mřížka bez inline stylu');
+
+    // hromadně: soukromou fotku doporučit jde, na webu ale není; detail řekne proč
+    $b->jdi('index.php?p=galerie');
+    $r = $b->odesli('index.php?p=galerie', ['akce' => 'doporucit', 'ids' => [$ids['soukrome'], $ids['ok']]]);
+    ok(str_contains($r['body'], 'Označeno jako doporučené: 1.'), 'hromadná akce');
+    ok(str_contains($r['body'], '★ Doporučená'), 'štítek v galerii');
+    $r = $b->jdi('index.php?p=galerie&doporucene=1');
+    ok(str_contains($r['body'], 'Tajné.jpg') && str_contains($r['body'], 'Les.jpg') && !str_contains($r['body'], 'Bez odkazu.jpg'), 'filtr Jen doporučené');
+    ok(str_contains($b->jdi('index.php?p=medium&id=' . $ids['soukrome'])['body'], 'Kategorie média není zobrazená na veřejném webu.'));
+    ok(!str_contains($anon->jdi('verejne.php')['body'], 'Tajné'), 'soukromá doporučená se na webu neukáže');
+
+    // nastavení v administraci
+    $r = $b->jdi('index.php?p=web');
+    ok(str_contains($r['body'], 'name="doporucene_sloupce"') && str_contains($r['body'], 'name="doporucene_radky"') && str_contains($r['body'], '<strong>1</strong> na webu (dalších 1 není veřejných)'));
+    ok(str_contains($r['body'], '<option value="8"') && !str_contains($r['body'], 'name="doporucene_radky"><option value="0"'));
+    $r = $b->odesli('index.php?p=web', ['akce' => 'zaklad', 'zapnuto' => '1', 'nazev' => 'G', 'nadpis' => 'N', 'tlacitko' => 'T', 'vybrane_nadpis' => 'V', 'vybrane_pocet' => '4',
+        'doporucene_nadpis' => 'Tipy', 'doporucene_podnadpis' => 'Vybrali jsme', 'doporucene_sloupce' => '6', 'doporucene_radky' => '3']);
+    ok(str_contains($r['body'], 'Nastavení webu uloženo'));
+    $r = $anon->jdi('verejne.php');
+    ok(str_contains($r['body'], '<h2>Tipy</h2><p>Vybrali jsme</p>') && str_contains($r['body'], 'fotky doporucene sloupce-6'), 'nadpis, podnadpis a mřížka');
+    $r = $b->odesli('index.php?p=web', ['akce' => 'zaklad', 'zapnuto' => '1', 'nazev' => 'G', 'nadpis' => 'N', 'tlacitko' => 'T', 'vybrane_nadpis' => 'V', 'vybrane_pocet' => '4',
+        'doporucene_nadpis' => 'Tipy', 'doporucene_sloupce' => '12', 'doporucene_radky' => '3']);
+    ok(str_contains($r['body'], 'musí být 3 až 8'), 'mimo rozsah');
+
+    // zrušení v detailu a hromadně
+    $b->jdi('index.php?p=medium&id=' . $ids['ok']);
+    $r = $b->odesli('index.php?p=medium&id=' . $ids['ok'], ['akce' => 'nedoporucit']);
+    ok(str_contains($r['body'], 'Doporučení zrušeno.'));
+    ok(!str_contains($anon->jdi('verejne.php')['body'], 'sekce-doporucene'), 'po zrušení sekce zmizí');
+    $b->jdi('index.php?p=galerie');
+    ok(str_contains($b->odesli('index.php?p=galerie', ['akce' => 'nedoporucit', 'ids' => [$ids['soukrome']]])['body'], 'Doporučení zrušeno: 1.'));
+});
+
 test('komprese: úloha jen z obrázků, kroky, souhrn, bez originálu uvolní místo', function () {
     [$app, $ver, , $ids] = webData();
     $k = $app->komprese();

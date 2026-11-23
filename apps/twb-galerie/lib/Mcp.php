@@ -85,6 +85,7 @@ final class Mcp
                     'orientace' => ['type' => 'string', 'enum' => array_keys(Media::ORIENTACE)],
                     'razeni' => ['type' => 'string', 'enum' => array_merge(array_keys(Media::RAZENI), ['relevance', 'nahodne'])],
                     'archiv' => ['type' => 'boolean', 'description' => 'true = hledat v archivu místo aktivních médií'],
+                    'doporucene' => ['type' => 'boolean', 'description' => 'true = jen média označená jako doporučená (veřejný web z nich ukazuje náhodný výběr)'],
                     'strana' => ['type' => 'integer', 'minimum' => 1, 'description' => 'Stránka (výchozí 1)'],
                     'na_stranku' => ['type' => 'integer', 'minimum' => 1, 'maximum' => self::MAX_NA_STRANKU, 'description' => 'Počet na stránku (výchozí 20, nejvýš ' . self::MAX_NA_STRANKU . ')'],
                 ]],
@@ -98,7 +99,7 @@ final class Mcp
                 ]],
                 fn(array $a) => ['medium' => $this->medium($a)]),
             new Nastroj('uprav_medium', 'Upravit údaje média',
-                'Změní údaje existujícího média: název, poznámku, kategorii, tagy (nahradí dosavadní), autora, licenci, archiv. Zadej jen pole, která se mají změnit; '
+                'Změní údaje existujícího média: název, poznámku, kategorii, tagy (nahradí dosavadní), autora, licenci, archiv, doporučení pro veřejný web. Zadej jen pole, která se mají změnit; '
                 . 'prázdný text nebo null pole vymaže. Soubor ani médium nemaže.',
                 ['type' => 'object', 'required' => ['id'], 'properties' => [
                     'id' => ['type' => 'integer', 'minimum' => 1],
@@ -107,6 +108,7 @@ final class Mcp
                     'kategorie' => ['type' => ['integer', 'string', 'null'], 'description' => 'id nebo název kategorie; null = bez kategorie'],
                     'tagy' => $tagy + ['description' => 'Nový seznam tagů (nahradí dosavadní)'],
                     'archiv' => ['type' => 'boolean', 'description' => 'true = přesunout do archivu, false = vrátit z archivu'],
+                    'doporucena' => ['type' => 'boolean', 'description' => 'true = doporučená fotografie (veřejný web z doporučených ukazuje náhodný výběr), false = zrušit doporučení'],
                     'licence' => ['type' => ['string', 'null'], 'maxLength' => 2000, 'description' => 'Licence jako text (původní znění z metadat)'],
                 ] + array_map(fn($p) => ['type' => [$p['type'], 'null']] + (isset($p['enum']) ? ['enum' => array_merge($p['enum'], [null])] : []) + $p, $licence)],
                 fn(array $a) => $this->uprav($a), 'write', zapis: true),
@@ -239,6 +241,7 @@ final class Mcp
         if (isset($a['kategorie']) && $a['kategorie'] !== '' && $a['kategorie'] !== null) $get['kategorie'] = (string)$a['kategorie'];
         if ($t = $this->tagy($a['tagy'] ?? null)) $get['tagy'] = implode(',', $t);
         if (!empty($a['archiv'])) $get['archiv'] = '1';
+        if (!empty($a['doporucene'])) $get['doporucene'] = '1';
         $r = $this->api('GET', 'media', $get);
         return ['celkem' => $r['celkem'], 'strana' => $r['strana'], 'stran' => $r['stran'], 'media' => array_map(fn($m) => $this->kratce($m), $r['media'])];
     }
@@ -275,7 +278,7 @@ final class Mcp
             'rozmer' => $m['sirka'] !== null && $m['vyska'] !== null ? "{$m['sirka']}×{$m['vyska']}" : null,
             'kategorie' => $m['kategorie']['nazev'] ?? null, 'tagy' => $m['tagy'], 'poznamka' => $poz,
             'autor' => $m['autor'], 'licence' => $m['licence_nazev'], 'atribuce' => $m['atribuce']['text'] ?? null,
-            'archivovano' => $m['archivovano'] !== null, 'vytvoreno' => $m['vytvoreno'],
+            'archivovano' => $m['archivovano'] !== null, 'doporucena' => $m['doporucena'] ?? false, 'vytvoreno' => $m['vytvoreno'],
             'stranka_url' => $m['stranka_url'], 'verejny_odkaz' => $m['verejny_odkaz'],
             'nahled' => $m['nahledy']['640'] ?? null,
         ];

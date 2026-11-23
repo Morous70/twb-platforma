@@ -34,9 +34,9 @@ claude mcp add --transport http galerie https://galerie.kazbo.eu/mcp.php --heade
 | Nástroj | Co dělá | Oprávnění |
 |---|---|---|
 | `nahraj_medium` | uloží nové médium z adresy (`url`) nebo z base64 (`data_base64`, do 20 MB) s názvem, tagy, kategorií, poznámkou, autorem a licencí | zápis |
-| `hledej_media` | seznam médií s hledáním (`q`) a filtry (druh, kategorie, tagy, orientace, archiv), stránkování | čtení |
+| `hledej_media` | seznam médií s hledáním (`q`) a filtry (druh, kategorie, tagy, orientace, archiv, doporučené), stránkování | čtení |
 | `detail_media` | všechny údaje média podle id nebo odkazu: atribuce, veřejný odkaz, náhledy 150–1920 px | čtení |
-| `uprav_medium` | změní název, poznámku, kategorii, tagy, autora, licenci nebo archiv | zápis |
+| `uprav_medium` | změní název, poznámku, kategorii, tagy, autora, licenci, archiv nebo doporučení | zápis |
 | `seznam_kategorii` | kategorie s počtem médií | čtení |
 | `vytvor_kategorii` | založí kategorii | zápis |
 | `seznam_licenci` | číselník licencí (kódy pro `licence_kod`) | čtení |

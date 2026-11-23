@@ -33,7 +33,7 @@ Všechny cesty začínají `https://galerie.kazbo.eu/api.php/v1`.
 | GET `/media/odkaz` | najde médium podle odkazu z této galerie (`?url=`) | čtení |
 | GET `/media/{id}/soubor` | stáhne soubor (`?sirka=` zmenšený obrázek, `?original=1` originál před kompresí, `?stahnout=1`) | čtení |
 | POST `/media` | nahraje soubor (i ZIP s obrázky) nebo stáhne soubor z adresy | zápis |
-| PATCH `/media/{id}` | změní název, poznámku, kategorii, tagy, archiv, autora nebo licenci | zápis |
+| PATCH `/media/{id}` | změní název, poznámku, kategorii, tagy, archiv, doporučení, autora nebo licenci | zápis |
 | POST `/media/{id}/soubor` | nahradí soubor (odkaz a údaje zůstanou) | zápis |
 | POST `/media/{id}/odkaz` | vytvoří nový veřejný odkaz (starý přestane fungovat) | zápis |
 | DELETE `/media/{id}/odkaz` | vypne veřejný odkaz | zápis |
@@ -60,6 +60,7 @@ Všechny cesty začínají `https://galerie.kazbo.eu/api.php/v1`.
 | `min_sirka`, `min_vyska` | nejmenší šířka nebo výška v px |
 | `id` | jen tato média, id oddělená čárkou (nejvýš 200); bez `razeni` v zadaném pořadí |
 | `archiv` | `1` = jen archiv (jinak jen média mimo archiv) |
+| `doporucene` | `1` = jen doporučené fotografie (veřejný web z nich ukazuje náhodný výběr) |
 | `razeni` | `nove` (výchozí bez `q`), `relevance` (výchozí s `q`), `stare`, `nazev`, `velikost`, `nahodne` |
 | `seme` | u `razeni=nahodne`: stejné semeno = stejné pořadí (i při stránkování). Bez něj odpověď vrátí nové `seme`, které pošlete s další stránkou. |
 | `strana`, `na_stranku` | stránkování, na stránku 1–200 (výchozí 48) |
@@ -82,6 +83,7 @@ Každé médium má:
 | `nahledy_plati_do` | null = adresy náhledů jsou trvalé (médium má veřejný odkaz); jinak čas, do kdy platí (1–2 hodiny) |
 | `stranka_url` | trvalá adresa média (detail v administraci) – podle ní jiná aplikace pozná, že médium už má |
 | `archivovano`, `vytvoreno`, `komprimovano` | archiv, datum nahrání, údaje originálu před kompresí |
+| `doporucena` | true = doporučená fotografie pro veřejný web |
 | `verejny_odkaz` | veřejný odkaz na soubor (null, když je vypnutý) |
 | `soubor` | adresa ke stažení přes API (s klíčem) |
 
@@ -115,7 +117,7 @@ U obrázku se z metadat načtou štítky (přidají se k `tagy`), autor a licenc
 ZIP (soubor s příponou `.zip`) se rozbalí a každý obrázek se uloží zvlášť; odpověď má místo `medium` pole `media`, seznam přeskočených souborů `preskoceno` a `chyby`. Kategorie, tagy a poznámka platí pro všechny obrázky.
 
 ## Úpravy
-PATCH `/media/{id}` s tělem JSON (`Content-Type: application/json`), jen pole, která chcete změnit: `nazev`, `poznamka`, `kategorie` (id nebo null), `tagy` (pole), `archiv` (true/false), `autor`, `licence`, `licence_url` (http/https; null nebo prázdný text údaj smaže), `licence_kod` (kód z `GET /licence`, null = neuvedena) a `licence_verze` (u CC číslo verze, u `jine` název licence).
+PATCH `/media/{id}` s tělem JSON (`Content-Type: application/json`), jen pole, která chcete změnit: `nazev`, `poznamka`, `kategorie` (id nebo null), `tagy` (pole), `archiv` (true/false), `doporucena` (true/false), `autor`, `licence`, `licence_url` (http/https; null nebo prázdný text údaj smaže), `licence_kod` (kód z `GET /licence`, null = neuvedena) a `licence_verze` (u CC číslo verze, u `jine` název licence).
 Když je některé pole neplatné, nezmění se nic.
 
 ## Příklady

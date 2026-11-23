@@ -9,11 +9,11 @@ use TWB\Licence\Licence;
  * Databázové schéma aplikace (SQLite). Verze se ukládá v module_versions pod „twb-galerie“
  * a do nastavení schema_version (podle ní moduly zalohy a aktualizace poznají starší data).
  * Tabulku media zakládá modul galerie, tabulky auth_tokens a passkeys modul prihlaseni.
- * Aplikace k media přidává kategorii, poznámku, autora, licenci (text, kód a verzi) a klíč veřejného odkazu (sloupce, které modul nezná a nečte).
+ * Aplikace k media přidává kategorii, poznámku, autora, licenci (text, kód a verzi), klíč veřejného odkazu a příznak doporučené (sloupce, které modul nezná a nečte).
  */
 final class Schema implements ModulMigrace
 {
-    public static function verze(): int { return 7; }
+    public static function verze(): int { return 8; }
 
     /** Tabulky, které musí existovat dřív než cokoli jiného (nastavení a protokol). */
     public static function zakladniTabulky(Db $db): void
@@ -96,6 +96,12 @@ final class Schema implements ModulMigrace
             foreach (['web_public' => 'INTEGER NOT NULL DEFAULT 0', 'web_description' => 'TEXT NULL', 'web_cover_id' => 'INTEGER NULL', 'web_order' => 'INTEGER NOT NULL DEFAULT 0'] as $sl => $typ) {
                 if (!in_array($sl, $sloupce, true)) $db->q("ALTER TABLE categories ADD COLUMN $sl $typ");
             }
+        }
+        if ($zVerze < 8) {
+            // 0.8.4: doporučená fotografie – veřejný web z doporučených ukazuje náhodný výběr (výchozí: nic není doporučené)
+            $sloupce = array_column($db->q('PRAGMA table_info(media)')->fetchAll(), 'name');
+            if (!in_array('featured', $sloupce, true)) $db->q('ALTER TABLE media ADD COLUMN featured INTEGER NOT NULL DEFAULT 0');
+            $db->q('CREATE INDEX IF NOT EXISTS media_featured ON media (featured)');
         }
     }
 }

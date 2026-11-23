@@ -12,6 +12,8 @@ namespace MediaGalerie;
  * jeden měřicí kód do hlavičky nebo na konec stránky. Se zapnutým souhlasem s cookies se měřicí ani reklamní kód nenačte,
  * dokud ho návštěvník nepovolí (na stránce je jen jako neživý <template>, oživí ho assets/verejne.js). Kód zadává jen
  * přihlášený správce; stránka s kódem dostane volnější CSP. Stránka Zásady ochrany osobních údajů (vlastní Markdown nebo vzor).
+ * Doporučené fotografie (0.8.4): na hlavní stránce náhodný výběr z veřejných fotek označených jako doporučená (media.featured),
+ * v mřížce s nastaveným počtem sloupců (3–8) a řádků (1–5).
  */
 final class Web
 {
@@ -27,6 +29,11 @@ final class Web
         'vybrane_nadpis' => 'Vybrané galerie',
         'vybrane_podnadpis' => 'Vyberte si, co chcete prohlédnout.',
         'vybrane_pocet' => 4,
+        // doporučené fotografie (0.8.4): náhodný výběr z médií označených jako doporučená, mřížka sloupce × řádky
+        'doporucene_nadpis' => 'Doporučené fotografie',
+        'doporucene_podnadpis' => 'Náhodný výběr toho nejlepšího z galerie.',
+        'doporucene_sloupce' => 4,
+        'doporucene_radky' => 2,
         'o_galerii' => "Fotografie, příběhy a okamžiky zachycené na jednom místě.\n\nNové fotografie průběžně přibývají.",
         'patka' => '© TWB Galerie',
         'odkaz_administrace' => true,
@@ -67,6 +74,9 @@ final class Web
     /** Největší délka vloženého kódu (reklamní pozice, měření) a obsahu ads.txt. */
     public const MAX_KOD = 20000;
     public const NA_STRANKU = 36;
+    /** Mřížka doporučených fotografií: počet sloupců a řádků. */
+    public const SLOUPCE = [3, 8];
+    public const RADKY = [1, 5];
     /** Náhled v kartách a mřížce, velký obrázek v okně a úvodní fotka (delší strana v px, z Media::NAHLEDY). */
     public const PX_NAHLED = 640;
     public const PX_VELKY = 1920;
@@ -96,6 +106,8 @@ final class Web
             }
         }
         if (!isset(self::UMISTENI_MERENI[$out['mereni_umisteni']])) $out['mereni_umisteni'] = 'konec';
+        $out['doporucene_sloupce'] = min(self::SLOUPCE[1], max(self::SLOUPCE[0], (int)$out['doporucene_sloupce']));
+        $out['doporucene_radky'] = min(self::RADKY[1], max(self::RADKY[0], (int)$out['doporucene_radky']));
         return $out;
     }
 
@@ -123,9 +135,12 @@ final class Web
         $n['zapnuto'] = !empty($p['zapnuto']);
         $n['odkaz_administrace'] = !empty($p['odkaz_administrace']);
         $n['skryt_vyhledavacum'] = !empty($p['skryt_vyhledavacum']);
+        // doporučené fotografie (0.8.4): chybí-li pole ve formuláři (starší klient), zůstane dosavadní hodnota
+        $p += array_intersect_key($n, array_flip(['doporucene_nadpis', 'doporucene_podnadpis', 'doporucene_sloupce', 'doporucene_radky']));
         foreach (['nazev' => ['Název webu', 60, true], 'stitek' => ['Štítek nad nadpisem', 60, false], 'nadpis' => ['Nadpis', 120, true],
             'podnadpis' => ['Podnadpis', 300, false], 'tlacitko' => ['Text tlačítka', 40, true], 'poznamka' => ['Poznámka pod tlačítkem', 120, false],
             'vybrane_nadpis' => ['Nadpis vybraných galerií', 80, true], 'vybrane_podnadpis' => ['Podnadpis vybraných galerií', 160, false],
+            'doporucene_nadpis' => ['Nadpis doporučených fotografií', 80, true], 'doporucene_podnadpis' => ['Podnadpis doporučených fotografií', 160, false],
             'patka' => ['Patička', 200, false]] as $k => [$popis, $max, $povinne]) {
             $n[$k] = (string)Vstup::text($p, $k, $popis, $max, $povinne);
         }
@@ -133,6 +148,11 @@ final class Web
         $pocet = (int)($p['vybrane_pocet'] ?? 4);
         if ($pocet < 0 || $pocet > 12) throw new Chyba('Počet vybraných galerií musí být 0 až 12.');
         $n['vybrane_pocet'] = $pocet;
+        foreach (['doporucene_sloupce' => [self::SLOUPCE, 'Počet sloupců doporučených fotografií'], 'doporucene_radky' => [self::RADKY, 'Počet řádků doporučených fotografií']] as $k => [[$od, $do], $popis]) {
+            $c = filter_var($p[$k], FILTER_VALIDATE_INT);
+            if ($c === false || $c < $od || $c > $do) throw new Chyba("{$popis} musí být {$od} až {$do}.");
+            $n[$k] = $c;
+        }
         $uvod = (int)($p['uvod_id'] ?? 0);
         if ($uvod > 0 && !$this->muzeBytUvodni($uvod)) throw new Chyba('Úvodní fotka musí být obrázek se zapnutým veřejným odkazem, který není v archivu.');
         $n['uvod_id'] = $uvod > 0 ? $uvod : null;
@@ -336,6 +356,38 @@ final class Web
         $strana = min(max(1, $strana), $stran);
         $polozky = $this->app->db->q("SELECT m.* $kde ORDER BY m.id DESC LIMIT " . $naStranku . ' OFFSET ' . (($strana - 1) * $naStranku), [$kategorie])->fetchAll();
         return ['polozky' => $polozky, 'celkem' => $celkem, 'strana' => $strana, 'stran' => $stran];
+    }
+
+    /**
+     * Doporučené fotky pro hlavní stránku: náhodný výběr z veřejných fotek označených jako doporučená (každé načtení jiný,
+     * stránka se drží v mezipaměti 60 s). Počet = sloupce × řádky z nastavení. @return list<array<string, mixed>>
+     */
+    public function doporucene(?int $pocet = null): array
+    {
+        $n = $this->nastaveni();
+        $pocet ??= (int)$n['doporucene_sloupce'] * (int)$n['doporucene_radky'];
+        return $this->app->db->q('SELECT m.*, c.name AS kategorie_nazev FROM media m JOIN categories c ON c.id = m.category_id WHERE m.featured = 1 AND ' . self::VEREJNA
+            . ' ORDER BY RANDOM() LIMIT ' . max(1, $pocet))->fetchAll();
+    }
+
+    /** Kolik doporučených fotek může web ukázat a kolik je doporučených celkem (i neveřejných). @return array{verejne: int, celkem: int} */
+    public function pocetDoporucenych(): array
+    {
+        return [
+            'verejne' => (int)$this->app->db->q('SELECT COUNT(*) FROM media m JOIN categories c ON c.id = m.category_id WHERE m.featured = 1 AND ' . self::VEREJNA)->fetchColumn(),
+            'celkem' => (int)$this->app->db->q('SELECT COUNT(*) FROM media WHERE featured = 1')->fetchColumn(),
+        ];
+    }
+
+    /** Proč se doporučená fotka na webu neukáže ('' = ukáže se). @param array<string, mixed> $m */
+    public function procNeniNaWebu(array $m): string
+    {
+        if ($m['kind'] !== 'image') return 'Na webu se ukazují jen obrázky.';
+        if ($m['archived_at']) return 'Médium je v archivu.';
+        if (!$m['public_key']) return 'Médium nemá zapnutý veřejný odkaz.';
+        if (!$m['category_id']) return 'Médium není v žádné kategorii – na webu jsou jen fotky z kategorií zobrazených na veřejném webu.';
+        if (!$this->app->db->q('SELECT web_public FROM categories WHERE id = ?', [$m['category_id']])->fetchColumn()) return 'Kategorie média není zobrazená na veřejném webu.';
+        return '';
     }
 
     /** Nejnovější fotky ze všech veřejných kategorií. @return list<array<string, mixed>> */

@@ -49,6 +49,11 @@ if ($post) {
                 $media->zrusOdkaz($id);
                 $zprava = 'Veřejný odkaz je vypnutý.';
                 break;
+            case 'doporucit':
+            case 'nedoporucit':
+                $media->nastavDoporucene([$id], $akce === 'doporucit');
+                $zprava = $akce === 'doporucit' ? 'Fotografie je doporučená.' : 'Doporučení zrušeno.';
+                break;
             case 'web-uvodni':
                 $app->web()->nastavUvodni($id);
                 $zprava = 'Obrázek je teď úvodní fotkou veřejného webu.';
@@ -118,7 +123,9 @@ $src = 'media.php?id=' . $id . '&v=' . substr((string)$m['md5'], 0, 8);
       <?php if ($m['kind'] === 'image' && !$m['orig_filename']): ?><?= $ui->tlacitko('Zkomprimovat', 'komprimovat', [], 'maly') ?><?php endif; ?>
       <?php if ($m['orig_filename']): ?><?= $ui->tlacitko('Vrátit původní soubor', 'original', [], 'maly', 'Vrátit původní (nekomprimovaný) soubor?') ?><?php endif; ?>
       <?php if ($m['kind'] === 'image' && $m['public_key'] && !$m['archived_at']): ?><?= $ui->tlacitko((int)($app->web()->nastaveni()['uvod_id'] ?? 0) === (int)$m['id'] ? 'Je úvodní fotkou webu' : 'Úvodní fotka webu', 'web-uvodni', [], 'maly') ?><?php endif; ?>
+      <?php if ($m['kind'] === 'image' || $m['featured']): ?><?= $m['featured'] ? $ui->tlacitko('★ Doporučená – zrušit', 'nedoporucit', [], 'maly') : $ui->tlacitko('☆ Označit jako doporučenou', 'doporucit', [], 'maly') ?><?php endif; ?>
     </div>
+    <?php if ($m['featured'] && ($proc = $app->web()->procNeniNaWebu($m)) !== ''): ?><p class="slabe mala" style="margin:.5rem 0 0">Doporučená fotka se na webu zatím neukáže: <?= Ui::h($proc) ?></p><?php endif; ?>
   </div>
 </section>
 

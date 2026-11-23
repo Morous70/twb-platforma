@@ -247,6 +247,12 @@ test('API: úprava (vše nebo nic), archiv, odkaz, nahrazení, smazání', funct
     ok($r['json']['medium']['archivovano'] !== null);
     eq(1, api($s, 'GET', '/media?archiv=1', $cteni)['json']['celkem']);
     api($s, 'PATCH', "/media/$id", $zapis, json: ['archiv' => false]);
+    // 0.8.4: doporučená fotografie – pole doporucena, filtr doporucene
+    eq(false, api($s, 'GET', "/media/$id", $cteni)['json']['medium']['doporucena']);
+    eq(true, api($s, 'PATCH', "/media/$id", $zapis, json: ['doporucena' => true])['json']['medium']['doporucena']);
+    eq([$id], array_column(api($s, 'GET', '/media?doporucene=1', $cteni)['json']['media'], 'id'));
+    api($s, 'PATCH', "/media/$id", $zapis, json: ['doporucena' => false]);
+    eq(0, api($s, 'GET', '/media?doporucene=1', $cteni)['json']['celkem']);
     $stary = api($s, 'GET', "/media/$id", $cteni)['json']['medium']['verejny_odkaz'];
     $novy = api($s, 'POST', "/media/$id/odkaz", $zapis)['json']['medium']['verejny_odkaz'];
     ok($novy !== $stary && $novy !== null);

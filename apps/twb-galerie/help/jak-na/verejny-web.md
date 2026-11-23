@@ -46,14 +46,16 @@ U kategorie v **Kategorie → Upravit** nastavíte:
 Stránka galerie ukazuje fotky po 36, nejnovější první. Kliknutím se fotka zvětší, šipkami (nebo posunem prstu) se listuje, Esc okno zavře.
 V popisku je uvedení autora podle licence (např. „Foto: Jana Nováková, CC BY 4.0“).
 
-Stránka **Veřejný web** má karty **Základ a texty**, **Reklama**, **Měření návštěvnosti** a **GDPR a cookies**; každá se ukládá svým tlačítkem Uložit.
+Stránka **Veřejný web** má karty **Základ a texty** (rozdělená do skupin Stav webu, Logo a patička, Úvodní část, Vybrané galerie, Doporučené fotografie a Stránka O galerii), **Reklama**, **Měření návštěvnosti** a **GDPR a cookies**; každá se ukládá svým tlačítkem Uložit.
 
 ## Reklama
 Vypínač **Zobrazovat reklamu na veřejných stránkách** a pro každou pozici jedno pole pro **kód z reklamního systému** (AdSense, Sklik,
 Revive, Etarget…), včetně `<script>`. Kód se vypíše přesně tak, jak ho vložíte – vkládejte jen kód, kterému věříte. Prázdná pozice se nezobrazí.
 - **Pod úvodem** – hlavní stránka pod úvodní fotkou, stránka Galerie a galerie kategorie pod nadpisem (banner na šířku, např. 970×250 nebo 728×90).
-- **Pod galeriemi** – pod kartami galerií, v galerii kategorie pod mřížkou fotek (obdélník 300×250 nebo banner na šířku).
 - **Před patičkou** – úplně dole na hlavní stránce, v galeriích i na stránce O galerii.
+
+Pozice **Pod galeriemi** od verze 0.8.8 není. Pokud jste do ní měli kód, přesunul se do **Před patičkou**; když tam už jiný kód byl,
+karta Reklama ho ukáže jako *uschovaný kód* (na webu se nezobrazuje) – zkopírujte ho do některé pozice, nebo ho zaškrtnutím zahoďte.
 
 **ads.txt** web vydá na adrese `/ads.txt` (řádky dá reklamní systém, AdSense: *Weby → ads.txt*). Prázdné pole = soubor neexistuje.
 

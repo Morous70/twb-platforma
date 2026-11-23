@@ -36,7 +36,7 @@ if ($p === 'odhlasit') {
     $ui->presmeruj('index.php');
 }
 
-$stranky = ['prehled', 'galerie', 'medium', 'komprese', 'kategorie', 'web', 'api', 'napoveda', 'nastaveni', 'protokol'];
+$stranky = ['prehled', 'galerie', 'medium', 'komprese', 'kategorie', 'stitky', 'web', 'api', 'napoveda', 'nastaveni', 'protokol'];
 if (!in_array($p, $stranky, true)) { http_response_code(404); $p = 'prehled'; }
 $menu = ['protokol' => 'nastaveni', 'medium' => 'galerie', 'komprese' => 'galerie'][$p] ?? $p;
 $titulek = Ui::MENU[$p] ?? ['protokol' => 'Protokol', 'komprese' => 'Komprimovat obrázky'][$p] ?? '';

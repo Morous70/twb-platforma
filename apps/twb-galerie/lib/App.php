@@ -186,6 +186,7 @@ final class App
 
     public function media(): Media { return $this->sluzba('media', fn() => new Media($this)); }
     public function kategorie(): Kategorie { return $this->sluzba('kategorie', fn() => new Kategorie($this)); }
+    public function stitky(): Stitky { return $this->sluzba('stitky', fn() => new Stitky($this)); }
     public function apiKlice(): ApiKlice { return $this->sluzba('apiKlice', fn() => new ApiKlice($this)); }
     public function mcp(): Mcp { return $this->sluzba('mcp', fn() => new Mcp($this)); }
     public function komprese(): Komprese { return $this->sluzba('komprese', fn() => new Komprese($this)); }

@@ -1,6 +1,6 @@
 <?php
 declare(strict_types=1);
-// Veřejný web: karty Základ a texty, Reklama (0.8.3: jen kód pro každou pozici, ads.txt), Měření návštěvnosti (kód, kam vložit),
+// Veřejný web: karty Základ a texty (0.8.8: skupiny polí ve vlastních kartách), Reklama (0.8.3: jen kód pro každou pozici, ads.txt), Měření návštěvnosti (kód, kam vložit),
 // GDPR a cookies (souhlas, zásady ochrany osobních údajů). Každá karta má svůj formulář (akce = část). Proměnné: $app, $ui, $post.
 use MediaGalerie\{Ui, Chyba, Web};
 
@@ -28,8 +28,6 @@ $rozsah = static fn(array $od_do): array => array_combine(range($od_do[0], $od_d
 // po chybě ukázat odeslaný stav zaškrtávátek jen ve formuláři, který se odesílal (ostatní karty zůstanou podle uloženého nastavení)
 $castPole = ['reklama_zapnuto' => 'reklama', 'mereni_zapnuto' => 'mereni', 'cookies_souhlas' => 'gdpr', 'zasady_zapnuto' => 'gdpr'];
 $zaskrtnuto = static fn(string $nazev, bool $vychozi): bool => ($post && ($_POST['akce'] ?? '') === ($castPole[$nazev] ?? 'zaklad')) ? !empty($_POST[$nazev]) : $vychozi;
-$zaskrt = static fn(string $nazev, string $popis, bool $vychozi, string $napoveda = ''): string => '<label class="zaskrtavatko"><input type="checkbox" name="' . Ui::h($nazev) . '" value="1"'
-    . ($zaskrtnuto($nazev, $vychozi) ? ' checked' : '') . '> <span>' . Ui::h($popis) . '</span></label>' . ($napoveda !== '' ? '<small class="slabe mala" style="display:block;margin:-.25rem 0 .5rem 1.6rem">' . $napoveda . '</small>' : '');
 /** Vypínač (zaškrtávátko vzhledu přepínače) s nápovědou pod ním. */
 $vypinac = static fn(string $nazev, string $popis, bool $vychozi, string $napoveda = ''): string => '<label class="vypinac"><input type="checkbox" role="switch" name="' . Ui::h($nazev) . '" value="1"'
     . ($zaskrtnuto($nazev, $vychozi) ? ' checked' : '') . '> <span>' . Ui::h($popis) . '</span></label>' . ($napoveda !== '' ? '<p class="slabe" style="margin:.5rem 0 0">' . $napoveda . '</p>' : '');
@@ -57,39 +55,56 @@ $adresaZasad = $app->url(Web::ZASADY);
 
 <?= $panel('zaklad') ?>
 <?= $formular('zaklad') ?>
-<div class="formular karta">
-  <h2 style="margin:0">Základ</h2>
-  <?= $zaskrt('zapnuto', 'Veřejný web zapnutý', (bool)$n['zapnuto'], 'Vypnutý web přesměruje návštěvníky na přihlášení do administrace.') ?>
-  <?= $zaskrt('odkaz_administrace', 'Ukázat tlačítko „Přihlášení do administrace“', (bool)$n['odkaz_administrace'], 'Bez tlačítka se do administrace dostanete na adrese …/index.php.') ?>
-  <?= $zaskrt('skryt_vyhledavacum', 'Skrýt web před vyhledávači (noindex)', (bool)$n['skryt_vyhledavacum']) ?>
+<?php /* 0.8.8: karta rozdělená do skupin – každá skupina má vlastní kartu s nadpisem a krátkým popisem, pole vedle sebe, kde se to hodí */ ?>
+<div class="web-zaklad">
+<section class="karta formular web-skupina" aria-labelledby="sk-stav">
+  <header class="skupina-hlavicka"><h2 id="sk-stav">Stav webu</h2><p class="slabe">Zapnutí webu a co uvidí návštěvníci a vyhledávače.</p></header>
+  <?= $vypinac('zapnuto', 'Veřejný web zapnutý', (bool)$n['zapnuto'], 'Vypnutý web přesměruje návštěvníky na přihlášení do administrace.') ?>
+  <?= $vypinac('odkaz_administrace', 'Tlačítko „Přihlášení do administrace“', (bool)$n['odkaz_administrace'], 'Bez tlačítka se do administrace dostanete na adrese …/index.php.') ?>
+  <?= $vypinac('skryt_vyhledavacum', 'Skrýt web před vyhledávači (noindex)', (bool)$n['skryt_vyhledavacum']) ?>
+</section>
+
+<section class="karta formular web-skupina" aria-labelledby="sk-logo">
+  <header class="skupina-hlavicka"><h2 id="sk-logo">Logo a patička</h2><p class="slabe">Název v záhlaví každé stránky a text v patičce.</p></header>
   <?= Ui::pole('Název webu (logo)', 'nazev', $n['nazev'], ['required' => true, 'maxlength' => 60]) ?>
-  <?= Ui::pole('Patička', 'patka', $n['patka'], ['maxlength' => 200]) ?>
+  <?= Ui::pole('Patička', 'patka', $n['patka'], ['maxlength' => 200, 'placeholder' => '© …']) ?>
+</section>
 
-  <h2 style="margin:1rem 0 0">Úvodní fotka a texty</h2>
-  <?= Ui::vyber('Úvodní fotka', 'uvod_id', ['' => '— automaticky: obálka první veřejné galerie —'] + $web->moznosti(), $n['uvod_id'] ?? '', [],
-      'Jen obrázky se zapnutým veřejným odkazem (nejnovějších 500). Jde nastavit i tlačítkem v detailu média.'
-      . ($uvod ? ' Teď se ukazuje: <strong>' . Ui::h($uvod['original_name']) . '</strong>.' : ' Zatím žádná – místo fotky bude barevný přechod.')) ?>
-  <?= Ui::pole('Štítek nad nadpisem', 'stitek', $n['stitek'], ['maxlength' => 60]) ?>
-  <?= Ui::pole('Nadpis', 'nadpis', $n['nadpis'], ['required' => true, 'maxlength' => 120]) ?>
+<section class="karta formular web-skupina web-skupina-siroka" aria-labelledby="sk-uvod">
+  <header class="skupina-hlavicka"><h2 id="sk-uvod">Úvodní část hlavní stránky</h2><p class="slabe">Velká fotka nahoře s nadpisem a tlačítkem do Galerie.</p></header>
+  <div class="uvod-vyber">
+    <div class="uvod-nahled"><?php if ($uvod): ?><img src="media.php?id=<?= (int)$uvod['id'] ?>&amp;nahled=1&amp;v=<?= Ui::h(substr((string)$uvod['md5'], 0, 8)) ?>" alt="Úvodní fotka: <?= Ui::h($uvod['original_name']) ?>"><?php else: ?><span>Bez fotky – barevný přechod</span><?php endif; ?></div>
+    <?= Ui::vyber('Úvodní fotka', 'uvod_id', ['' => '— automaticky: obálka první veřejné galerie —'] + $web->moznosti(), $n['uvod_id'] ?? '', [],
+        'Jen obrázky se zapnutým veřejným odkazem (nejnovějších 500). Jde nastavit i tlačítkem v detailu média.'
+        . ($uvod ? ' Teď se ukazuje: <strong>' . Ui::h($uvod['original_name']) . '</strong>.' : '')) ?>
+  </div>
+  <div class="radek radek-2">
+    <?= Ui::pole('Štítek nad nadpisem', 'stitek', $n['stitek'], ['maxlength' => 60]) ?>
+    <?= Ui::pole('Nadpis', 'nadpis', $n['nadpis'], ['required' => true, 'maxlength' => 120]) ?>
+  </div>
   <?= Ui::pole('Podnadpis', 'podnadpis', $n['podnadpis'], ['maxlength' => 300]) ?>
-  <?= Ui::pole('Text tlačítka', 'tlacitko', $n['tlacitko'], ['required' => true, 'maxlength' => 40]) ?>
-  <?= Ui::pole('Poznámka pod tlačítkem', 'poznamka', $n['poznamka'], ['maxlength' => 120]) ?>
+  <div class="radek radek-2">
+    <?= Ui::pole('Text tlačítka', 'tlacitko', $n['tlacitko'], ['required' => true, 'maxlength' => 40]) ?>
+    <?= Ui::pole('Poznámka pod tlačítkem', 'poznamka', $n['poznamka'], ['maxlength' => 120]) ?>
+  </div>
+</section>
 
-  <h2 style="margin:1rem 0 0">Vybrané galerie</h2>
+<section class="karta formular web-skupina" aria-labelledby="sk-vybrane">
+  <header class="skupina-hlavicka"><h2 id="sk-vybrane">Vybrané galerie</h2><p class="slabe">Karty kategorií na hlavní stránce, v pořadí ze stránky <a href="<?= Ui::h(Ui::odkaz('kategorie')) ?>">Kategorie</a>.</p></header>
   <?= Ui::pole('Nadpis', 'vybrane_nadpis', $n['vybrane_nadpis'], ['required' => true, 'maxlength' => 80]) ?>
   <?= Ui::pole('Podnadpis', 'vybrane_podnadpis', $n['vybrane_podnadpis'], ['maxlength' => 160]) ?>
-  <?= Ui::pole('Počet karet na hlavní stránce', 'vybrane_pocet', (string)$n['vybrane_pocet'], ['type' => 'number', 'min' => 0, 'max' => 12],
-      'Prvních N veřejných kategorií podle pořadí nastaveného u kategorie (0 = sekce se skryje). Všechny jsou na stránce Galerie.') ?>
+  <?= Ui::pole('Počet karet', 'vybrane_pocet', (string)$n['vybrane_pocet'], ['type' => 'number', 'min' => 0, 'max' => 12],
+      'Prvních N veřejných kategorií (0 = sekce se skryje). Všechny jsou na stránce Galerie.') ?>
+</section>
 
-  <h2 style="margin:1rem 0 0">Doporučené fotografie</h2>
-  <p class="slabe" style="margin:0">Hlavní stránka ukáže pod vybranými galeriemi náhodný výběr z fotografií označených jako <strong>doporučená</strong>
-    (v detailu média nebo hromadnou akcí v <a href="<?= Ui::h(Ui::odkaz('galerie')) ?>">Galerii</a>). Při každém načtení stránky jiný. Ukážou se jen veřejné fotky
-    (veřejná kategorie, zapnutý veřejný odkaz, mimo archiv); bez nich se sekce skryje.</p>
-  <p class="karta-poznamka">Doporučených fotografií: <strong><?= $doporucenych['verejne'] ?></strong> na webu<?= $doporucenych['celkem'] > $doporucenych['verejne'] ? ' (dalších ' . ($doporucenych['celkem'] - $doporucenych['verejne']) . ' není veřejných)' : '' ?>
-    · <a href="<?= Ui::h(Ui::odkaz('galerie', ['doporucene' => 1])) ?>">zobrazit v Galerii</a></p>
+<section class="karta formular web-skupina" aria-labelledby="sk-doporucene">
+  <header class="skupina-hlavicka"><h2 id="sk-doporucene">Doporučené fotografie</h2><p class="slabe">Náhodný výběr z fotek označených jako <strong>doporučená</strong>, při každém načtení jiný.</p></header>
+  <p class="doporucene-souhrn"><?= Ui::stav($doporucenych['verejne'] > 0 ? 'bezi' : 'ceka', 'Na webu: ' . $doporucenych['verejne']) ?>
+    <?php if ($mimoWeb): ?><?= Ui::stav('ceka', 'Neukáže se: ' . count($mimoWeb)) ?><?php endif; ?>
+    <a href="<?= Ui::h(Ui::odkaz('galerie', ['doporucene' => 1])) ?>">Zobrazit v Galerii</a></p>
   <?php if ($mimoWeb): ?>
-  <details class="doporucene-mimo-web" open>
-    <summary>Doporučené, které se na webu neukážou (<?= count($mimoWeb) ?>)</summary>
+  <details class="doporucene-mimo-web">
+    <summary>Proč se <?= count($mimoWeb) ?> doporučených neukáže</summary>
     <ul>
       <?php foreach ($mimoWeb as $d): ?>
       <li><a href="<?= Ui::h(Ui::odkaz('medium', ['id' => $d['id']])) ?>"><?= Ui::h($d['nazev']) ?></a><?= $d['kategorie'] !== '' ? ' <span class="slabe">· ' . Ui::h($d['kategorie']) . '</span>' : '' ?>
@@ -100,18 +115,20 @@ $adresaZasad = $app->url(Web::ZASADY);
   <?php endif; ?>
   <?= Ui::pole('Nadpis', 'doporucene_nadpis', $n['doporucene_nadpis'], ['required' => true, 'maxlength' => 80]) ?>
   <?= Ui::pole('Podnadpis', 'doporucene_podnadpis', $n['doporucene_podnadpis'], ['maxlength' => 160]) ?>
-  <div class="radek">
+  <div class="radek radek-2">
     <?= Ui::vyber('Sloupce', 'doporucene_sloupce', $rozsah(Web::SLOUPCE), (string)$n['doporucene_sloupce']) ?>
-    <?= Ui::vyber('Řádky', 'doporucene_radky', $rozsah(Web::RADKY), (string)$n['doporucene_radky'], [], 'Na webu najednou nejvýš sloupce × řádky fotek. Na mobilu se sloupce zúží (až na 2). Když doporučených nestačí, poslední řádek bude neúplný.') ?>
+    <?= Ui::vyber('Řádky', 'doporucene_radky', $rozsah(Web::RADKY), (string)$n['doporucene_radky']) ?>
   </div>
+  <small class="slabe mala">Najednou nejvýš sloupce × řádky fotek, na mobilu se sloupce zúží (až na 2). Když doporučených nestačí, poslední řádek bude neúplný.</small>
+</section>
 
-  <h2 style="margin:1rem 0 0">Stránka O galerii</h2>
-  <?= Ui::oblast('Text', 'o_galerii', $n['o_galerii'], ['rows' => 10, 'maxlength' => 20000],
-      'Odstavce oddělte prázdným řádkem. Jde použít <code>**tučně**</code>, odrážky <code>- </code>, nadpisy <code>## </code> a odkazy <code>[text](https://…)</code>.') ?>
-
-  <div class="tlacitka"><button type="submit" class="hlavni">Uložit</button>
-    <a class="tlacitko" href="<?= Ui::h($app->url()) ?>/">Zobrazit web</a></div>
+<section class="karta formular web-skupina web-skupina-siroka" aria-labelledby="sk-o-galerii">
+  <header class="skupina-hlavicka"><h2 id="sk-o-galerii">Stránka O galerii</h2><p class="slabe">Odstavce oddělte prázdným řádkem. Jde použít <code>**tučně**</code>, odrážky <code>- </code>, nadpisy <code>## </code> a odkazy <code>[text](https://…)</code>.</p></header>
+  <?= Ui::oblast('Text', 'o_galerii', $n['o_galerii'], ['rows' => 8, 'maxlength' => 20000]) ?>
+</section>
 </div>
+<div class="tlacitka ulozit-lista"><button type="submit" class="hlavni">Uložit</button>
+  <a class="tlacitko" href="<?= Ui::h($app->url()) ?>/">Zobrazit web</a></div>
 </form>
 </div>
 
@@ -130,6 +147,15 @@ $adresaZasad = $app->url(Web::ZASADY);
     placeholder="<ins …></ins>&#10;<script async src=&quot;https://…&quot;></script>"><?= Ui::h($post && $karta === 'reklama' ? (string)($_POST["reklama_{$k}"] ?? '') : $n['reklama'][$k]) ?></textarea>
 </div>
 <?php endforeach; ?>
+<?php if (trim((string)$n['reklama_odlozena']) !== ''): ?>
+<div class="karta formular hlaska-varovani">
+  <h2 style="margin:0">Uschovaný kód ze zrušené pozice Pod galeriemi</h2>
+  <p class="slabe" style="margin:0">Od verze 0.8.8 je reklama jen <strong>Pod úvodem</strong> a <strong>Před patičkou</strong>. Pozice Před patičkou už měla svůj kód, proto se tento
+    na webu <strong>nezobrazuje</strong>. Když ho chcete použít, zkopírujte ho do některé pozice výš; jinak ho zahoďte.</p>
+  <textarea class="kod" rows="3" readonly spellcheck="false" aria-label="Uschovaný kód reklamy"><?= Ui::h($n['reklama_odlozena']) ?></textarea>
+  <label class="zaskrtavatko"><input type="checkbox" name="zahodit_odlozenou" value="1"> <span>Zahodit uschovaný kód při uložení</span></label>
+</div>
+<?php endif; ?>
 <div class="karta formular">
   <h2 style="margin:0">ads.txt</h2>
   <p class="slabe" style="margin:0">Web ho vydá na <a href="<?= Ui::h($app->url('ads.txt')) ?>"><code>/ads.txt</code></a> – vyžaduje ho např. AdSense (<em>Weby → ads.txt</em>). Prázdné = soubor neexistuje.</p>

@@ -29,6 +29,8 @@ final class Sloupce
         public readonly ?string $tagy = 'tags',
         public readonly ?string $archivovano = 'archived_at',
         public readonly ?string $vytvoreno = 'created_at',
+        /** 0.3.0: popis úprav obrázku (ořez, otočení); bez sloupce jde upravovat také, jen se úprava nezapamatuje (komprese pak vychází z originálu). */
+        public readonly ?string $upravy = null,
     ) {
         foreach (get_object_vars($this) as $s) if ($s !== null) Db::identifikator($s);
     }

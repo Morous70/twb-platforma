@@ -4,7 +4,7 @@ namespace MediaGalerie;
 
 use TWB\Jadro\{Db, Host, Migrace, Nastaveni};
 use TWB\Prihlaseni\{Heslo, Zamek, Relace, Tokeny, Google, Passkey, Obnova, Posta};
-use TWB\Galerie\Galerie;
+use TWB\Galerie\{Galerie, Sloupce};
 use TWB\Zalohy\{Zalohy, Skupina};
 use TWB\Aktualizace\Aktualizace;
 
@@ -181,7 +181,7 @@ final class App
 
     public function galerie(): Galerie
     {
-        return $this->sluzba('galerie', fn() => new Galerie($this->host, $this->data . '/media'));
+        return $this->sluzba('galerie', fn() => new Galerie($this->host, $this->data . '/media', new Sloupce(upravy: 'edits')));
     }
 
     public function media(): Media { return $this->sluzba('media', fn() => new Media($this)); }

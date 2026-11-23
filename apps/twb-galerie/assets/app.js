@@ -762,3 +762,215 @@
     });
   });
 })();
+
+// 0.8.13: Detail média → Upravit obrázek. Bez knihoven: náhled na <canvas> (otočení a překlopení), nad ním výřez s úchyty
+// (myš, dotyk – pointer události; šipky na zaměřeném výřezu). Výřez se počítá jako podíl 0–1 z otočeného obrázku,
+// server (PHP GD) ho přepočte na pixely a dodrží přesný poměr stran. Nic se neodesílá, dokud uživatel neklikne na Uložit úpravu.
+(function () {
+  const box = document.querySelector('[data-uprava]');
+  if (!box) return;
+  const plocha = box.querySelector('[data-plocha-upravy]');
+  const platno = box.querySelector('[data-platno]');
+  const vyrezEl = box.querySelector('[data-vyrez]');
+  const info = box.querySelector('[data-uprava-info]');
+  const form = box.querySelector('[data-uprava-formular]');
+  const ulozit = box.querySelector('[data-uprava-ulozit]');
+  const prohodit = box.querySelector('[data-prohodit]');
+  const img = new Image();
+  // stav: otočení po směru hodin, překlopení (po otočení), výřez {x, y, w, h} v podílech zobrazeného obrázku (null = celý), poměr [a, b]
+  let s = { rot: 0, fh: false, fv: false, vyrez: null };
+  let pomerZaklad = null; // [a, b] podle tlačítka (bez prohození)
+  let nacteno = false;
+
+  const W = () => (s.rot % 180 ? img.naturalHeight : img.naturalWidth);
+  const H = () => (s.rot % 180 ? img.naturalWidth : img.naturalHeight);
+  const pomer = () => (pomerZaklad ? (prohodit.checked ? [pomerZaklad[1], pomerZaklad[0]] : pomerZaklad) : null);
+  // poměr w/h výřezu v podílech (podíly šířky a výšky mají jiné měřítko)
+  const pomerF = () => { const p = pomer(); return p ? (p[0] / p[1]) * (H() / W()) : null; };
+  const omez = (v, a, b) => Math.min(b, Math.max(a, v));
+
+  function nejvetsi(rf, stredX, stredY) {
+    let w = 1, h = 1 / rf;
+    if (h > 1) { h = 1; w = rf; }
+    return { x: omez(stredX - w / 2, 0, 1 - w), y: omez(stredY - h / 2, 0, 1 - h), w: w, h: h };
+  }
+
+  function prizpusobPomeru() {
+    const rf = pomerF();
+    if (!rf) return;
+    const v = s.vyrez || { x: 0, y: 0, w: 1, h: 1 };
+    s.vyrez = nejvetsi(rf, v.x + v.w / 2, v.y + v.h / 2);
+  }
+
+  function vykresli() {
+    if (!nacteno) return;
+    const maxW = Math.max(200, box.clientWidth - 40);
+    const maxH = Math.max(200, window.innerHeight * 0.6);
+    const k = Math.min(1, maxW / W(), maxH / H());
+    const cw = Math.max(1, Math.round(W() * k)), ch = Math.max(1, Math.round(H() * k));
+    const dpr = window.devicePixelRatio || 1;
+    platno.width = Math.round(cw * dpr); platno.height = Math.round(ch * dpr);
+    platno.style.width = cw + 'px'; platno.style.height = ch + 'px';
+    const c = platno.getContext('2d');
+    c.setTransform(dpr, 0, 0, dpr, 0, 0);
+    c.clearRect(0, 0, cw, ch);
+    c.translate(cw / 2, ch / 2);
+    c.scale(s.fh ? -1 : 1, s.fv ? -1 : 1);
+    c.rotate(s.rot * Math.PI / 180);
+    const dw = img.naturalWidth * k, dh = img.naturalHeight * k;
+    c.drawImage(img, -dw / 2, -dh / 2, dw, dh);
+    obnovVyrez();
+  }
+
+  function obnovVyrez() {
+    const v = s.vyrez;
+    vyrezEl.hidden = !v;
+    vyrezEl.classList.toggle('s-pomerem', !!pomer());
+    if (v) {
+      vyrezEl.style.left = (v.x * 100) + '%'; vyrezEl.style.top = (v.y * 100) + '%';
+      vyrezEl.style.width = (v.w * 100) + '%'; vyrezEl.style.height = (v.h * 100) + '%';
+    }
+    const p = pomer();
+    let w = W(), h = H();
+    if (v) {
+      w = Math.max(1, Math.round(v.w * W())); h = Math.max(1, Math.round(v.h * H()));
+      if (p) { const g = nsd(p[0], p[1]), a = p[0] / g, b = p[1] / g, n = Math.max(1, Math.min(Math.floor(w / a), Math.floor(h / b))); w = a * n; h = b * n; }
+    }
+    const zmena = s.rot !== 0 || s.fh || s.fv || (v && (v.w < 0.999 || v.h < 0.999));
+    info.textContent = 'Výsledek: ' + w + ' × ' + h + ' px' + (p ? ' (' + p[0] + ':' + p[1] + ')' : '') + (zmena ? '' : ' – zatím beze změny');
+    ulozit.disabled = !zmena;
+  }
+  function nsd(a, b) { while (b) { const t = b; b = a % b; a = t; } return Math.max(1, a); }
+
+  // otočení a překlopení výřez přenesou, ať zůstane na stejném místě fotky
+  function otoc(oKolik) {
+    const v = s.vyrez;
+    if (v) s.vyrez = oKolik === 90 ? { x: 1 - v.y - v.h, y: v.x, w: v.h, h: v.w } : { x: v.y, y: 1 - v.x - v.w, w: v.h, h: v.w };
+    s.rot = (s.rot + oKolik + 360) % 360;
+    // otočení překlopeného obrázku = překlopení v druhém směru (rot∘flipH = flipV∘rot)
+    if (s.fh !== s.fv) { const t = s.fh; s.fh = s.fv; s.fv = t; }
+    if (pomerZaklad) prohodit.checked = !prohodit.checked;
+  }
+  box.querySelectorAll('[data-uprava-akce]').forEach((b) => b.addEventListener('click', () => {
+    const a = b.dataset.upravaAkce, v = s.vyrez;
+    if (a === 'vlevo') otoc(-90);
+    else if (a === 'vpravo') otoc(90);
+    else if (a === 'vodorovne') { s.fh = !s.fh; if (v) v.x = 1 - v.x - v.w; }
+    else if (a === 'svisle') { s.fv = !s.fv; if (v) v.y = 1 - v.y - v.h; }
+    vykresli();
+  }));
+  box.querySelectorAll('[data-pomer]').forEach((b) => b.addEventListener('click', () => {
+    box.querySelectorAll('[data-pomer]').forEach((x) => x.setAttribute('aria-pressed', x === b ? 'true' : 'false'));
+    pomerZaklad = b.dataset.pomer ? b.dataset.pomer.split(':').map(Number) : null;
+    prizpusobPomeru();
+    obnovVyrez();
+  }));
+  prohodit.addEventListener('change', () => { if (pomerZaklad) { prizpusobPomeru(); obnovVyrez(); } });
+  box.querySelector('[data-uprava-zrusit-vyrez]').addEventListener('click', () => {
+    s.vyrez = null; pomerZaklad = null;
+    box.querySelectorAll('[data-pomer]').forEach((x) => x.setAttribute('aria-pressed', x.dataset.pomer === '' ? 'true' : 'false'));
+    obnovVyrez();
+  });
+  box.querySelector('[data-uprava-reset]').addEventListener('click', () => {
+    s = { rot: 0, fh: false, fv: false, vyrez: null }; pomerZaklad = null; prohodit.checked = false;
+    box.querySelectorAll('[data-pomer]').forEach((x) => x.setAttribute('aria-pressed', x.dataset.pomer === '' ? 'true' : 'false'));
+    vykresli();
+  });
+
+  // tažení: nový výřez (mimo výřez), posun (uvnitř), změna velikosti (úchyt)
+  let tah = null;
+  function bod(e) {
+    const r = platno.getBoundingClientRect();
+    return { x: omez((e.clientX - r.left) / r.width, 0, 1), y: omez((e.clientY - r.top) / r.height, 0, 1) };
+  }
+  // výřez z pevného rohu (kotvy) k bodu; s poměrem se větší strana dopočítá a nevyjede z obrázku
+  function zKotvy(ax, ay, px, py) {
+    const rf = pomerF(), sx = px >= ax ? 1 : -1, sy = py >= ay ? 1 : -1;
+    let w = Math.abs(px - ax), h = Math.abs(py - ay);
+    if (rf) {
+      w = Math.max(w, h * rf); h = w / rf;
+      const maxW = sx > 0 ? 1 - ax : ax, maxH = sy > 0 ? 1 - ay : ay;
+      if (w > maxW) { w = maxW; h = w / rf; }
+      if (h > maxH) { h = maxH; w = h * rf; }
+    }
+    return { x: sx > 0 ? ax : ax - w, y: sy > 0 ? ay : ay - h, w: w, h: h };
+  }
+  plocha.addEventListener('pointerdown', (e) => {
+    if (!nacteno || e.button > 0) return;
+    e.preventDefault();
+    const p = bod(e), v = s.vyrez, u = e.target.dataset ? e.target.dataset.uchyt : null;
+    if (u && v) {
+      // kotva = protilehlý roh / hrana
+      tah = { typ: 'uchyt', u: u, ax: u.includes('w') ? v.x + v.w : v.x, ay: u.includes('n') ? v.y + v.h : v.y, puvodni: { ...v } };
+    } else if (v && e.target === vyrezEl) {
+      tah = { typ: 'posun', dx: p.x - v.x, dy: p.y - v.y };
+    } else {
+      tah = { typ: 'novy', ax: p.x, ay: p.y };
+    }
+    plocha.setPointerCapture(e.pointerId);
+  });
+  plocha.addEventListener('pointermove', (e) => {
+    if (!tah) return;
+    const p = bod(e);
+    let v = s.vyrez;
+    if (tah.typ === 'posun') {
+      v.x = omez(p.x - tah.dx, 0, 1 - v.w); v.y = omez(p.y - tah.dy, 0, 1 - v.h);
+    } else if (tah.typ === 'novy') {
+      if (Math.abs(p.x - tah.ax) < 0.01 && Math.abs(p.y - tah.ay) < 0.01) return;
+      s.vyrez = zKotvy(tah.ax, tah.ay, p.x, p.y);
+    } else {
+      const u = tah.u, o = tah.puvodni;
+      if (u.length === 2 || pomer()) {
+        s.vyrez = zKotvy(tah.ax, tah.ay, u.includes('e') || u.includes('w') ? p.x : (u.includes('w') ? o.x : o.x + o.w), u.includes('n') || u.includes('s') ? p.y : o.y + o.h);
+      } else if (u === 'n' || u === 's') {
+        const y1 = u === 'n' ? p.y : o.y, y2 = u === 's' ? p.y : o.y + o.h;
+        s.vyrez = { x: o.x, w: o.w, y: Math.min(y1, y2), h: Math.abs(y2 - y1) };
+      } else {
+        const x1 = u === 'w' ? p.x : o.x, x2 = u === 'e' ? p.x : o.x + o.w;
+        s.vyrez = { y: o.y, h: o.h, x: Math.min(x1, x2), w: Math.abs(x2 - x1) };
+      }
+    }
+    obnovVyrez();
+  });
+  const konec = () => {
+    if (!tah) return;
+    tah = null;
+    // příliš malý výřez (pouhé kliknutí) = žádný výřez
+    if (s.vyrez && (s.vyrez.w * W() < 8 || s.vyrez.h * H() < 8)) s.vyrez = pomer() ? nejvetsi(pomerF(), .5, .5) : null;
+    obnovVyrez();
+  };
+  plocha.addEventListener('pointerup', konec);
+  plocha.addEventListener('pointercancel', konec);
+  vyrezEl.addEventListener('keydown', (e) => {
+    const v = s.vyrez, d = e.shiftKey ? 0.1 : 0.01;
+    const posun = { ArrowLeft: [-d, 0], ArrowRight: [d, 0], ArrowUp: [0, -d], ArrowDown: [0, d] }[e.key];
+    if (!v || !posun) return;
+    e.preventDefault();
+    v.x = omez(v.x + posun[0], 0, 1 - v.w); v.y = omez(v.y + posun[1], 0, 1 - v.h);
+    obnovVyrez();
+  });
+
+  form.addEventListener('submit', () => {
+    const v = s.vyrez, p = pomer();
+    const hodnoty = { otoceni: s.rot, preklopit_h: s.fh ? 1 : '', preklopit_v: s.fv ? 1 : '', pomer: p && v ? p[0] + ':' + p[1] : '',
+      orez_x: v ? v.x.toFixed(6) : '', orez_y: v ? v.y.toFixed(6) : '', orez_w: v ? v.w.toFixed(6) : '', orez_h: v ? v.h.toFixed(6) : '' };
+    Object.keys(hodnoty).forEach((k) => { form.elements[k].value = hodnoty[k]; });
+    ulozit.disabled = true;
+    ulozit.textContent = 'Ukládám…';
+  });
+
+  function otevri() {
+    box.open = true;
+    if (img.src) return;
+    img.onload = () => { nacteno = true; vykresli(); };
+    img.onerror = () => { info.textContent = 'Obrázek se nepodařilo načíst.'; };
+    img.src = box.dataset.src;
+  }
+  box.addEventListener('toggle', () => { if (box.open) otevri(); });
+  document.querySelectorAll('[data-otevrit-upravu]').forEach((a) => a.addEventListener('click', (e) => {
+    e.preventDefault(); otevri(); box.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }));
+  if (location.hash === '#uprava') otevri();
+  let cekani = null;
+  window.addEventListener('resize', () => { clearTimeout(cekani); cekani = setTimeout(vykresli, 150); });
+})();

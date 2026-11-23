@@ -33,7 +33,7 @@ test('úvodní fotky: nastavení z 0.8.10 (jedna uvod_id) se převede na seznam'
     eq([[$ids[2]], $ids[2], 'Starý'], [$n['uvod_ids'], $n['uvod_id'], $n['nadpis']]);
     eq($ids[2], (int)$app->web()->uvodni()['id']);
     eq(true, $n['logo_nazev'], 'výchozí: název vedle loga');
-    eq(9, Schema::verze());
+    ok(Schema::verze() >= 9);
 });
 
 test('úvodní fotky: až pět, náhodně jedna, neplatné se přeskočí; formulář i tlačítko v detailu', function () {

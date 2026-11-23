@@ -7,7 +7,7 @@ use TWB\Jadro\Nastaveni;
 /**
  * Komprese obrázků: zmenšení do maximálního rozměru a uložení jako JPG; obrázky se skutečnou průhledností
  * jen zmenšené jako PNG. Modul pracuje se soubory a daty; ukládání do databáze (původní soubor, obnovení)
- * řeší galerie. Objekty GD se neuvolňují imagedestroy() – od PHP 8.5 je zastaralé a nic nedělá.
+ * řeší galerie. Od 0.3.0 i úprava: otočení, překlopení a ořez (volný nebo v poměru stran). Objekty GD se neuvolňují imagedestroy() – od PHP 8.5 je zastaralé a nic nedělá.
  */
 final class Obrazky
 {
@@ -226,6 +226,161 @@ final class Obrazky
         [$ext, $mime] = $webp ? ['webp', 'image/webp'] : ($alfa ? ['png', 'image/png'] : ['jpg', 'image/jpeg']);
         return ['data' => $data, 'ext' => $ext, 'mime' => $mime,
                 'w' => $nw, 'h' => $nh, 'ow' => $rw, 'oh' => $rh];
+    }
+
+    /** Kvalita JPEG/WebP po úpravě (ořez, otočení): vysoká, úprava nemá viditelně zhoršit fotku. */
+    public const KVALITA_UPRAVY = 92;
+    /** Poměry stran ořezu (šířka:výška); „prohodit“ z nich dělá obrázky na výšku (9:16 …). */
+    public const POMERY = ['1:1' => [1, 1], '16:9' => [16, 9], '4:3' => [4, 3], '3:2' => [3, 2], '2:1' => [2, 1]];
+
+    /**
+     * Ověří úpravu obrázku z formuláře (0.3.0). Otočení po směru hodinových ručiček 0/90/180/270, překlopení vodorovně/svisle
+     * (provádí se po otočení) a ořez jako podíl 0–1 z obrázku už otočeného a překlopeného (nezávisí na velikosti náhledu v prohlížeči).
+     * Poměr stran (např. „16:9“, prohozený „9:16“) se při ořezu dodrží přesně na pixely.
+     * @param array<string, mixed> $p pole otoceni, preklopit_h, preklopit_v, orez_x, orez_y, orez_w, orez_h, pomer
+     * @return array{otoceni: int, h: bool, v: bool, orez: ?array{0: float, 1: float, 2: float, 3: float}, pomer: ?array{0: int, 1: int}}
+     */
+    public static function upravaZFormulare(array $p): array
+    {
+        $ot = (int)($p['otoceni'] ?? 0);
+        $ot = (($ot % 360) + 360) % 360;
+        if ($ot % 90 !== 0) throw new \InvalidArgumentException('Otočit jde jen o 90°, 180° nebo 270°.');
+        $h = !empty($p['preklopit_h']);
+        $v = !empty($p['preklopit_v']);
+        if ($h && $v) { $h = $v = false; $ot = ($ot + 180) % 360; }   // obojí překlopení = otočení o 180°
+        $orez = null;
+        if (isset($p['orez_w']) && (string)$p['orez_w'] !== '') {
+            $c = [];
+            foreach (['orez_x', 'orez_y', 'orez_w', 'orez_h'] as $k) {
+                $x = $p[$k] ?? null;
+                if (!is_numeric($x)) throw new \InvalidArgumentException('Neplatný výřez.');
+                $c[] = min(1.0, max(0.0, (float)$x));
+            }
+            if ($c[2] <= 0 || $c[3] <= 0) throw new \InvalidArgumentException('Výřez je prázdný.');
+            if ($c[2] < 0.999 || $c[3] < 0.999) $orez = $c;
+        }
+        $pomer = null;
+        $t = trim((string)($p['pomer'] ?? ''));
+        if ($t !== '') {
+            if (!preg_match('/^(\d{1,2}):(\d{1,2})$/', $t, $m)) throw new \InvalidArgumentException('Neplatný poměr stran.');
+            $zaklad = self::POMERY["{$m[1]}:{$m[2]}"] ?? self::POMERY["{$m[2]}:{$m[1]}"] ?? null;
+            if ($zaklad === null) throw new \InvalidArgumentException('Neznámý poměr stran.');
+            $pomer = [(int)$m[1], (int)$m[2]];
+        }
+        if ($pomer !== null && $orez === null) $orez = [0.0, 0.0, 1.0, 1.0];   // poměr bez výřezu = co největší výřez uprostřed
+        return ['otoceni' => $ot, 'h' => $h, 'v' => $v, 'orez' => $orez, 'pomer' => $pomer];
+    }
+
+    /** Je úprava prázdná (nic se nezmění)? @param array{otoceni: int, h: bool, v: bool, orez: ?array, pomer: ?array} $u */
+    public static function upravaPrazdna(array $u): bool
+    {
+        return $u['otoceni'] === 0 && !$u['h'] && !$u['v'] && $u['orez'] === null;
+    }
+
+    /** Popis úpravy česky: „otočeno o 90° doprava, překlopeno vodorovně, oříznuto 16:9 (1920×1080 px)“. */
+    public static function popisUpravy(array $u, ?int $w = null, ?int $h = null): string
+    {
+        $t = [];
+        if ($u['otoceni'] === 90) $t[] = 'otočeno o 90° doprava';
+        elseif ($u['otoceni'] === 270) $t[] = 'otočeno o 90° doleva';
+        elseif ($u['otoceni'] === 180) $t[] = 'otočeno o 180°';
+        if ($u['h']) $t[] = 'překlopeno vodorovně';
+        if ($u['v']) $t[] = 'překlopeno svisle';
+        if ($u['orez'] !== null) $t[] = 'oříznuto' . ($u['pomer'] ? " {$u['pomer'][0]}:{$u['pomer'][1]}" : '') . ($w ? " ({$w}×{$h} px)" : '');
+        return implode(', ', $t);
+    }
+
+    /**
+     * Výřez v pixelech z podílů; s poměrem stran přesně (největší obdélník daného poměru, který se vejde do výřezu, se středem ve středu výřezu).
+     * @param array{0: float, 1: float, 2: float, 3: float} $orez @param ?array{0: int, 1: int} $pomer
+     * @return array{x: int, y: int, width: int, height: int}
+     */
+    public static function vyrez(int $w, int $h, array $orez, ?array $pomer): array
+    {
+        [$fx, $fy, $fw, $fh] = $orez;
+        $x = (int)round($fx * $w); $y = (int)round($fy * $h);
+        $cw = max(1, min($w - $x, (int)round($fw * $w)));
+        $ch = max(1, min($h - $y, (int)round($fh * $h)));
+        if ($pomer !== null) {
+            [$a, $b] = $pomer;
+            $stredX = $x + $cw / 2; $stredY = $y + $ch / 2;
+            // celé násobky poměru, ať je výsledek přesně a:b (16:9 → 1920×1080, ne 1919×1080)
+            $g = self::nsd($a, $b);
+            $a2 = intdiv($a, $g); $b2 = intdiv($b, $g);
+            $k = max(1, min(intdiv($cw, $a2), intdiv($ch, $b2)));
+            $nw = min($w, $a2 * $k); $nh = min($h, $b2 * $k);
+            $x = (int)max(0, min($w - $nw, round($stredX - $nw / 2)));
+            $y = (int)max(0, min($h - $nh, round($stredY - $nh / 2)));
+            [$cw, $ch] = [$nw, $nh];
+        }
+        return ['x' => $x, 'y' => $y, 'width' => $cw, 'height' => $ch];
+    }
+
+    private static function nsd(int $a, int $b): int { while ($b) [$a, $b] = [$b, $a % $b]; return max(1, $a); }
+
+    /**
+     * Upraví obrázek ze souboru (0.3.0): nejdřív otočení podle EXIF, pak otočení, překlopení a ořez podle $u (viz upravaZFormulare).
+     * Formát zůstává (JPEG s metadaty a orientací 1, PNG s průhledností, WebP); GIF a BMP se uloží jako PNG (bez ztráty kvality).
+     * Animovaný GIF upravit nejde (přišel by o animaci). Při nedostatku paměti RuntimeException.
+     * @return array{data: string, ext: string, mime: string, w: int, h: int, ow: int, oh: int}
+     */
+    public static function uprav(string $cesta, array $u): array
+    {
+        $info = @getimagesize($cesta);
+        if (!$info) throw new \RuntimeException('Soubor není obrázek, který jde upravit.');
+        [$w, $h, $typ] = $info;
+        if (!in_array($typ, [IMAGETYPE_JPEG, IMAGETYPE_PNG, IMAGETYPE_GIF, IMAGETYPE_WEBP, IMAGETYPE_BMP], true)) throw new \RuntimeException('Tento formát obrázku upravit nejde.');
+        if ($typ === IMAGETYPE_GIF && self::jeAnimovanyGif($cesta)) throw new \RuntimeException('Animovaný GIF upravit nejde, přišel by o animaci.');
+        $orient = $typ === IMAGETYPE_JPEG ? self::exifOrientace($cesta) : 1;
+        // paměť: zdroj + otočená kopie + výřez (5 B na pixel)
+        $potreba = $w * $h * 5 * 3 + 16 * 1048576;
+        if ($potreba > self::limitPameti() - memory_get_usage()) {
+            @ini_set('memory_limit', (string)max(512, (int)ceil(($potreba + memory_get_usage()) / 1048576) + 32) . 'M');
+            if ($potreba > self::limitPameti() - memory_get_usage()) {
+                throw new \RuntimeException(sprintf('Obrázek %d×%d px je na úpravu na serveru příliš velký (nestačí paměť).', $w, $h));
+            }
+        }
+        $im = @imagecreatefromstring((string)file_get_contents($cesta));
+        if (!$im) throw new \RuntimeException('Obrázek se nepodařilo načíst.');
+        if (!imageistruecolor($im)) imagepalettetotruecolor($im);
+        imagealphablending($im, false);
+        imagesavealpha($im, true);
+        if ($orient > 1) $im = self::otoc($im, $orient);
+        $ow = imagesx($im); $oh = imagesy($im);
+        if ($u['otoceni']) {
+            // imagerotate otáčí proti směru hodinových ručiček; u násobků 90° nevzniká žádné pozadí
+            $o = imagerotate($im, 360 - $u['otoceni'], (int)imagecolorallocatealpha($im, 0, 0, 0, 127));
+            if (!$o) throw new \RuntimeException('Obrázek se nepodařilo otočit.');
+            $im = $o;
+            imagealphablending($im, false);
+            imagesavealpha($im, true);
+        }
+        if ($u['h']) imageflip($im, IMG_FLIP_HORIZONTAL);
+        if ($u['v']) imageflip($im, IMG_FLIP_VERTICAL);
+        if ($u['orez'] !== null) {
+            $r = self::vyrez(imagesx($im), imagesy($im), $u['orez'], $u['pomer']);
+            $c = imagecreatetruecolor($r['width'], $r['height']);
+            imagealphablending($c, false);
+            imagesavealpha($c, true);
+            imagecopy($c, $im, 0, 0, $r['x'], $r['y'], $r['width'], $r['height']);
+            $im = $c;
+        }
+        $nw = imagesx($im); $nh = imagesy($im);
+        ob_start();
+        if ($typ === IMAGETYPE_JPEG) {
+            imagejpeg($im, null, self::KVALITA_UPRAVY);
+            [$ext, $mime] = ['jpg', 'image/jpeg'];
+        } elseif ($typ === IMAGETYPE_WEBP && function_exists('imagewebp')) {
+            imagewebp($im, null, self::KVALITA_UPRAVY);
+            [$ext, $mime] = ['webp', 'image/webp'];
+        } else {
+            imagepng($im, null, 9);
+            [$ext, $mime] = ['png', 'image/png'];
+        }
+        $data = (string)ob_get_clean();
+        if ($data === '') throw new \RuntimeException('Upravený obrázek se nepodařilo uložit.');
+        if ($typ === IMAGETYPE_JPEG) $data = self::vlozMetadataJpeg($data, self::metadataJpeg($cesta));
+        return ['data' => $data, 'ext' => $ext, 'mime' => $mime, 'w' => $nw, 'h' => $nh, 'ow' => $ow, 'oh' => $oh];
     }
 
     /** Segmenty JPEG, které se při kompresi přenášejí: APP1 (EXIF, XMP), APP2 (barevný profil ICC), APP13 (IPTC). */

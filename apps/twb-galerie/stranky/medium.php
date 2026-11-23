@@ -1,10 +1,11 @@
 <?php
 declare(strict_types=1);
-// Detail média: náhled, údaje, název, poznámka, kategorie, tagy, veřejný odkaz, nahrazení souboru, komprese, archiv, smazání.
+// Detail média: náhled, údaje, název, poznámka, kategorie, tagy, veřejný odkaz, nahrazení souboru, komprese, úprava obrázku (0.8.13), archiv, smazání.
 // Proměnné: $app, $ui, $post.
 use MediaGalerie\{App, Ui, Chyba, Media, Vstup};
 use TWB\Licence\Licence;
 use TWB\Zalohy\Zalohy;
+use TWB\Obrazky\Obrazky;
 
 $galerie = $app->galerie();
 $media = $app->media();
@@ -69,9 +70,19 @@ if ($post) {
                 $zprava = $z ? 'Zkomprimováno: ' . $z : 'Obrázek už je dost malý, komprese ho nezmenší.';
                 if ($z) $app->log('info', 'Obrázek zkomprimován: ' . $z);
                 break;
+            case 'upravit':
+                // 0.8.13: ořez, otočení, překlopení; původní soubor zůstane (návrat tlačítkem Vrátit původní soubor)
+                try { $u = Obrazky::upravaZFormulare($_POST); }
+                catch (InvalidArgumentException $e) { throw new Chyba($e->getMessage()); }
+                try { $v = $galerie->upravObrazek($id, $u); }
+                catch (RuntimeException $e) { throw new Chyba($e->getMessage()); }
+                $media->uklidNahledy();
+                $zprava = 'Obrázek upraven: ' . $v['popis'] . '. Původní soubor zůstal uložený.';
+                break;
             case 'original':
                 if (!$galerie->obnovPuvodni($id)) throw new Chyba('Původní soubor není k dispozici.');
                 $app->log('info', "Obnoven původní soubor: {$m['original_name']}");
+                $media->uklidNahledy();
                 $zprava = 'Vrácen původní soubor.';
                 break;
             case 'archivovat':
@@ -99,6 +110,8 @@ $url = $media->verejnaAdresa($m);
 $kategorie = $app->kategorie()->volby();
 $tagy = $galerie->tagy()->vsechny();
 $src = 'media.php?id=' . $id . '&v=' . substr((string)$m['md5'], 0, 8);
+// úprava obrázku: ne u animovaného GIFu (přišel by o animaci)
+$lzeUpravit = $m['kind'] === 'image' && !($m['mime'] === 'image/gif' && Obrazky::jeAnimovanyGif($app->data . '/media/' . basename((string)$m['filename'])));
 ?>
 <p><a href="<?= Ui::h(Ui::odkaz('galerie', $m['archived_at'] ? ['archiv' => 1] : [])) ?>">← <?= $m['archived_at'] ? 'Archiv' : 'Galerie' ?></a>
   <?php if ($m['archived_at']): ?> <?= Ui::stav('paused', 'v archivu') ?><?php endif; ?></p>
@@ -115,7 +128,8 @@ $src = 'media.php?id=' . $id . '&v=' . substr((string)$m['md5'], 0, 8);
       <?php if ($m['width']): ?><dt>Rozměr</dt><dd><?= (int)$m['width'] ?>×<?= (int)$m['height'] ?> px</dd><?php endif; ?>
       <dt>Velikost</dt><dd><?= Ui::h(Zalohy::velikost((int)$m['size'])) ?></dd>
       <?php if ($m['orig_filename']): ?><dt>Originál</dt><dd><?= (int)$m['orig_w'] ?>×<?= (int)$m['orig_h'] ?> px, <?= Ui::h(Zalohy::velikost((int)$m['orig_size'])) ?>
-        · <span data-okno-skupina<?= Ui::okno($m, null, $src . '&original=1', false, (int)$m['orig_w'] . '×' . (int)$m['orig_h'] . ' · originál před kompresí') ?>><a href="<?= Ui::h($src . '&original=1') ?>" data-otevrit-okno>zobrazit</a></span></dd><?php endif; ?>
+        · <span data-okno-skupina<?= Ui::okno($m, null, $src . '&original=1', false, (int)$m['orig_w'] . '×' . (int)$m['orig_h'] . ' · originál před ' . ($m['edits'] ? 'úpravou' : 'kompresí')) ?>><a href="<?= Ui::h($src . '&original=1') ?>" data-otevrit-okno>zobrazit</a></span></dd><?php endif; ?>
+      <?php if ($m['edits']): ?><dt>Upraveno</dt><dd><?= Ui::h((string)$m['edits']) ?></dd><?php endif; ?>
       <dt>Nahráno</dt><dd><?= Ui::h(Ui::datum(strtotime((string)$m['created_at']))) ?><?= $m['upload_name'] && $m['upload_name'] !== $m['original_name'] ? ' jako ' . Ui::h($m['upload_name']) : '' ?></dd>
       <?php if ($m['author']): ?><dt>Autor</dt><dd><?= Ui::h($m['author']) ?></dd><?php endif; ?>
       <?php $licOdkaz = Licence::odkaz($m['license_code'], $m['license_version'], $m['license_url']); $licNazev = Licence::nazev($m['license_code'], $m['license_version']); ?>
@@ -127,12 +141,48 @@ $src = 'media.php?id=' . $id . '&v=' . substr((string)$m['md5'], 0, 8);
     <div class="tlacitka" style="margin-top:1rem">
       <a class="tlacitko maly" href="<?= Ui::h($src . '&stahnout=1') ?>">Stáhnout</a>
       <?php if ($m['kind'] === 'image' && !$m['orig_filename']): ?><?= $ui->tlacitko('Zkomprimovat', 'komprimovat', [], 'maly') ?><?php endif; ?>
-      <?php if ($m['orig_filename']): ?><?= $ui->tlacitko('Vrátit původní soubor', 'original', [], 'maly', 'Vrátit původní (nekomprimovaný) soubor?') ?><?php endif; ?>
+      <?php if ($lzeUpravit): ?><a class="tlacitko maly" href="#uprava" data-otevrit-upravu>Upravit obrázek</a><?php endif; ?>
+      <?php if ($m['orig_filename']): ?><?= $ui->tlacitko('Vrátit původní soubor', 'original', [], 'maly', $m['edits'] ? 'Vrátit původní soubor? Úpravy (ořez, otočení) i komprese se zahodí.' : 'Vrátit původní (nekomprimovaný) soubor?') ?><?php endif; ?>
       <?php if ($m['kind'] === 'image' && $m['public_key'] && !$m['archived_at']): ?><?= $app->web()->jeUvodni((int)$m['id']) ? $ui->tlacitko('Odebrat z úvodních fotek', 'web-uvodni', [], 'maly') : $ui->tlacitko('Přidat mezi úvodní fotky', 'web-uvodni', [], 'maly') ?><?php endif; ?>
       <?php if ($m['kind'] === 'image' || $m['featured']): ?><?= $m['featured'] ? $ui->tlacitko('★ Doporučená – zrušit', 'nedoporucit', [], 'maly') : $ui->tlacitko('☆ Označit jako doporučenou', 'doporucit', [], 'maly') ?><?php endif; ?>
     </div>
     <?php if ($m['featured'] && ($proc = $app->web()->procNeniNaWebu($m)) !== ''): ?><p class="slabe mala" style="margin:.5rem 0 0">Doporučená fotka se na webu zatím neukáže: <?= Ui::h($proc) ?></p><?php endif; ?>
   </div>
+  <?php if ($lzeUpravit): ?>
+  <details class="karta uprava" id="uprava" data-uprava data-src="<?= Ui::h($src) ?>">
+    <summary><h2>Upravit obrázek</h2></summary>
+    <p class="slabe mala">Ořez, otočení a překlopení. Výřez nakreslete nebo posuňte myší (prstem), velikost měňte za rohy.
+      <?= $m['orig_filename'] ? 'Původní soubor zůstává uložený' : 'Dosavadní soubor se uloží jako původní' ?> – úpravu vrátíte tlačítkem <em>Vrátit původní soubor</em>.</p>
+    <div class="tlacitka" role="group" aria-label="Otočení a překlopení">
+      <button type="button" class="maly" data-uprava-akce="vlevo" title="Otočit o 90° doleva">⟲ Doleva</button>
+      <button type="button" class="maly" data-uprava-akce="vpravo" title="Otočit o 90° doprava">⟳ Doprava</button>
+      <button type="button" class="maly" data-uprava-akce="vodorovne" title="Překlopit vodorovně (zrcadlově)">⇋ Překlopit vodorovně</button>
+      <button type="button" class="maly" data-uprava-akce="svisle" title="Překlopit svisle (vzhůru nohama)">⇅ Překlopit svisle</button>
+    </div>
+    <div class="tlacitka uprava-pomery" role="group" aria-label="Poměr stran ořezu">
+      <span class="mala">Poměr stran:</span>
+      <button type="button" class="maly" data-pomer="" aria-pressed="true">Volný</button>
+      <?php foreach (array_keys(Obrazky::POMERY) as $p): ?><button type="button" class="maly" data-pomer="<?= Ui::h($p) ?>" aria-pressed="false"><?= Ui::h($p) ?></button><?php endforeach; ?>
+      <label class="mala"><input type="checkbox" data-prohodit> Prohodit (na výšku, např. 9:16)</label>
+    </div>
+    <div class="uprava-plocha" data-plocha-upravy>
+      <canvas data-platno aria-label="Náhled úpravy"></canvas>
+      <div class="uprava-vyrez" data-vyrez tabindex="0" aria-label="Výřez – šipkami posunete" hidden>
+        <?php foreach (['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'] as $u): ?><span class="uchyt uchyt-<?= $u ?>" data-uchyt="<?= $u ?>"></span><?php endforeach; ?>
+      </div>
+    </div>
+    <p class="mala" data-uprava-info aria-live="polite"></p>
+    <form method="post" class="tlacitka" data-uprava-formular>
+      <?= $ui->csrf() ?>
+      <input type="hidden" name="akce" value="upravit">
+      <?php foreach (['otoceni', 'preklopit_h', 'preklopit_v', 'orez_x', 'orez_y', 'orez_w', 'orez_h', 'pomer'] as $n): ?><input type="hidden" name="<?= $n ?>" value=""><?php endforeach; ?>
+      <button type="submit" class="hlavni" data-uprava-ulozit disabled>Uložit úpravu</button>
+      <button type="button" class="maly" data-uprava-zrusit-vyrez>Zrušit výřez</button>
+      <button type="button" class="maly" data-uprava-reset>Začít znovu</button>
+    </form>
+    <noscript><p class="hlaska hlaska-chyba">Úprava obrázku potřebuje zapnutý JavaScript.</p></noscript>
+  </details>
+  <?php endif; ?>
 </section>
 
 <section>

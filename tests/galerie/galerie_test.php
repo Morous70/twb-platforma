@@ -289,3 +289,87 @@ test('0.2.0: komprimujPodrobne bez originálu uvolní místo a návrat už nejde
     eq(false, $g->obnovPuvodni($id));
     ok(!in_array($m['pvSoubor'], soubory($h->datovaSlozka . '/media'), true));
 });
+
+// ---------- 0.3.0: úprava obrázku ----------
+
+/** Galerie se sloupcem pro popis úprav (jako TWB Media galerie). */
+function galerieSUpravami(array $nastaveni = []): array
+{
+    $h = novyHost();
+    (new JadroMigrace($h->db))->spust('galerie', Migrace::class);
+    $h->db->q('ALTER TABLE media ADD COLUMN edits TEXT NULL');
+    foreach ($nastaveni as $k => $v) $h->nastaveni->uloz($k, $v);
+    return [$h, new Galerie($h, $h->datovaSlozka . '/media', new Sloupce(upravy: 'edits'), cas: fn() => 1_800_000_000)];
+}
+$UP = fn(array $p) => TWB\Obrazky\Obrazky::upravaZFormulare($p);
+
+test('0.3.0: úprava obrázku – originál se ponechá, úpravy se skládají, návrat vrátí originál a smaže úpravy', function () use ($UP) {
+    [$h, $g] = galerieSUpravami(['img_auto' => '0']);
+    $id = $g->uloz(obrazek(800, 400), 'fotka.jpg')['id'];
+    $puvodni = $g->radek($id);
+    $v = $g->upravObrazek($id, $UP(['otoceni' => '90']));
+    eq(['otočeno o 90° doprava', 400, 800], [$v['popis'], $v['w'], $v['h']]);
+    $m = $g->radek($id);
+    eq([$puvodni['soubor'], 800, 400], [$m['pvSoubor'], (int)$m['pvSirka'], (int)$m['pvVyska']], 'dosavadní soubor = originál');
+    eq([400, 800, 'otočeno o 90° doprava'], [(int)$m['sirka'], (int)$m['vyska'], $m['upravy']]);
+    ok($m['md5'] !== $puvodni['md5'] && $m['soubor'] !== $puvodni['soubor']);
+    eq(md5_file($h->datovaSlozka . '/media/' . $m['soubor']), $m['md5']);
+    // druhá úprava vychází z upravené verze; originál zůstává, mezikrok se smaže
+    $g->upravObrazek($id, $UP(['pomer' => '1:1']));
+    $m2 = $g->radek($id);
+    eq([400, 400, $puvodni['soubor']], [(int)$m2['sirka'], (int)$m2['vyska'], $m2['pvSoubor']]);
+    eq('otočeno o 90° doprava; oříznuto 1:1 (400×400 px)', $m2['upravy']);
+    $s = soubory($h->datovaSlozka . '/media'); sort($s);
+    $cekam = [$puvodni['soubor'], $m2['soubor']]; sort($cekam);
+    eq($cekam, $s, 'jen originál a poslední verze');
+    // komprese upraveného obrázku vychází z upravené verze (úprava nezmizí)
+    ok($g->komprimujPodrobne($id, ['max_w' => 200, 'max_h' => 200, 'quality' => 80, 'min_kb' => 0]) !== null);
+    $m3 = $g->radek($id);
+    eq([200, 200, $puvodni['soubor']], [(int)$m3['sirka'], (int)$m3['vyska'], $m3['pvSoubor']]);
+    ok($g->obnovPuvodni($id));
+    $m4 = $g->radek($id);
+    eq([$puvodni['soubor'], 800, 400, null, null], [$m4['soubor'], (int)$m4['sirka'], (int)$m4['vyska'], $m4['pvSoubor'], $m4['upravy']]);
+    eq([$puvodni['soubor']], soubory($h->datovaSlozka . '/media'));
+});
+
+test('0.3.0: úprava zkomprimovaného obrázku nechá originál; komprese bez originálu a nahrazení souboru úpravy zapomenou', function () use ($UP) {
+    [$h, $g] = galerieSUpravami(['img_auto' => '1', 'img_max_w' => '1000', 'img_max_h' => '1000', 'img_min_kb' => '0']);
+    $id = $g->uloz(obrazek(2000, 1000), 'velka.jpg')['id'];
+    $z = $g->radek($id);
+    ok($z['pvSoubor'] !== null, 'zkomprimováno při nahrání');
+    $g->upravObrazek($id, $UP(['preklopit_h' => '1']));
+    $m = $g->radek($id);
+    eq([$z['pvSoubor'], 1000, 500, 'překlopeno vodorovně'], [$m['pvSoubor'], (int)$m['sirka'], (int)$m['vyska'], $m['upravy']], 'z komprimované verze, originál stejný');
+    ok(!in_array($z['soubor'], soubory($h->datovaSlozka . '/media'), true), 'zkomprimovaná verze smazána');
+    ok($g->komprimujPodrobne($id, ['max_w' => 500, 'max_h' => 500, 'quality' => 80, 'min_kb' => 0], true, false) !== null);
+    $m = $g->radek($id);
+    eq([null, null, 500, 250], [$m['pvSoubor'], $m['upravy'], (int)$m['sirka'], (int)$m['vyska']], 'bez originálu už úprava nejde vrátit');
+    $g->upravObrazek($id, $UP(['otoceni' => '180']));
+    ok($g->radek($id)['upravy'] !== null);
+    $h->nastaveni->uloz('img_auto', '0');
+    $g->uloz(obrazek(300, 300), 'jina.jpg', [], $id);
+    $m = $g->radek($id);
+    eq([null, null], [$m['pvSoubor'], $m['upravy']], 'nahrazení souboru');
+});
+
+test('0.3.0: úprava – prázdná úprava, PDF a galerie bez sloupců pro originál', function () use ($UP) {
+    [$h, $g] = galerieSUpravami(['img_auto' => '0']);
+    $id = $g->uloz(obrazek(100, 50), 'a.jpg')['id'];
+    throws(fn() => $g->upravObrazek($id, $UP([])), 'nic nemění');
+    throws(fn() => $g->upravObrazek($g->uloz(pdf(), 'a.pdf')['id'], $UP(['otoceni' => '90'])), 'jen obrázek');
+    // výchozí Sloupce bez sloupce úprav: úprava funguje, originál se ponechá
+    [$h2, $g2] = galerie(['img_auto' => '0']);
+    $id2 = $g2->uloz(obrazek(100, 50, 'png'), 'b.png')['id'];
+    $g2->upravObrazek($id2, $UP(['otoceni' => '270']));
+    $m = $g2->radek($id2);
+    eq([50, 100, false], [(int)$m['sirka'], (int)$m['vyska'], array_key_exists('upravy', $m)]);
+    ok($m['pvSoubor'] !== null);
+    // bez pv* sloupců se soubor nahradí
+    $h3 = novyHost();
+    (new JadroMigrace($h3->db))->spust('galerie', Migrace::class);
+    $g3 = new Galerie($h3, $h3->datovaSlozka . '/media', new Sloupce(pvSoubor: null, pvMime: null, pvVelikost: null, pvSirka: null, pvVyska: null));
+    $id3 = $g3->uloz(obrazek(100, 50), 'c.jpg')['id'];
+    $g3->upravObrazek($id3, $UP(['otoceni' => '90']));
+    eq(1, count(soubory($h3->datovaSlozka . '/media')));
+    eq(50, (int)$g3->radek($id3)['sirka']);
+});

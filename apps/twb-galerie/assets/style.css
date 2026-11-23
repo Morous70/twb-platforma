@@ -121,7 +121,7 @@ footer a { color: var(--slaby); }
 .dlazdice-ikona { position: absolute; top: 1.1rem; right: 1.25rem; width: 2.6rem; height: 2.6rem; border-radius: 50%; background: var(--hlavni-svetla); color: var(--hlavni);
   display: flex; align-items: center; justify-content: center; }
 .dva-sloupce { display: grid; gap: 1.5rem; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); }
-@media (max-width: 1199.98px) { .dva-sloupce { grid-template-columns: 1fr; } }
+@media (max-width: 1199.98px) { .dva-sloupce { grid-template-columns: minmax(0, 1fr); } }
 
 /* ---------- hlášky ---------- */
 .hlaska { padding: .85rem 1rem; border-radius: var(--polomer); margin-bottom: 1rem; border: 0; border-left: 4px solid currentColor; background: var(--plocha); box-shadow: var(--stin); }
@@ -323,9 +323,9 @@ body.okno-otevrene { overflow: hidden; }
 .nahled-detail { max-height: none; display: flex; flex-direction: column; align-items: center; }
 .nahled-detail img, .nahled-detail video { max-width: 100%; max-height: 70vh; height: auto; }
 .nahled-detail iframe { width: 100%; height: 70vh; background: #fff; }
-dl.udaje { display: grid; grid-template-columns: max-content 1fr; gap: .4rem 1rem; margin: 0; }
+dl.udaje { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: .4rem 1rem; margin: 0; }
 dl.udaje dt { color: var(--slaby); }
-dl.udaje dd { margin: 0; }
+dl.udaje dd { margin: 0; overflow-wrap: anywhere; }
 .prazdne { padding: 2.5rem 1rem; text-align: center; color: var(--slaby); background: var(--plocha); border-radius: var(--polomer); box-shadow: var(--stin); margin-bottom: 1.5rem; }
 .karta .prazdne { box-shadow: none; border: 1px dashed var(--okraj); margin-bottom: 0; }
 .seznam-voleb { display: grid; gap: .3rem; max-height: 22rem; overflow: auto; padding: .5rem; border: 1px solid var(--okraj-pole); border-radius: var(--polomer-pole); background: var(--plocha); }
@@ -547,3 +547,27 @@ body.vybirani, body.vybirani * { user-select: none; cursor: crosshair; }
 .radek-nahrani { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .75rem; margin-top: .75rem; }
 .radek-nahrani .pole { margin: 0; }
 @media (max-width: 575.98px) { .radek-nahrani { grid-template-columns: minmax(0, 1fr); } }
+
+/* 0.8.13: úprava obrázku v detailu – ořez (výřez s úchyty), otočení, překlopení */
+.uprava { margin-top: 1.5rem; }
+.uprava > summary { cursor: pointer; list-style-position: inside; }
+.uprava > summary h2 { display: inline; margin: 0; font-size: 1.1rem; }
+.uprava[open] > summary { margin-bottom: .75rem; }
+.uprava .tlacitka { margin: .5rem 0; align-items: center; }
+.uprava button[aria-pressed="true"] { background: var(--hlavni); border-color: var(--hlavni); color: #fff; }
+.uprava-pomery label { display: inline-flex; align-items: center; gap: .35rem; margin-left: .25rem; }
+.uprava-plocha { position: relative; display: block; width: fit-content; max-width: 100%; margin: .75rem auto; touch-action: none; user-select: none; -webkit-user-select: none;
+  background: repeating-conic-gradient(var(--kod) 0 25%, var(--plocha) 0 50%) 0 0 / 16px 16px; cursor: crosshair; }
+.uprava-plocha canvas { display: block; max-width: 100%; }
+.uprava-vyrez { position: absolute; box-sizing: border-box; border: 2px solid #fff; outline: 1px solid rgba(0, 0, 0, .6); cursor: move;
+  box-shadow: 0 0 0 9999px rgba(0, 0, 0, .5); background-image: linear-gradient(rgba(255,255,255,.35), rgba(255,255,255,.35)), linear-gradient(rgba(255,255,255,.35), rgba(255,255,255,.35)),
+  linear-gradient(rgba(255,255,255,.35), rgba(255,255,255,.35)), linear-gradient(rgba(255,255,255,.35), rgba(255,255,255,.35));
+  background-size: 1px 100%, 1px 100%, 100% 1px, 100% 1px; background-position: 33.33% 0, 66.67% 0, 0 33.33%, 0 66.67%; background-repeat: no-repeat; }
+.uprava-plocha { overflow: hidden; }
+.uprava-vyrez:focus-visible { outline: 3px solid var(--hlavni); }
+.uchyt { position: absolute; width: 14px; height: 14px; background: #fff; border: 1px solid rgba(0, 0, 0, .6); border-radius: 2px; margin: -8px 0 0 -8px; }
+.uchyt-nw { left: 0; top: 0; cursor: nwse-resize; } .uchyt-n { left: 50%; top: 0; cursor: ns-resize; } .uchyt-ne { left: 100%; top: 0; cursor: nesw-resize; }
+.uchyt-e { left: 100%; top: 50%; cursor: ew-resize; } .uchyt-se { left: 100%; top: 100%; cursor: nwse-resize; } .uchyt-s { left: 50%; top: 100%; cursor: ns-resize; }
+.uchyt-sw { left: 0; top: 100%; cursor: nesw-resize; } .uchyt-w { left: 0; top: 50%; cursor: ew-resize; }
+.uprava-vyrez.s-pomerem .uchyt-n, .uprava-vyrez.s-pomerem .uchyt-e, .uprava-vyrez.s-pomerem .uchyt-s, .uprava-vyrez.s-pomerem .uchyt-w { display: none; }
+@media (pointer: coarse) { .uchyt { width: 22px; height: 22px; margin: -12px 0 0 -12px; } }

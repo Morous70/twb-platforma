@@ -10,7 +10,8 @@ use RuntimeException;
 /**
  * Galerie médií (obrázky, videa, PDF) v tabulce aplikace. Soubory jsou ve složce pod náhodnými názvy,
  * tabulka drží název, druh, velikost, kontrolní součet, rozměry, tagy a archiv.
- * Obrázky se zmenšují s uchováním originálu (návrat jedním krokem).
+ * Obrázky se zmenšují s uchováním originálu (návrat jedním krokem). Od 0.3.0 jde obrázek upravit (otočit, překlopit, oříznout);
+ * originál se ponechá stejně jako u komprese a „Vrátit původní soubor“ vrátí úpravu i kompresi najednou.
  *
  * Co je specifické pro aplikaci (kde se médium používá, mazání vazeb), řeší funkce `priSmazani` a `pouziti`.
  */
@@ -252,7 +253,7 @@ final class Galerie
             $novyNazev = $prejmenoval ? Obrazky::nazevSPriponou((string)$stary['nazev'], $pripona) : $nazev;
             $this->smazSoubory($stary);
             $this->uprav((int)$stary['id'], $udaje + ['nahranyNazev' => $nazev, 'nazev' => $novyNazev,
-                'pvSoubor' => null, 'pvMime' => null, 'pvVelikost' => null, 'pvSirka' => null, 'pvVyska' => null]);
+                'pvSoubor' => null, 'pvMime' => null, 'pvVelikost' => null, 'pvSirka' => null, 'pvVyska' => null, 'upravy' => null]);
             $id = (int)$stary['id'];
             $this->host->protokol->zapis('info', "Soubor nahrazen: {$stary['nazev']} → $novyNazev");
         } else {
@@ -348,7 +349,8 @@ final class Galerie
         if (!$this->sloupce->maKompresi()) return null;
         $r = $this->radek($id);
         if ($r['druh'] !== 'image') return null;
-        $zdroj = $r['pvSoubor'] ?: $r['soubor'];
+        // upravený obrázek (ořez, otočení) se komprimuje z upravené verze – z originálu by úprava zmizela
+        $zdroj = !empty($r['upravy']) ? $r['soubor'] : ($r['pvSoubor'] ?: $r['soubor']);
         $zdrojCesta = $this->slozka . '/' . basename((string)$zdroj);
         if (!is_file($zdrojCesta)) return null;
         $v = Obrazky::komprimuj($zdrojCesta, $s, $vynutit);
@@ -374,7 +376,7 @@ final class Galerie
             // bez návratu: dosavadní soubor i originál pryč (až po uložení řádku)
             $smazat[] = (string)$r['soubor'];
             if ($r['pvSoubor']) $smazat[] = (string)$r['pvSoubor'];
-            $nove += ['pvSoubor' => null, 'pvMime' => null, 'pvVelikost' => null, 'pvSirka' => null, 'pvVyska' => null];
+            $nove += ['pvSoubor' => null, 'pvMime' => null, 'pvVelikost' => null, 'pvSirka' => null, 'pvVyska' => null, 'upravy' => null];
             $diskPo = $velikost;
         } elseif ($r['pvSoubor']) {
             // už komprimovaný → starou zmenšenou verzi nahradit, originál zůstává
@@ -408,8 +410,55 @@ final class Galerie
         $rozmer = @getimagesize($cesta) ?: [null, null];
         $this->uprav($id, ['soubor' => $r['pvSoubor'], 'mime' => $r['pvMime'], 'velikost' => filesize($cesta), 'md5' => md5_file($cesta),
             'nazev' => Obrazky::nazevSPriponou((string)$r['nazev'], strtolower(pathinfo((string)$r['pvSoubor'], PATHINFO_EXTENSION))),
-            'sirka' => $rozmer[0], 'vyska' => $rozmer[1], 'pvSoubor' => null, 'pvMime' => null, 'pvVelikost' => null, 'pvSirka' => null, 'pvVyska' => null]);
+            'sirka' => $rozmer[0], 'vyska' => $rozmer[1], 'pvSoubor' => null, 'pvMime' => null, 'pvVelikost' => null, 'pvSirka' => null, 'pvVyska' => null, 'upravy' => null]);
         return true;
+    }
+
+    // ---------- úprava obrázku (0.3.0) ----------
+
+    /**
+     * Upraví obrázek (otočení, překlopení, ořez – viz Obrazky::upravaZFormulare). Vychází z aktuálního souboru (i zkomprimovaného),
+     * takže se úpravy dají skládat. Originál: když položka ještě nemá původní soubor, stane se jím dosavadní soubor; jinak původní
+     * soubor zůstává a dosavadní upravená/zkomprimovaná verze se smaže. Bez sloupců pro originál se soubor prostě nahradí.
+     * Mění se md5, takže náhledy, ETag a adresy s ?v= se obnoví samy.
+     * @param array{otoceni: int, h: bool, v: bool, orez: ?array, pomer: ?array} $u
+     * @return array{popis: string, w: int, h: int, velikost: int}
+     */
+    public function upravObrazek(int $id, array $u): array
+    {
+        if (Obrazky::upravaPrazdna($u)) throw new RuntimeException('Úprava nic nemění – otočte obrázek nebo vyberte výřez.');
+        $r = $this->radek($id);
+        if ($r['druh'] !== 'image') throw new RuntimeException('Upravit jde jen obrázek.');
+        $soucasna = $this->slozka . '/' . basename((string)$r['soubor']);
+        if (!is_file($soucasna)) throw new RuntimeException('Soubor média na disku chybí.');
+        $v = Obrazky::uprav($soucasna, $u);
+        $velikost = strlen($v['data']);
+        $soubor = bin2hex(random_bytes(12)) . '.' . $v['ext'];
+        if (file_put_contents($this->slozka . "/$soubor", $v['data']) !== $velikost) {
+            @unlink($this->slozka . "/$soubor");
+            throw new RuntimeException('Upravený soubor se nepodařilo uložit (plný disk?).');
+        }
+        $popis = Obrazky::popisUpravy($u, $v['w'], $v['h']);
+        $nove = ['soubor' => $soubor, 'mime' => $v['mime'], 'velikost' => $velikost, 'md5' => md5($v['data']),
+                 'nazev' => Obrazky::nazevSPriponou((string)$r['nazev'], $v['ext']), 'sirka' => $v['w'], 'vyska' => $v['h'],
+                 'upravy' => trim(((string)($r['upravy'] ?? '')) . '; ' . $popis, '; ')];
+        $smazat = [];
+        if (!$this->sloupce->maKompresi()) {
+            $smazat[] = (string)$r['soubor'];
+        } elseif ($r['pvSoubor']) {
+            if ($r['soubor'] !== $r['pvSoubor']) $smazat[] = (string)$r['soubor'];
+        } else {
+            $nove += ['pvSoubor' => $r['soubor'], 'pvMime' => $r['mime'], 'pvVelikost' => (int)$r['velikost'], 'pvSirka' => $v['ow'], 'pvVyska' => $v['oh']];
+        }
+        try {
+            $this->uprav($id, $nove);
+        } catch (\Throwable $e) {
+            @unlink($this->slozka . "/$soubor");
+            throw $e;
+        }
+        foreach (array_unique($smazat) as $f) @unlink($this->slozka . '/' . basename($f));
+        $this->host->protokol->zapis('info', "Obrázek upraven: {$r['nazev']} – {$popis}");
+        return ['popis' => $popis, 'w' => $v['w'], 'h' => $v['h'], 'velikost' => $velikost];
     }
 
     // ---------- zálohy ----------

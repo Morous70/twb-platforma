@@ -463,3 +463,52 @@ body.vybirani, body.vybirani * { user-select: none; cursor: crosshair; }
 .doporucene-mimo-web summary { cursor: pointer; font-weight: 600; }
 .doporucene-mimo-web ul { margin: .5rem 0 0; padding-left: 1.2rem; display: grid; gap: .4rem; }
 .doporucene-mimo-web a { overflow-wrap: anywhere; }
+
+/* 0.8.8: pořadí kategorií přetažením */
+.skryte { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+.tabulka-kategorie .sloupec-uchyt { width: 2.75rem; padding-right: 0; }
+.uchyt { min-height: 0; padding: .3rem .45rem; border: 1px solid transparent; background: transparent; color: var(--slaby); font-size: 1.1rem; line-height: 1; cursor: grab; touch-action: none; border-radius: var(--polomer); }
+.uchyt:hover, .uchyt:focus-visible { border-color: var(--okraj); color: var(--text); background: var(--kod); }
+.tazeni, .tazeni * { cursor: grabbing !important; user-select: none; }
+.tabulka-kategorie tr.tazeny td { background: var(--hlavni-svetla); }
+.poradi-stav { margin-left: .35rem; font-weight: 600; color: var(--hlavni-tmava); }
+.poradi-stav.chyba { color: var(--chyba-text); }
+
+/* 0.8.8: Přehled – Naposledy nahrané v mřížce 8 × 2 (16 médií). Sloupce jen 8, 4 nebo 2 (dělitele 16) podle šířky obsahu,
+   takže na užší ploše vznikne 4 × 4 nebo 2 × 8 a všech 16 médií zůstane vidět v celých řádcích. */
+.posledni-obal { container-type: inline-size; margin-bottom: 1.5rem; }
+.posledni-obal > .posledni-mrizka { grid-template-columns: repeat(var(--sloupce, 2), minmax(0, 1fr)); gap: .75rem; margin-bottom: 0; }
+@container (min-width: 520px) { .posledni-obal > .posledni-mrizka { --sloupce: 4; } }
+@container (min-width: 1000px) { .posledni-obal > .posledni-mrizka { --sloupce: 8; } }
+.posledni-mrizka figcaption { padding: .5rem .6rem; }
+
+/* 0.8.8: Veřejný web → Základ a texty ve skupinách (karty se vedle sebe skládají do dvou sloupců) */
+.web-zaklad { display: grid; gap: 1.5rem; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; margin-bottom: 1.5rem; }
+.web-zaklad > .karta { margin-bottom: 0; }
+.web-skupina-siroka { grid-column: 1 / -1; }
+@media (max-width: 1199.98px) { .web-zaklad { grid-template-columns: minmax(0, 1fr); } }
+.skupina-hlavicka { border-bottom: 1px solid var(--okraj); padding-bottom: .75rem; }
+.skupina-hlavicka h2 { margin: 0; font-size: 1.05rem; }
+.skupina-hlavicka p { margin: .25rem 0 0; font-size: .875rem; }
+.web-skupina .vypinac { font-size: .95rem; }
+.web-skupina .vypinac + p { margin: -.6rem 0 0 3.2rem !important; font-size: .85rem; }
+.formular .radek-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+@media (max-width: 575.98px) { .formular .radek-2 { grid-template-columns: minmax(0, 1fr); } }
+.uvod-vyber { display: grid; grid-template-columns: 160px minmax(0, 1fr); gap: 1rem; align-items: start; }
+.uvod-nahled { aspect-ratio: 16 / 10; border-radius: var(--polomer); overflow: hidden; background: linear-gradient(135deg, var(--hlavni-svetla), var(--hlavni)); display: flex; align-items: center; justify-content: center; }
+.uvod-nahled img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.uvod-nahled span { color: #fff; font-size: .8rem; text-align: center; padding: .5rem; }
+@media (max-width: 575.98px) { .uvod-vyber { grid-template-columns: minmax(0, 1fr); } .uvod-nahled { max-width: 240px; } }
+.doporucene-souhrn { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; margin: 0; }
+.doporucene-souhrn a { margin-left: auto; }
+.web-skupina .doporucene-mimo-web { margin: 0; }
+.ulozit-lista { margin-bottom: 1.5rem; }
+
+/* 0.8.8: stránka Štítky */
+.tabulka-stitky .sloupec-vyber { width: 2.5rem; padding-right: 0; }
+.tabulka-stitky tr.aktivni td { background: var(--hlavni-svetla); }
+.stitek-velky { font-size: .85rem; padding: .15rem .6rem; cursor: pointer; }
+
+/* 0.8.8: tlačítka v posledním sloupci tabulky (buňka zůstane buňkou, takže okraje řádků navazují) */
+.bunka-akce { white-space: nowrap; }
+.bunka-akce > .tlacitka { justify-content: flex-end; flex-wrap: nowrap; }

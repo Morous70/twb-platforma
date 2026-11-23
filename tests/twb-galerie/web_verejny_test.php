@@ -127,11 +127,12 @@ test('web 0.8.3: reklama jen jako kód pro pozice, měření, převod nastavení
     $adsense = "<ins class=\"adsbygoogle\" data-ad-slot=\"2\"></ins>\r\n<script>(adsbygoogle = window.adsbygoogle || []).push({});</script>";
     $web->uloz('reklama', ['reklama_zapnuto' => '1', 'reklama_pod_uvodem' => "  $adsense \n", 'reklama_pred_patickou' => '<b>x</b>', 'ads_txt' => "google.com, pub-1, DIRECT\r\n"]);
     $n = $web->nastaveni();
-    eq([str_replace("\r\n", "\n", $adsense), '', '<b>x</b>', 'google.com, pub-1, DIRECT'], [$n['reklama']['pod_uvodem'], $n['reklama']['pod_galeriemi'], $n['reklama']['pred_patickou'], $n['ads_txt']]);
+    eq([str_replace("\r\n", "\n", $adsense), '<b>x</b>', 'google.com, pub-1, DIRECT'], [$n['reklama']['pod_uvodem'], $n['reklama']['pred_patickou'], $n['ads_txt']]);
+    eq(['pod_uvodem', 'pred_patickou'], array_keys($n['reklama']), '0.8.8: jen dvě pozice');
     ok(Web::maReklamu($n));
     eq('', Web::reklamaKod(['reklama_zapnuto' => false] + $n, 'pod_uvodem'), 'vypnutá reklama');
     eq(['reklama' => 'Reklama'], Web::kategorieSouhlasu($n));
-    try { $web->uloz('reklama', ['reklama_pod_galeriemi' => str_repeat('x', Web::MAX_KOD + 1)]); ok(false); } catch (Chyba) { ok(true); }
+    try { $web->uloz('reklama', ['reklama_pred_patickou' => str_repeat('x', Web::MAX_KOD + 1)]); ok(false); } catch (Chyba) { ok(true); }
 
     $web->uloz('mereni', ['mereni_zapnuto' => '1', 'mereni_kod' => '<script>/* matomo */</script>', 'mereni_umisteni' => 'hlavicka']);
     $n = $web->nastaveni();
@@ -146,8 +147,33 @@ test('web 0.8.3: reklama jen jako kód pro pozice, měření, převod nastavení
     $app->nastaveni()->uloz('web', json_encode(['nazev' => 'Stará', 'banner1' => ['zobrazit' => true, 'typ' => 'kod', 'kod' => '<i>A</i>'],
         'banner2' => ['zobrazit' => true, 'typ' => 'text', 'text' => 'Text', 'kod' => '<i>B</i>'], 'kod_hlavicka' => '<meta name="x">', 'ads_txt' => 'a']));
     $n = $web->nastaveni();
-    eq(['Stará', '<i>A</i>', '', true, '<meta name="x">', 'hlavicka', 'a'], [$n['nazev'], $n['reklama']['pod_uvodem'], $n['reklama']['pod_galeriemi'], $n['mereni_zapnuto'], $n['mereni_kod'], $n['mereni_umisteni'], $n['ads_txt']]);
+    eq(['Stará', '<i>A</i>', '', true, '<meta name="x">', 'hlavicka', 'a'], [$n['nazev'], $n['reklama']['pod_uvodem'], $n['reklama']['pred_patickou'], $n['mereni_zapnuto'], $n['mereni_kod'], $n['mereni_umisteni'], $n['ads_txt']]);
     ok(!isset($n['banner1']) && !isset($n['kod_hlavicka']));
+});
+
+test('web 0.8.8: zrušená pozice Pod galeriemi – kód se přesune Před patičku, obsazenou pozici nepřepíše (uschová se)', function () {
+    $app = novaApp();
+    $web = $app->web();
+    $uloz = fn(array $r) => $app->nastaveni()->uloz('web', json_encode(['reklama_zapnuto' => true, 'reklama' => $r]));
+    $uloz(['pod_uvodem' => '<i>U</i>', 'pod_galeriemi' => '<i>G</i>', 'pred_patickou' => '']);
+    $n = $web->nastaveni();
+    eq(['<i>U</i>', '<i>G</i>', ''], [$n['reklama']['pod_uvodem'], $n['reklama']['pred_patickou'], $n['reklama_odlozena']]);
+    $uloz(['pod_uvodem' => '', 'pod_galeriemi' => '<i>G</i>', 'pred_patickou' => '<i>P</i>']);
+    $n = $web->nastaveni();
+    eq(['<i>P</i>', '<i>G</i>'], [$n['reklama']['pred_patickou'], $n['reklama_odlozena']], 'obsazená pozice zůstane, kód se uschová');
+    eq('', Web::reklamaKod($n, 'pod_galeriemi'), 'zrušená pozice se nevypíše');
+    // uložení kterékoli části převod zapíše; uschovaný kód přežije uložení reklamy, zahodí se jen na požádání
+    $web->uloz('reklama', ['reklama_zapnuto' => '1', 'reklama_pred_patickou' => '<i>P</i>']);
+    $ulozene = json_decode((string)$app->nastaveni()->dej('web', ''), true);
+    ok(!isset($ulozene['reklama']['pod_galeriemi']), 'zrušená pozice zmizí z uloženého nastavení');
+    eq('<i>G</i>', $web->nastaveni()['reklama_odlozena']);
+    $web->uloz('reklama', ['reklama_zapnuto' => '1', 'reklama_pred_patickou' => '<i>P</i>', 'zahodit_odlozenou' => '1']);
+    eq('', $web->nastaveni()['reklama_odlozena']);
+    // stejný kód v obou pozicích se neuschovává; nastavení z 0.8.0–0.8.2 (banner2) jde rovnou Před patičku
+    $uloz(['pod_galeriemi' => '<i>P</i>', 'pred_patickou' => '<i>P</i>']);
+    eq('', $web->nastaveni()['reklama_odlozena']);
+    $app->nastaveni()->uloz('web', json_encode(['banner2' => ['zobrazit' => true, 'typ' => 'kod', 'kod' => '<i>B</i>']]));
+    eq('<i>B</i>', $web->nastaveni()['reklama']['pred_patickou']);
 });
 
 test('web 0.8.3: GDPR – kontrola údajů, vzorový text zásad podle nastavení, vlastní text', function () {
@@ -189,7 +215,7 @@ test('web 0.8.3 na serveru: pozice reklamy, měření, cookie lišta, zásady, a
     eq(404, $anon->jdi('verejne.php?s=' . Web::ZASADY)['code'], 'nezveřejněné zásady');
 
     $r = $b->jdi('index.php?p=web');
-    foreach (['role="tablist"', 'name="reklama_pod_uvodem"', 'name="reklama_pod_galeriemi"', 'name="reklama_pred_patickou"', 'name="mereni_kod"', 'name="mereni_umisteni"',
+    foreach (['role="tablist"', 'name="reklama_pod_uvodem"', 'name="reklama_pred_patickou"', 'name="mereni_kod"', 'name="mereni_umisteni"',
         'name="cookies_souhlas"', 'name="provozovatel"', 'data-vlozit-vzor'] as $t) ok(str_contains($r['body'], $t), $t);
     ok(!str_contains($r['body'], '_typ"') && !str_contains($r['body'], 'reklamní plocha'), 'žádná volba text/kód');
     $kod = '<div id="ssp-zone-1"></div><script src="https://ssp.seznam.cz/static/js/ssp.js"></script>';
@@ -302,7 +328,7 @@ test('web 0.8.4 na serveru: doporučení v detailu a hromadně, sekce na hlavní
 
     // nastavení v administraci
     $r = $b->jdi('index.php?p=web');
-    ok(str_contains($r['body'], 'name="doporucene_sloupce"') && str_contains($r['body'], 'name="doporucene_radky"') && str_contains($r['body'], '<strong>1</strong> na webu (dalších 1 není veřejných)'));
+    ok(str_contains($r['body'], 'name="doporucene_sloupce"') && str_contains($r['body'], 'name="doporucene_radky"') && str_contains($r['body'], 'Na webu: 1') && str_contains($r['body'], 'Neukáže se: 1'));
     ok(str_contains($r['body'], '<option value="8"') && !str_contains($r['body'], 'name="doporucene_radky"><option value="0"'));
     $r = $b->odesli('index.php?p=web', ['akce' => 'zaklad', 'zapnuto' => '1', 'nazev' => 'G', 'nadpis' => 'N', 'tlacitko' => 'T', 'vybrane_nadpis' => 'V', 'vybrane_pocet' => '4',
         'doporucene_nadpis' => 'Tipy', 'doporucene_podnadpis' => 'Vybrali jsme', 'doporucene_sloupce' => '6', 'doporucene_radky' => '3']);
@@ -389,7 +415,7 @@ test('0.8.7: doporučené mimo web – seznam s důvodem v administraci', functi
     eq(['Soukromé', 'Příroda'], [$mimo[1]['kategorie'], $mimo[3]['kategorie']]);
     ok(str_contains($mimo[0]['duvod'], 'jen obrázky') && str_contains($mimo[1]['duvod'], 'není zobrazená') && str_contains($mimo[2]['duvod'], 'archivu') && str_contains($mimo[3]['duvod'], 'veřejný odkaz'));
     $r = $b->jdi('index.php?p=web');
-    ok(str_contains($r['body'], 'Doporučené, které se na webu neukážou (4)'), 'nadpis seznamu');
+    ok(str_contains($r['body'], 'Proč se 4 doporučených neukáže'), 'nadpis seznamu');
     ok(str_contains($r['body'], 'p=medium&amp;id=' . $ids['bezodkazu']) && str_contains($r['body'], 'Tajné.jpg') && str_contains($r['body'], 'Médium nemá zapnutý veřejný odkaz.'), 'odkaz na detail a důvod');
     ok(!str_contains($r['body'], 'p=medium&amp;id=' . $ids['ok'] . '"'), 'veřejná v seznamu není');
 });

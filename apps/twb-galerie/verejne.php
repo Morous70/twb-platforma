@@ -117,7 +117,6 @@ switch ($stranka) {
         } elseif (!$kategorie) {
             $obsah .= '<p class="prazdne">Galerie se připravuje. Nové fotografie brzy přibudou.</p>';
         }
-        $obsah .= $reklama('pod_galeriemi');
         if ($doporucene = $web->doporucene()) {
             // 0.8.4: náhodný výběr z doporučených; mřížka sloupce × řádky (třídy v assets/verejne.css, CSP nepovoluje style="")
             $obsah .= '<section class="sekce sekce-doporucene">' . $nadpisSekce($n['doporucene_nadpis'], $n['doporucene_podnadpis'])
@@ -137,7 +136,6 @@ switch ($stranka) {
             $obsah .= '<div class="obsah"><nav class="drobecky" aria-label="Drobečková navigace"><a href="?s=galerie">Galerie</a> <span aria-hidden="true">›</span> <span>' . $h($k['name']) . '</span></nav>'
                 . $nadpisSekce((string)$k['name'], ($k['web_description'] ? $k['web_description'] . ' · ' : '') . $fotografii($f['celkem']), 'h1') . $reklama('pod_uvodem');
             $obsah .= $f['polozky'] ? $mrizka($f['polozky']) : '<p class="prazdne">V této galerii zatím nejsou žádné fotografie.</p>';
-            $obsah .= $reklama('pod_galeriemi');
             if ($f['stran'] > 1) {
                 $obsah .= '<nav class="strankovani" aria-label="Stránky">';
                 for ($i = 1; $i <= $f['stran']; $i++) {
@@ -151,7 +149,6 @@ switch ($stranka) {
         $titulek = 'Galerie';
         $obsah .= '<div class="obsah">' . $nadpisSekce('Galerie', $kategorie ? 'Všechny veřejné galerie.' : '', 'h1') . $reklama('pod_uvodem');
         $obsah .= $kategorie ? $karty($kategorie) : '<p class="prazdne">Galerie se připravuje. Nové fotografie brzy přibudou.</p>';
-        $obsah .= $reklama('pod_galeriemi');
         if ($nove = $web->nejnovejsi(12)) $obsah .= '<section class="sekce">' . $nadpisSekce('Nejnovější fotografie') . $mrizka($nove, true) . '</section>';
         $obsah .= $reklama('pred_patickou') . '</div>';
         break;

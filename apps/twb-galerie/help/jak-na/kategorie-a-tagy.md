@@ -4,13 +4,16 @@ sekce: jak-na
 admin: ne
 kontext: kategorie
 souvisi: nahravani
-klicova: kategorie, složka, tag, štítek, archiv, hledání, hromadně
+klicova: kategorie, složka, pořadí, přetažení, tag, štítek, štítky, přejmenovat, sloučit, smazat tag, archiv, hledání, hromadně
 ---
 # Kategorie, tagy a archiv
 
 - **Kategorie** jsou složky. Soubor patří nejvýš do jedné kategorie. Kategorie založíte na stránce **Kategorie**; smazáním kategorie se soubory nesmažou, jen zůstanou bez kategorie.
+  **Pořadí** kategorií změníte přetažením řádku za úchyt ⠿ vlevo (myší i prstem; nebo úchyt vyberte klávesou Tab a posouvejte šipkami). Uloží se hned a platí ve výběrech kategorií, v API i na veřejném webu.
 - **Tagy** jsou volné štítky (nejvýš 10 na soubor, každý do 30 znaků). Velikost písmen se nerozlišuje.
   Tag napište do pole a stiskněte **Enter** (nebo Tab či čárku) – vznikne štítek. Křížkem ho odeberete, **Backspace** v prázdném poli smaže poslední. Při psaní se nabízejí tagy, které už v galerii jsou.
+- Stránka **Štítky** ukáže všechny tagy s počtem médií (číslo otevře média v Galerii). Tag tam jde **přejmenovat** (když nový název už existuje, oba se sloučí),
+  **sloučit** víc vybraných do jednoho (zaškrtněte je a napište výsledný název) nebo **smazat** – média zůstanou, jen bez tagu.
 - **Archiv** schová soubory, které už nepoužíváte, ale nechcete je mazat. Veřejný odkaz dál funguje. Archiv otevřete tlačítkem **Archiv** v galerii.
 
 ## Hledání a hromadné akce

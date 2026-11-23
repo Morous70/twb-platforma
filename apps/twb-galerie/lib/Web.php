@@ -8,7 +8,9 @@ namespace MediaGalerie;
  * které nejsou v archivu a mají zapnutý veřejný odkaz (vypnutý odkaz = fotka zmizí i z webu). Obrázky se vydávají
  * přes trvalé adresy náhledů veřejného odkazu (soubor.php/<klíč>/w<px>/…), originál se na webu nenabízí.
  * Texty, úvodní fotka a reklamní plochy jsou v nastavení `web` (JSON, zálohuje se).
- * Reklama (0.8.3): pro každou pozici (POZICE) jen kód z reklamního systému (HTML/JS), vloží se bez úprav. Měření návštěvnosti:
+ * Reklama (0.8.3): pro každou pozici (POZICE) jen kód z reklamního systému (HTML/JS), vloží se bez úprav. 0.8.8: jen pozice Pod úvodem
+ * a Před patičkou; kód zrušené pozice Pod galeriemi se při čtení přesune do Před patičkou, a když je obsazená, uschová se
+ * (reklama_odlozena – nezobrazuje se, správce ho v administraci vidí a může přesunout nebo zahodit). Měření návštěvnosti:
  * jeden měřicí kód do hlavičky nebo na konec stránky. Se zapnutým souhlasem s cookies se měřicí ani reklamní kód nenačte,
  * dokud ho návštěvník nepovolí (na stránce je jen jako neživý <template>, oživí ho assets/verejne.js). Kód zadává jen
  * přihlášený správce; stránka s kódem dostane volnější CSP. Stránka Zásady ochrany osobních údajů (vlastní Markdown nebo vzor).
@@ -40,7 +42,9 @@ final class Web
         'skryt_vyhledavacum' => false,
         // reklama (0.8.3): kód pro každou pozici, prázdná pozice se nezobrazí
         'reklama_zapnuto' => true,
-        'reklama' => ['pod_uvodem' => '', 'pod_galeriemi' => '', 'pred_patickou' => ''],
+        'reklama' => ['pod_uvodem' => '', 'pred_patickou' => ''],
+        // 0.8.8: kód ze zrušené pozice Pod galeriemi, pro který nezbylo místo (nezobrazuje se)
+        'reklama_odlozena' => '',
         'ads_txt' => '',
         // měření návštěvnosti
         'mereni_zapnuto' => false,
@@ -59,7 +63,6 @@ final class Web
     /** Reklamní pozice: klíč => [název, kde je a na co se hodí]. */
     public const POZICE = [
         'pod_uvodem' => ['Pod úvodem', 'Hlavní stránka pod úvodní fotkou, stránka Galerie a galerie kategorie pod nadpisem. Nejvíc zobrazení – vhodné pro banner na šířku (např. 970×250 nebo 728×90, na mobilu 320×100).'],
-        'pod_galeriemi' => ['Pod galeriemi', 'Hlavní stránka pod kartami vybraných galerií, stránka Galerie pod seznamem galerií, galerie kategorie pod mřížkou fotek. Vhodné pro obdélník 300×250 nebo banner na šířku.'],
         'pred_patickou' => ['Před patičkou', 'Úplně dole na hlavní stránce, v galeriích i na stránce O galerii – dobere návštěvníky, kteří prošli celou stránku.'],
     ];
     /** Kam vložit měřicí kód. */
@@ -94,11 +97,12 @@ final class Web
         $n = is_array($n) ? $n : [];
         $out = array_replace(self::VYCHOZI, array_intersect_key($n, self::VYCHOZI));
         $out['reklama'] = array_replace(self::VYCHOZI['reklama'], is_array($n['reklama'] ?? null) ? array_map('strval', array_intersect_key($n['reklama'], self::VYCHOZI['reklama'])) : []);
+        $zrusena = is_array($n['reklama'] ?? null) ? ['pod_galeriemi' => (string)($n['reklama']['pod_galeriemi'] ?? '')] : [];
         if (!isset($n['reklama'])) {
             // nastavení z 0.8.0–0.8.2: z reklamních ploch zůstane jen kód (textové plochy byly jen ukázka), kód do hlavičky → měření
             foreach (['banner1' => 'pod_uvodem', 'banner2' => 'pod_galeriemi'] as $stary => $pozice) {
                 $b = $n[$stary] ?? null;
-                if (is_array($b) && ($b['typ'] ?? '') === 'kod' && !empty($b['zobrazit'])) $out['reklama'][$pozice] = (string)($b['kod'] ?? '');
+                if (is_array($b) && ($b['typ'] ?? '') === 'kod' && !empty($b['zobrazit'])) $zrusena[$pozice] = (string)($b['kod'] ?? '');
             }
             if (($n['kod_hlavicka'] ?? '') !== '' && !isset($n['mereni_kod'])) {
                 $out['mereni_zapnuto'] = true;
@@ -106,6 +110,14 @@ final class Web
                 $out['mereni_umisteni'] = 'hlavicka';
             }
         }
+        if (isset($zrusena['pod_uvodem'])) $out['reklama']['pod_uvodem'] = $zrusena['pod_uvodem'];
+        // 0.8.8: zrušená pozice Pod galeriemi → Před patičkou, je-li volná; jinak kód uschovat (nezobrazí se, správce rozhodne)
+        $kod = trim($zrusena['pod_galeriemi'] ?? '');
+        if ($kod !== '') {
+            if (trim($out['reklama']['pred_patickou']) === '') $out['reklama']['pred_patickou'] = $kod;
+            elseif (trim((string)$out['reklama_odlozena']) === '' && $kod !== trim($out['reklama']['pred_patickou'])) $out['reklama_odlozena'] = $kod;
+        }
+        $out['reklama_odlozena'] = (string)$out['reklama_odlozena'];
         if (!isset(self::UMISTENI_MERENI[$out['mereni_umisteni']])) $out['mereni_umisteni'] = 'konec';
         $out['doporucene_sloupce'] = min(self::SLOUPCE[1], max(self::SLOUPCE[0], (int)$out['doporucene_sloupce']));
         $out['doporucene_radky'] = min(self::RADKY[1], max(self::RADKY[0], (int)$out['doporucene_radky']));
@@ -165,6 +177,7 @@ final class Web
         $n['reklama_zapnuto'] = !empty($p['reklama_zapnuto']);
         foreach (self::POZICE as $k => [$nazev]) $n['reklama'][$k] = self::kod($p, "reklama_{$k}", "Reklama – {$nazev}");
         $n['ads_txt'] = self::kod($p, 'ads_txt', 'Obsah ads.txt');
+        if (!empty($p['zahodit_odlozenou'])) $n['reklama_odlozena'] = '';
     }
 
     /** @param array<string, mixed> $n @param array<string, mixed> $p */
@@ -327,8 +340,7 @@ final class Web
     {
         $r = $this->app->db->q('SELECT c.*, COUNT(m.id) AS pocet FROM categories c JOIN media m ON m.category_id = c.id AND ' . self::VEREJNA
             . ' WHERE c.web_public = 1 GROUP BY c.id HAVING COUNT(m.id) > 0')->fetchAll();
-        usort($r, fn($a, $b) => ((int)$a['web_order'] <=> (int)$b['web_order'])
-            ?: strcmp(\TWB\Tagy\Tagy::klicRazeni($a['name']), \TWB\Tagy\Tagy::klicRazeni($b['name'])) ?: $a['id'] <=> $b['id']);
+        usort($r, [Kategorie::class, 'porovnej']);
         foreach ($r as &$k) $k['obalka'] = $this->obalka($k);
         return $r;
     }
@@ -487,10 +499,9 @@ final class Web
         if ($obalka > 0 && !$this->app->db->q("SELECT 1 FROM media WHERE id = ? AND category_id = ? AND kind = 'image'", [$obalka, $id])->fetchColumn()) {
             throw new Chyba('Obálka musí být obrázek z této kategorie.');
         }
-        $poradi = (int)($p['web_order'] ?? 0);
-        if ($poradi < -999 || $poradi > 999) throw new Chyba('Pořadí musí být −999 až 999.');
-        $this->app->db->q('UPDATE categories SET web_public = ?, web_description = ?, web_cover_id = ?, web_order = ?, updated_at = ? WHERE id = ?', [
-            !empty($p['web_public']) ? 1 : 0, Vstup::text($p, 'web_description', 'Popis na webu', 500, false), $obalka > 0 ? $obalka : null, $poradi, time(), $id]);
+        // pořadí (0.8.8) se nastavuje přetažením v seznamu kategorií (Kategorie::nastavPoradi), formulář ho nemění
+        $this->app->db->q('UPDATE categories SET web_public = ?, web_description = ?, web_cover_id = ?, updated_at = ? WHERE id = ?', [
+            !empty($p['web_public']) ? 1 : 0, Vstup::text($p, 'web_description', 'Popis na webu', 500, false), $obalka > 0 ? $obalka : null, time(), $id]);
     }
 
     /** Obrázky kategorie s veřejným odkazem pro výběr obálky. @return array<int, string> */

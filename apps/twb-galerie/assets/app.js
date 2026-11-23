@@ -647,3 +647,104 @@
     });
   });
 })();
+
+// Kategorie (0.8.8): pořadí přetažením řádku za úchyt (myš, dotyk – pointer události) nebo šipkami na zaměřeném úchytu.
+// Nové pořadí se hned uloží (POST akce=poradi, odpověď JSON); při chybě se vrátí původní pořadí.
+(function () {
+  var telo = document.querySelector('tbody[data-poradi]');
+  if (!telo || !window.fetch) return;
+  var stav = document.querySelector('[data-poradi-stav]');
+  var radky = function () { return Array.prototype.slice.call(telo.querySelectorAll('tr[data-poradi-id]')); };
+  var poradi = function () { return radky().map(function (r) { return r.getAttribute('data-poradi-id'); }).join(','); };
+  var ulozene = poradi();
+  var casovac = null;
+  var hlaska = function (t, chyba) { if (stav) { stav.textContent = t; stav.classList.toggle('chyba', !!chyba); } };
+  var obnovUlozene = function () {
+    var podleId = {};
+    radky().forEach(function (r) { podleId[r.getAttribute('data-poradi-id')] = r; });
+    ulozene.split(',').forEach(function (id) { if (podleId[id]) telo.appendChild(podleId[id]); });
+  };
+  var uloz = function () {
+    var nove = poradi();
+    if (nove === ulozene) return;
+    hlaska('Ukládám pořadí…');
+    var fd = new FormData();
+    fd.append('csrf', telo.getAttribute('data-poradi'));
+    fd.append('akce', 'poradi');
+    fd.append('poradi', nove);
+    fetch(window.location.pathname + '?p=kategorie', { method: 'POST', body: fd, credentials: 'same-origin', headers: { 'Accept': 'application/json' } })
+      .then(function (r) { return r.json(); })
+      .then(function (j) {
+        if (!j.ok) throw new Error(j.error || 'Chyba');
+        ulozene = nove;
+        hlaska('Pořadí uloženo.');
+      })
+      .catch(function (e) {
+        obnovUlozene();
+        hlaska('Pořadí se nepodařilo uložit' + (e && e.message && e.message !== 'Chyba' ? ': ' + e.message : '') + '. Načtěte stránku znovu.', true);
+      });
+  };
+
+  // tažení: řádek se přesouvá mezi ostatními podle polohy ukazatele, uloží se po puštění
+  var tazeny = null;
+  telo.addEventListener('pointerdown', function (e) {
+    var uchyt = e.target.closest('[data-uchyt]');
+    if (!uchyt || e.button > 0) return;
+    e.preventDefault();
+    tazeny = uchyt.closest('tr');
+    tazeny.classList.add('tazeny');
+    telo.classList.add('tazeni');
+    try { uchyt.setPointerCapture(e.pointerId); } catch (x) { /* starší prohlížeč */ }
+  });
+  telo.addEventListener('pointermove', function (e) {
+    if (!tazeny) return;
+    e.preventDefault();
+    var ostatni = radky().filter(function (r) { return r !== tazeny; });
+    var pred = null;
+    for (var i = 0; i < ostatni.length; i++) {
+      var b = ostatni[i].getBoundingClientRect();
+      if (e.clientY < b.top + b.height / 2) { pred = ostatni[i]; break; }
+    }
+    if (pred !== tazeny.nextElementSibling || (pred === null && telo.lastElementChild !== tazeny)) telo.insertBefore(tazeny, pred);
+  });
+  var pust = function () {
+    if (!tazeny) return;
+    tazeny.classList.remove('tazeny');
+    telo.classList.remove('tazeni');
+    tazeny = null;
+    uloz();
+  };
+  telo.addEventListener('pointerup', pust);
+  telo.addEventListener('pointercancel', pust);
+
+  // klávesnice: šipka nahoru/dolů přesune řádek, uloží se chvíli po poslední změně
+  telo.addEventListener('keydown', function (e) {
+    var uchyt = e.target.closest('[data-uchyt]');
+    if (!uchyt || (e.key !== 'ArrowUp' && e.key !== 'ArrowDown')) return;
+    e.preventDefault();
+    var r = uchyt.closest('tr');
+    if (e.key === 'ArrowUp' && r.previousElementSibling) telo.insertBefore(r, r.previousElementSibling);
+    else if (e.key === 'ArrowDown' && r.nextElementSibling) telo.insertBefore(r.nextElementSibling, r);
+    else return;
+    uchyt.focus();
+    clearTimeout(casovac);
+    casovac = setTimeout(uloz, 500);
+  });
+})();
+
+// Štítky (0.8.8): u formuláře Sloučit ukázat, které štítky jsou vybrané; první vybraný nabídnout jako cíl
+(function () {
+  var form = document.getElementById('f-slouceni');
+  if (!form) return;
+  var info = form.querySelector('[data-stitky-vybrane]');
+  var cil = form.querySelector('[name="cil"]');
+  var vychozi = info ? info.textContent : '';
+  var obnov = function () {
+    var v = Array.prototype.slice.call(document.querySelectorAll('[data-stitek-vyber]:checked')).map(function (c) { return c.value; });
+    if (info) info.textContent = v.length ? 'Vybráno ' + v.length + ': ' + v.join(', ') : vychozi;
+    if (cil && v.length && (cil.value === '' || cil.dataset.auto === '1')) { cil.value = v[0]; cil.dataset.auto = '1'; }
+  };
+  if (cil) cil.addEventListener('input', function () { cil.dataset.auto = ''; });
+  document.querySelectorAll('[data-stitek-vyber]').forEach(function (c) { c.addEventListener('change', obnov); });
+  obnov();
+})();

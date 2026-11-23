@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 // Přihlašovací stránka: heslo, Google, Passkey, zapomenuté heslo (?zapomenute) a nové heslo z odkazu v e-mailu (?reset=token).
-// Proměnné: $app, $ui, $relace, $post.
+// 0.8.9: ve vzhledu veřejného webu (Ui::prihlasovaci). Proměnné: $app, $ui, $relace, $post.
 use MediaGalerie\Ui;
 
 $zamek = $app->zamek();
@@ -57,10 +57,10 @@ if ($reset !== ''): ?>
   <input type="hidden" name="akce" value="reset">
   <?= Ui::pole('Nové heslo', 'heslo', '', ['type' => 'password', 'required' => true, 'minlength' => 8, 'autocomplete' => 'new-password', 'autofocus' => true], 'Aspoň 8 znaků.') ?>
   <?= Ui::pole('Nové heslo znovu', 'heslo2', '', ['type' => 'password', 'required' => true, 'autocomplete' => 'new-password']) ?>
-  <button type="submit" class="hlavni">Nastavit heslo</button>
+  <button type="submit" class="tlacitko hlavni">Nastavit heslo</button>
 </form>
 <?php endif;
-$ui->samostatna('Nové heslo', (string)ob_get_clean());
+$ui->prihlasovaci('Nové heslo', (string)ob_get_clean(), 'Zvolte nové heslo do administrace.');
 return;
 endif;
 
@@ -72,11 +72,11 @@ if ($zapomenute): ?>
   <?= $ui->csrf() ?>
   <input type="hidden" name="akce" value="zapomenute">
   <?= Ui::pole('E-mail pro obnovu hesla', 'email', '', ['type' => 'email', 'required' => true, 'autocomplete' => 'email', 'autofocus' => true], 'Adresa nastavená v Nastavení → Zabezpečení.') ?>
-  <button type="submit" class="hlavni">Poslat odkaz</button>
+  <button type="submit" class="tlacitko hlavni">Poslat odkaz</button>
 </form>
-<p class="mala"><a href="index.php">Zpět na přihlášení</a></p>
+<p class="prihlaseni-odkazy"><a href="index.php">Zpět na přihlášení</a></p>
 <?php
-$ui->samostatna('Zapomenuté heslo', (string)ob_get_clean());
+$ui->prihlasovaci('Zapomenuté heslo', (string)ob_get_clean(), 'Pošleme vám odkaz pro nastavení nového hesla.');
 return;
 endif;
 
@@ -87,15 +87,15 @@ $passkey = $app->passkey()->dostupne() && $app->passkey()->seznam() !== [];
   <?= $ui->csrf() ?>
   <input type="hidden" name="akce" value="prihlasit">
   <label class="pole"><span>Heslo</span><input type="password" name="heslo" autocomplete="current-password" required autofocus></label>
-  <button type="submit" class="hlavni">Přihlásit</button>
+  <button type="submit" class="tlacitko hlavni">Přihlásit</button>
 </form>
 <?php if ($google || $passkey): ?>
 <div class="nebo"><span>nebo</span></div>
 <div class="tlacitka-sloupec">
-  <?php if ($passkey): ?><button type="button" id="passkey-prihlasit" data-csrf="<?= Ui::h($relace->csrfToken()) ?>">Přihlásit pomocí Passkey</button><?php endif; ?>
-  <?php if ($google): ?><a class="tlacitko" href="google.php">Přihlásit přes Google</a><?php endif; ?>
+  <?php if ($passkey): ?><button type="button" class="tlacitko vedlejsi" id="passkey-prihlasit" data-csrf="<?= Ui::h($relace->csrfToken()) ?>">Přihlásit pomocí Passkey</button><?php endif; ?>
+  <?php if ($google): ?><a class="tlacitko vedlejsi" href="google.php">Přihlásit přes Google</a><?php endif; ?>
 </div>
 <?php endif; ?>
-<p class="mala" style="text-align:center"><a href="index.php?zapomenute">Zapomenuté heslo</a></p>
+<p class="prihlaseni-odkazy"><a href="index.php?zapomenute">Zapomenuté heslo</a></p>
 <?php
-$ui->samostatna('Přihlášení', (string)ob_get_clean());
+$ui->prihlasovaci('Přihlášení', (string)ob_get_clean(), 'Správa galerie, médií a veřejného webu.');

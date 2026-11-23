@@ -147,15 +147,6 @@ $adresaZasad = $app->url(Web::ZASADY);
     placeholder="<ins …></ins>&#10;<script async src=&quot;https://…&quot;></script>"><?= Ui::h($post && $karta === 'reklama' ? (string)($_POST["reklama_{$k}"] ?? '') : $n['reklama'][$k]) ?></textarea>
 </div>
 <?php endforeach; ?>
-<?php if (trim((string)$n['reklama_odlozena']) !== ''): ?>
-<div class="karta formular hlaska-varovani">
-  <h2 style="margin:0">Uschovaný kód ze zrušené pozice Pod galeriemi</h2>
-  <p class="slabe" style="margin:0">Od verze 0.8.8 je reklama jen <strong>Pod úvodem</strong> a <strong>Před patičkou</strong>. Pozice Před patičkou už měla svůj kód, proto se tento
-    na webu <strong>nezobrazuje</strong>. Když ho chcete použít, zkopírujte ho do některé pozice výš; jinak ho zahoďte.</p>
-  <textarea class="kod" rows="3" readonly spellcheck="false" aria-label="Uschovaný kód reklamy"><?= Ui::h($n['reklama_odlozena']) ?></textarea>
-  <label class="zaskrtavatko"><input type="checkbox" name="zahodit_odlozenou" value="1"> <span>Zahodit uschovaný kód při uložení</span></label>
-</div>
-<?php endif; ?>
 <div class="karta formular">
   <h2 style="margin:0">ads.txt</h2>
   <p class="slabe" style="margin:0">Web ho vydá na <a href="<?= Ui::h($app->url('ads.txt')) ?>"><code>/ads.txt</code></a> – vyžaduje ho např. AdSense (<em>Weby → ads.txt</em>). Prázdné = soubor neexistuje.</p>

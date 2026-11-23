@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
-// TWB Media galerie 0.8.8: pořadí kategorií přetažením, stránka Štítky, Naposledy nahrané 8 × 2, Základ a texty ve skupinách,
-// reklama jen Pod úvodem a Před patičkou. Bez serveru, na serveru a ve skutečném prohlížeči (Playwright, když je k dispozici).
+// TWB Media galerie 0.8.8: pořadí kategorií přetažením, stránka Štítky, Naposledy nahrané 8 × 2, Základ a texty ve skupinách
+// (reklama jen ve dvou pozicích z 0.8.8 vrátila 0.8.9 – viz web_verejny_test.php). Bez serveru, na serveru a ve skutečném prohlížeči (Playwright, když je k dispozici).
 require __DIR__ . '/pomocne.php';
 require __DIR__ . '/server.php';
 
@@ -135,24 +135,13 @@ test('server: Přehled – Naposledy nahrané 16 nejnovějších v mřížce 8 �
     ok(str_contains($r['body'], 'foto-20.jpg') && str_contains($r['body'], 'foto-05.jpg') && !str_contains($r['body'], 'foto-04.jpg'), 'nejnovějších 16');
 });
 
-test('server: Základ a texty ve skupinách, reklama jen dvě pozice, uschovaný kód Pod galeriemi', function () use ($s, $b, $app) {
+test('server: Základ a texty ve skupinách', function () use ($s, $b) {
     $r = $b->jdi('index.php?p=web');
     foreach (['Stav webu', 'Logo a patička', 'Úvodní část hlavní stránky', 'Vybrané galerie', 'Doporučené fotografie', 'Stránka O galerii', 'class="web-zaklad"', 'ulozit-lista'] as $t) ok(str_contains($r['body'], $t), $t);
-    ok(!str_contains($r['body'], 'name="reklama_pod_galeriemi"') && !str_contains($r['body'], 'Uschovaný kód'), 'bez zrušené pozice');
     $r = $b->odesli('index.php?p=web', ['akce' => 'zaklad', 'zapnuto' => '1', 'nazev' => 'Moje', 'nadpis' => 'N', 'tlacitko' => 'T', 'vybrane_nadpis' => 'V', 'vybrane_pocet' => '3',
         'doporucene_nadpis' => 'D', 'doporucene_sloupce' => '5', 'doporucene_radky' => '2']);
     ok(str_contains($r['body'], 'Nastavení webu uloženo'));
     eq('Moje', json_decode((string)$s->db()->query("SELECT v FROM settings WHERE k = 'web'")->fetchColumn(), true)['nazev']);
-    // stará instalace s kódem ve zrušené pozici (obě pozice obsazené) → uschovaný kód v kartě Reklama, web ho nevypíše
-    $app->nastaveni()->uloz('web', json_encode(['reklama_zapnuto' => true, 'reklama' => ['pod_uvodem' => '<i id="u"></i>', 'pod_galeriemi' => '<i id="g"></i>', 'pred_patickou' => '<i id="p"></i>'], 'cookies_souhlas' => false]));
-    $r = $b->jdi('index.php?p=web&karta=reklama');
-    ok(str_contains($r['body'], 'Uschovaný kód') && str_contains($r['body'], htmlspecialchars('<i id="g"></i>')));
-    $web = (new Prohlizec($s))->jdi('verejne.php')['body'];
-    ok(str_contains($web, '<i id="u"></i>') && str_contains($web, '<i id="p"></i>') && !str_contains($web, '<i id="g"></i>') && !str_contains($web, 'reklama-pod-galeriemi'));
-    $b->odesli('index.php?p=web&karta=reklama', ['akce' => 'reklama', 'reklama_zapnuto' => '1', 'reklama_pod_uvodem' => '<i id="u"></i>', 'reklama_pred_patickou' => '<i id="g"></i>', 'zahodit_odlozenou' => '1']);
-    $r = $b->jdi('index.php?p=web&karta=reklama');
-    ok(!str_contains($r['body'], 'Uschovaný kód'), 'zahozený');
-    ok(str_contains((new Prohlizec($s))->jdi('verejne.php')['body'], '<i id="g"></i>'), 'přesunutý ručně Před patičku');
 });
 
 // ---------- v prohlížeči ----------

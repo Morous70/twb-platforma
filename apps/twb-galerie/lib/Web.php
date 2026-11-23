@@ -16,6 +16,8 @@ namespace MediaGalerie;
  * přihlášený správce; stránka s kódem dostane volnější CSP. Stránka Zásady ochrany osobních údajů (vlastní Markdown nebo vzor).
  * Doporučené fotografie (0.8.4): na hlavní stránce náhodný výběr z veřejných fotek označených jako doporučená (media.featured),
  * v mřížce s nastaveným počtem sloupců (3–8) a řádků (1–5).
+ * 0.8.11: až 5 úvodních fotek (uvod_ids, při každém načtení hlavní stránky náhodně jedna; dřívější uvod_id je první z nich)
+ * a vlastní grafické logo (tabulka web_files, vydává logo.php) v záhlaví webu, na přihlášení a v administraci; bez loga zůstává znak + název.
  */
 final class Web
 {
@@ -27,7 +29,9 @@ final class Web
         'podnadpis' => 'Fotografie, příběhy a okamžiky zachycené na jednom místě.',
         'tlacitko' => 'Prohlédnout galerii',
         'poznamka' => 'Nové fotografie průběžně přibývají',
-        'uvod_id' => null,
+        'uvod_id' => null,       // první z uvod_ids (kvůli starším klientům a zálohám z 0.8.10 a dřív)
+        'uvod_ids' => [],        // 0.8.11: až MAX_UVODNI úvodních fotek, na webu náhodně jedna
+        'logo_nazev' => true,    // 0.8.11: s vlastním logem ukázat vedle něj i název webu
         'vybrane_nadpis' => 'Vybrané galerie',
         'vybrane_podnadpis' => 'Vyberte si, co chcete prohlédnout.',
         'vybrane_pocet' => 4,
@@ -83,6 +87,11 @@ final class Web
     /** Náhled v kartách a mřížce, velký obrázek v okně a úvodní fotka (delší strana v px, z Media::NAHLEDY). */
     public const PX_NAHLED = 640;
     public const PX_VELKY = 1920;
+    /** Nejvýš úvodních fotek (0.8.11). */
+    public const MAX_UVODNI = 5;
+    /** Vlastní logo (0.8.11): povolené typy (MIME => přípona) a největší velikost souboru. */
+    public const LOGO_TYPY = ['image/png' => 'png', 'image/jpeg' => 'jpg', 'image/webp' => 'webp', 'image/gif' => 'gif', 'image/svg+xml' => 'svg'];
+    public const LOGO_MAX = 1048576;
 
     /** Podmínka pro fotku na webu (tabulka media jako m, categories jako c). */
     private const VEREJNA = "m.kind = 'image' AND m.archived_at IS NULL AND m.public_key IS NOT NULL AND c.web_public = 1";
@@ -112,6 +121,11 @@ final class Web
         $odlozena = trim((string)($n['reklama_odlozena'] ?? ''));
         if ($odlozena !== '' && trim($out['reklama']['pod_galeriemi']) === '') $out['reklama']['pod_galeriemi'] = $odlozena;
         if (!isset(self::UMISTENI_MERENI[$out['mereni_umisteni']])) $out['mereni_umisteni'] = 'konec';
+        // 0.8.11: seznam úvodních fotek; nastavení z 0.8.10 a dřív má jen jednu (uvod_id)
+        $ids = is_array($n['uvod_ids'] ?? null) ? $n['uvod_ids'] : (($n['uvod_id'] ?? null) ? [$n['uvod_id']] : []);
+        $out['uvod_ids'] = array_slice(array_values(array_unique(array_filter(array_map('intval', $ids), fn($i) => $i > 0))), 0, self::MAX_UVODNI);
+        $out['uvod_id'] = $out['uvod_ids'][0] ?? null;
+        $out['logo_nazev'] = (bool)$out['logo_nazev'];
         $out['doporucene_sloupce'] = min(self::SLOUPCE[1], max(self::SLOUPCE[0], (int)$out['doporucene_sloupce']));
         $out['doporucene_radky'] = min(self::RADKY[1], max(self::RADKY[0], (int)$out['doporucene_radky']));
         return $out;
@@ -141,6 +155,7 @@ final class Web
         $n['zapnuto'] = !empty($p['zapnuto']);
         $n['odkaz_administrace'] = !empty($p['odkaz_administrace']);
         $n['skryt_vyhledavacum'] = !empty($p['skryt_vyhledavacum']);
+        if (array_key_exists('logo_nazev', $p) || array_key_exists('logo_nazev_pole', $p)) $n['logo_nazev'] = !empty($p['logo_nazev']);
         // doporučené fotografie (0.8.4): chybí-li pole ve formuláři (starší klient), zůstane dosavadní hodnota
         $p += array_intersect_key($n, array_flip(['doporucene_nadpis', 'doporucene_podnadpis', 'doporucene_sloupce', 'doporucene_radky']));
         foreach (['nazev' => ['Název webu', 60, true], 'stitek' => ['Štítek nad nadpisem', 60, false], 'nadpis' => ['Nadpis', 120, true],
@@ -159,9 +174,16 @@ final class Web
             if ($c === false || $c < $od || $c > $do) throw new Chyba("{$popis} musí být {$od} až {$do}.");
             $n[$k] = $c;
         }
-        $uvod = (int)($p['uvod_id'] ?? 0);
-        if ($uvod > 0 && !$this->muzeBytUvodni($uvod)) throw new Chyba('Úvodní fotka musí být obrázek se zapnutým veřejným odkazem, který není v archivu.');
-        $n['uvod_id'] = $uvod > 0 ? $uvod : null;
+        // 0.8.11: pole uvod_1 … uvod_5; starší formulář posílá jen uvod_id; bez obojího zůstanou dosavadní
+        $pole = array_filter(range(1, self::MAX_UVODNI), fn($i) => array_key_exists("uvod_{$i}", $p));
+        if ($pole) $ids = array_map(fn($i) => (int)$p["uvod_{$i}"], $pole);
+        elseif (array_key_exists('uvod_id', $p)) $ids = [(int)$p['uvod_id']];
+        else $ids = $n['uvod_ids'];
+        $ids = array_values(array_unique(array_filter($ids, fn($i) => $i > 0)));
+        if (count($ids) > self::MAX_UVODNI) throw new Chyba('Úvodních fotek může být nejvýš ' . self::MAX_UVODNI . '.');
+        foreach ($ids as $id) if (!$this->muzeBytUvodni($id)) throw new Chyba('Úvodní fotka musí být obrázek se zapnutým veřejným odkazem, který není v archivu.');
+        $n['uvod_ids'] = $ids;
+        $n['uvod_id'] = $ids[0] ?? null;
     }
 
     /** @param array<string, mixed> $n @param array<string, mixed> $p */
@@ -279,13 +301,140 @@ final class Web
         return trim((string)$n['zasady_text']) !== '' ? (string)$n['zasady_text'] : $this->vzorZasad($n);
     }
 
-    /** Nastaví úvodní fotku (tlačítko v detailu média). */
+    /** Přidá fotku mezi úvodní (tlačítko v detailu média). 0.8.11: úvodních je až MAX_UVODNI, nová se přidá na konec. */
     public function nastavUvodni(int $id): void
     {
         if (!$this->muzeBytUvodni($id)) throw new Chyba('Úvodní fotka musí být obrázek se zapnutým veřejným odkazem, který není v archivu.');
         $n = $this->nastaveni();
-        $n['uvod_id'] = $id;
+        if (in_array($id, $n['uvod_ids'], true)) return;
+        // místo po fotce, která už úvodní být nemůže (vypnutý odkaz, archiv, smazaná), se uvolní
+        $ids = array_values(array_filter($n['uvod_ids'], fn($i) => $this->muzeBytUvodni($i)));
+        if (count($ids) >= self::MAX_UVODNI) throw new Chyba('Úvodních fotek je už ' . self::MAX_UVODNI . ' (víc nejde). Nejdřív některou odeberte – tady v detailu jiné fotky nebo na stránce Veřejný web.');
+        $ids[] = $id;
+        $this->ulozUvodni($n, $ids);
+    }
+
+    /** Odebere fotku z úvodních (0.8.11). */
+    public function odeberUvodni(int $id): void
+    {
+        $n = $this->nastaveni();
+        $this->ulozUvodni($n, array_values(array_diff($n['uvod_ids'], [$id])));
+    }
+
+    /** Je fotka mezi úvodními? */
+    public function jeUvodni(int $id): bool
+    {
+        return in_array($id, $this->nastaveni()['uvod_ids'], true);
+    }
+
+    /** @param array<string, mixed> $n @param list<int> $ids */
+    private function ulozUvodni(array $n, array $ids): void
+    {
+        $n['uvod_ids'] = $ids;
+        $n['uvod_id'] = $ids[0] ?? null;
         $this->app->nastaveni()->uloz('web', (string)json_encode($n, JSON_UNESCAPED_UNICODE));
+    }
+
+    // ---------- vlastní logo (0.8.11) ----------
+
+    /** @var array<string, mixed>|false|null údaje o logu bez obsahu (false = není) */
+    private array|false|null $logo = null;
+
+    /** Údaje o vlastním logu (bez obsahu), null = logo není. @return ?array{mime: string, md5: string, width: ?int, height: ?int, updated_at: int} */
+    public function logo(): ?array
+    {
+        if ($this->logo === null) {
+            try {
+                $r = $this->app->db->q("SELECT mime, md5, width, height, updated_at FROM web_files WHERE name = 'logo'")->fetch();
+            } catch (\Throwable) { $r = false; }   // tabulka ještě není (před migrací)
+            $this->logo = $r ? ['mime' => (string)$r['mime'], 'md5' => (string)$r['md5'], 'width' => $r['width'] !== null ? (int)$r['width'] : null,
+                'height' => $r['height'] !== null ? (int)$r['height'] : null, 'updated_at' => (int)$r['updated_at']] : false;
+        }
+        return $this->logo ?: null;
+    }
+
+    /** Adresa loga pro <img> (relativní, s otiskem obsahu kvůli mezipaměti), '' = logo není. */
+    public function logoAdresa(): string
+    {
+        $l = $this->logo();
+        return $l ? 'logo.php?v=' . substr($l['md5'], 0, 10) : '';
+    }
+
+    /** Obsah loga k vydání (logo.php). @return ?array{mime: string, md5: string, data: string} */
+    public function logoSoubor(): ?array
+    {
+        try {
+            $r = $this->app->db->q("SELECT mime, md5, data FROM web_files WHERE name = 'logo'")->fetch();
+        } catch (\Throwable) { return null; }
+        if (!$r) return null;
+        $data = base64_decode((string)$r['data'], true);
+        return $data === false ? null : ['mime' => (string)$r['mime'], 'md5' => (string)$r['md5'], 'data' => $data];
+    }
+
+    /**
+     * Uloží vlastní logo z nahraného souboru (pole z $_FILES). Typ se pozná podle obsahu: PNG, JPEG, WebP, GIF nebo SVG, nejvýš 1 MB.
+     * SVG se kontroluje jen na tvar (kořen <svg>); na webu se vkládá přes <img>, kde se skripty nespouštějí, a logo.php ho vydává se sandboxem.
+     * @param array<string, mixed> $soubor
+     */
+    public function ulozLogo(array $soubor): void
+    {
+        $chyba = (int)($soubor['error'] ?? UPLOAD_ERR_NO_FILE);
+        if ($chyba === UPLOAD_ERR_INI_SIZE || $chyba === UPLOAD_ERR_FORM_SIZE) throw new Chyba('Logo je příliš velké – nejvýš 1 MB.');
+        if ($chyba !== UPLOAD_ERR_OK || !is_file((string)($soubor['tmp_name'] ?? ''))) throw new Chyba('Logo se nepodařilo nahrát.');
+        $cesta = (string)$soubor['tmp_name'];
+        if ((int)filesize($cesta) > self::LOGO_MAX) throw new Chyba('Logo je příliš velké – nejvýš 1 MB.');
+        $this->ulozLogoData((string)file_get_contents($cesta));
+    }
+
+    /** Uloží logo z obsahu souboru (kontrola typu a rozměrů). */
+    public function ulozLogoData(string $data): void
+    {
+        if ($data === '') throw new Chyba('Soubor s logem je prázdný.');
+        if (strlen($data) > self::LOGO_MAX) throw new Chyba('Logo je příliš velké – nejvýš 1 MB.');
+        $mime = (string)(new \finfo(FILEINFO_MIME_TYPE))->buffer($data);
+        $w = $h = null;
+        if (self::jeSvg($data)) {
+            $mime = 'image/svg+xml';
+            [$w, $h] = self::rozmerySvg($data);
+        } else {
+            $info = @getimagesizefromstring($data);
+            if (!$info || !isset(self::LOGO_TYPY[(string)$info['mime']])) throw new Chyba('Logo musí být obrázek PNG, JPG, WebP, GIF nebo SVG.');
+            $mime = (string)$info['mime'];
+            [$w, $h] = [(int)$info[0], (int)$info[1]];
+            if ($w < 16 || $h < 16) throw new Chyba('Logo je příliš malé – aspoň 16 × 16 px.');
+        }
+        if (!isset(self::LOGO_TYPY[$mime])) throw new Chyba('Logo musí být obrázek PNG, JPG, WebP, GIF nebo SVG.');
+        $this->app->db->q('DELETE FROM web_files WHERE name = ?', ['logo']);
+        $this->app->db->q('INSERT INTO web_files (name, mime, data, md5, width, height, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+            ['logo', $mime, base64_encode($data), md5($data), $w, $h, time()]);
+        $this->logo = null;
+        $this->app->log('info', 'Nahráno vlastní logo webu (' . strtoupper(self::LOGO_TYPY[$mime]) . ($w ? ", {$w} × {$h} px" : '') . ').');
+    }
+
+    /** Smaže vlastní logo – web i administrace se vrátí ke znaku s názvem. */
+    public function smazLogo(): void
+    {
+        $this->app->db->q('DELETE FROM web_files WHERE name = ?', ['logo']);
+        $this->logo = null;
+        $this->app->log('info', 'Vlastní logo webu odebráno.');
+    }
+
+    /** Je obsah SVG (XML s kořenem <svg>)? */
+    private static function jeSvg(string $data): bool
+    {
+        $zacatek = (string)preg_replace('/^\xEF\xBB\xBF/', '', ltrim(substr($data, 0, 4096)));
+        $zacatek = (string)preg_replace('/^(<\?xml[^>]*>\s*|<!--.*?-->\s*|<!DOCTYPE[^>]*>\s*)+/is', '', $zacatek);
+        return (bool)preg_match('/^<svg[\s>]/i', $zacatek);
+    }
+
+    /** Rozměry SVG z width/height, jinak z viewBox. @return array{?int, ?int} */
+    private static function rozmerySvg(string $data): array
+    {
+        if (!preg_match('/<svg\b[^>]*>/is', $data, $m)) return [null, null];
+        $atr = static fn(string $n): ?float => preg_match('/\s' . $n . '\s*=\s*["\']\s*([\d.]+)\s*(px)?\s*["\']/i', $m[0], $x) ? (float)$x[1] : null;
+        [$w, $h] = [$atr('width'), $atr('height')];
+        if ((!$w || !$h) && preg_match('/viewBox\s*=\s*["\']\s*[-\d.]+[\s,]+[-\d.]+[\s,]+([\d.]+)[\s,]+([\d.]+)/i', $m[0], $vb)) [$w, $h] = [(float)$vb[1], (float)$vb[2]];
+        return [$w ? (int)round($w) : null, $h ? (int)round($h) : null];
     }
 
     /** Vložený kód (HTML/JS) nebo ads.txt: ořízne okraje, sjednotí konce řádků, kontroluje jen délku (obsah je na správci). @param array<string, mixed> $v */
@@ -450,16 +599,28 @@ final class Web
             . ' ORDER BY m.id DESC LIMIT ' . max(1, $n))->fetchAll();
     }
 
-    /** Úvodní fotka: zvolená v administraci (musí mít veřejný odkaz), jinak obálka první veřejné kategorie. @return ?array<string, mixed> */
+    /**
+     * Úvodní fotka: náhodně jedna ze zvolených v administraci (0.8.11: až MAX_UVODNI; musí mít veřejný odkaz a nebýt v archivu),
+     * bez nich obálka první veřejné kategorie. @return ?array<string, mixed>
+     */
     public function uvodni(?array $kategorie = null): ?array
     {
-        $id = (int)($this->nastaveni()['uvod_id'] ?? 0);
-        if ($id > 0) {
-            $m = $this->app->db->q("SELECT * FROM media WHERE id = ? AND kind = 'image' AND archived_at IS NULL AND public_key IS NOT NULL", [$id])->fetch();
-            if ($m) return $m;
-        }
+        $fotky = $this->uvodniFotky();
+        if ($fotky) return $fotky[array_rand($fotky)];
         $kategorie ??= $this->kategorie();
         return $kategorie[0]['obalka'] ?? null;
+    }
+
+    /** Zvolené úvodní fotky, které se teď můžou ukázat, v nastaveném pořadí. @return list<array<string, mixed>> */
+    public function uvodniFotky(): array
+    {
+        $ids = $this->nastaveni()['uvod_ids'];
+        if (!$ids) return [];
+        $radky = [];
+        foreach ($this->app->db->q("SELECT * FROM media WHERE id IN (" . implode(',', array_fill(0, count($ids), '?')) . ") AND kind = 'image' AND archived_at IS NULL AND public_key IS NOT NULL", $ids)->fetchAll() as $m) {
+            $radky[(int)$m['id']] = $m;
+        }
+        return array_values(array_filter(array_map(fn($id) => $radky[$id] ?? null, $ids)));
     }
 
     /** Adresa náhledu fotky (trvalá, přes veřejný odkaz). */

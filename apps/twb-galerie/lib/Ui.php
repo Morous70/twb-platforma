@@ -234,7 +234,7 @@ final class Ui
         $verze = self::h($this->app->verze);
         echo $this->hlavicka($titulek, 'administrace')
             . '<div class="obal"><nav id="menu" class="postranni" aria-label="Hlavní menu">'
-            . '<a class="logo" href="index.php"><img src="assets/ikona.svg" alt="" width="28" height="28"><span>' . App::NAZEV . '</span></a>'
+            . $this->logoAdministrace()
             . '<ul>' . $menu . '</ul>'
             . '<div class="postranni-pata">Verze ' . $verze . '</div></nav>'
             . '<div class="zaclona" data-prepni="menu" hidden></div>'
@@ -249,6 +249,17 @@ final class Ui
             . '<main' . ($limit > 0 ? ' data-necinnost="' . $limit . '"' : '') . '><h1>' . self::h($titulek)
             . ($pomoc ? ' <a class="pomoc" href="' . self::h(self::odkaz('napoveda', ['s' => $pomoc])) . '" title="Nápověda k této stránce" aria-label="Nápověda k této stránce">?</a>' : '') . '</h1>' . $this->hlasky() . $obsah . '</main>'
             . '<footer><span>' . App::NAZEV . ' ' . $verze . '</span><a href="' . self::h(self::odkaz('napoveda')) . '">Nápověda</a></footer></div></div></body></html>';
+    }
+
+    /** Logo v postranním menu administrace: vlastní logo webu (0.8.11), jinak ikona aplikace; název podle volby „Vedle loga i název“. */
+    private function logoAdministrace(): string
+    {
+        $web = $this->app->web();
+        $logo = $web->logoAdresa();
+        if ($logo === '') return '<a class="logo" href="index.php"><img src="assets/ikona.svg" alt="" width="28" height="28"><span>' . App::NAZEV . '</span></a>';
+        $sNazvem = $web->nastaveni()['logo_nazev'];
+        return '<a class="logo logo-vlastni" href="index.php"><img class="logo-obrazek" src="' . self::h($logo) . '" alt="' . ($sNazvem ? '' : App::NAZEV) . '">'
+            . ($sNazvem ? '<span>' . App::NAZEV . '</span>' : '') . '</a>';
     }
 
     /** Jednoduchá stránka bez menu (přihlášení, instalace). */
@@ -270,7 +281,7 @@ final class Ui
             . '<meta name="robots" content="noindex, nofollow"><title>' . self::h($titulek) . ' – ' . self::h($n['nazev']) . '</title>'
             . "<link rel=\"stylesheet\" href=\"assets/verejne.css?v=$v\"><link rel=\"icon\" href=\"assets/ikona.svg\" type=\"image/svg+xml\">"
             . "<script src=\"assets/verejne.js?v=$v\" defer></script><script src=\"assets/app.js?v=$v\" defer></script></head><body class=\"stranka-prihlaseni\">"
-            . VerejneRozvrzeni::zahlavi($n, '', (bool)$n['zapnuto'], false)
+            . VerejneRozvrzeni::zahlavi($n, '', (bool)$n['zapnuto'], false, $web->logoAdresa())
             . '<main class="prihlaseni' . ($foto === '' ? ' prihlaseni-bez-fotky' : '') . '">'
             . ($foto !== '' ? '<img class="prihlaseni-fotka" src="' . self::h($foto) . '" alt="">' : '')
             . '<section class="prihlaseni-karta" aria-labelledby="prihlaseni-nadpis">'

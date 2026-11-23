@@ -12,6 +12,11 @@ if ($post) {
     if (isset(Web::CASTI[$cast])) $karta = $cast;   // po chybě zůstat na kartě formuláře
     if ($ui->zpracuj(function () use ($web, $cast) {
         if (!isset(Web::CASTI[$cast])) throw new Chyba('Neznámá akce.');
+        // 0.8.11: vlastní logo (nahrání nebo odebrání) jen s kartou Základ a texty; nejdřív soubor, ať chyba v něm nic neuloží napůl
+        if ($cast === 'zaklad') {
+            if (!empty($_POST['logo_smazat'])) $web->smazLogo();
+            elseif (($_FILES['logo']['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE) $web->ulozLogo($_FILES['logo']);
+        }
         $web->uloz($cast, $_POST);
     })) {
         $ui->zprava('ok', 'Nastavení webu uloženo.');
@@ -21,7 +26,11 @@ if ($post) {
 $n = $web->nastaveni();
 $kategorie = $web->kategorie();
 $vsechny = $app->kategorie()->seznam();
-$uvod = $web->uvodni($kategorie);
+$uvodni = [];   // 0.8.11: zvolené úvodní fotky podle id (náhled u výběru)
+foreach ($web->uvodniFotky() as $m) $uvodni[(int)$m['id']] = $m;
+$automaticka = $uvodni ? null : $web->uvodni($kategorie);
+$logo = $web->logo();
+$moznosti = $web->moznosti();
 $doporucenych = $web->pocetDoporucenych();
 $mimoWeb = $doporucenych['celkem'] > $doporucenych['verejne'] ? $web->doporuceneMimoWeb() : [];
 $rozsah = static fn(array $od_do): array => array_combine(range($od_do[0], $od_do[1]), array_map('strval', range($od_do[0], $od_do[1])));
@@ -33,7 +42,7 @@ $vypinac = static fn(string $nazev, string $popis, bool $vychozi, string $napove
     . ($zaskrtnuto($nazev, $vychozi) ? ' checked' : '') . '> <span>' . Ui::h($popis) . '</span></label>' . ($napoveda !== '' ? '<p class="slabe" style="margin:.5rem 0 0">' . $napoveda . '</p>' : '');
 $panel = fn(string $id): string => '<div class="panel-karty" id="' . $id . '" role="tabpanel" aria-labelledby="karta-' . $id . '" tabindex="-1" data-karta'
     . ($id === $karta ? '' : ' hidden') . '>';
-$formular = fn(string $cast): string => '<form method="post" action="' . Ui::h(Ui::odkaz('web', ['karta' => $cast]) . '#' . $cast) . '">' . $ui->csrf()
+$formular = fn(string $cast): string => '<form method="post"' . ($cast === 'zaklad' ? ' enctype="multipart/form-data"' : '') . ' action="' . Ui::h(Ui::odkaz('web', ['karta' => $cast]) . '#' . $cast) . '">' . $ui->csrf()
     . '<input type="hidden" name="akce" value="' . $cast . '">';
 $souhlas = Web::kategorieSouhlasu(['cookies_souhlas' => true] + $n);
 $adresaZasad = $app->url(Web::ZASADY);
@@ -65,19 +74,41 @@ $adresaZasad = $app->url(Web::ZASADY);
 </section>
 
 <section class="karta formular web-skupina" aria-labelledby="sk-logo">
-  <header class="skupina-hlavicka"><h2 id="sk-logo">Logo a patička</h2><p class="slabe">Název v záhlaví každé stránky a text v patičce.</p></header>
-  <?= Ui::pole('Název webu (logo)', 'nazev', $n['nazev'], ['required' => true, 'maxlength' => 60]) ?>
+  <header class="skupina-hlavicka"><h2 id="sk-logo">Logo a patička</h2><p class="slabe">Logo a název v záhlaví každé stránky webu, na přihlášení a v administraci; text v patičce.</p></header>
+  <?php /* 0.8.11: vlastní grafické logo; bez něj znak s názvem webu */ ?>
+  <div class="logo-vyber">
+    <div class="logo-nahled<?= $logo ? '' : ' logo-nahled-prazdne' ?>"><?php if ($logo): ?><img src="<?= Ui::h($web->logoAdresa()) ?>" alt="Vlastní logo"><?php else: ?><span>Bez vlastního loga – znak a název</span><?php endif; ?></div>
+    <div class="logo-pole">
+      <label class="pole" for="f-logo"><span><?= $logo ? 'Nahradit logo' : 'Vlastní logo' ?></span>
+        <input id="f-logo" type="file" name="logo" accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml,.svg">
+        <small>PNG, JPG, WebP, GIF nebo SVG, nejvýš 1 MB. V záhlaví se zmenší na výšku 48 px (v administraci 36 px) – nejlépe vypadá logo na šířku s průhledným pozadím, aspoň 96 px vysoké nebo SVG.
+          <?= $logo ? '<br>Teď: <strong>' . Ui::h(strtoupper(Web::LOGO_TYPY[$logo['mime']] ?? '')) . '</strong>' . ($logo['width'] ? ', ' . $logo['width'] . ' × ' . $logo['height'] . ' px' : '') . ', nahráno ' . date('j. n. Y H:i', $logo['updated_at']) . '.' : '' ?></small></label>
+      <?php if ($logo): ?><label class="zaskrtavatko"><input type="checkbox" name="logo_smazat" value="1"> <span>Odebrat vlastní logo (vrátí se znak s názvem)</span></label><?php endif; ?>
+    </div>
+  </div>
+  <input type="hidden" name="logo_nazev_pole" value="1">
+  <?= $vypinac('logo_nazev', 'Vedle loga zobrazit i název webu', (bool)$n['logo_nazev'], 'Vypněte, když logo název už obsahuje. Bez vlastního loga se název ukazuje vždy.') ?>
+  <?= Ui::pole('Název webu', 'nazev', $n['nazev'], ['required' => true, 'maxlength' => 60], 'V záhlaví, v titulku stránek a jako popis loga pro čtečky.') ?>
   <?= Ui::pole('Patička', 'patka', $n['patka'], ['maxlength' => 200, 'placeholder' => '© …']) ?>
 </section>
 
 <section class="karta formular web-skupina web-skupina-siroka" aria-labelledby="sk-uvod">
-  <header class="skupina-hlavicka"><h2 id="sk-uvod">Úvodní část hlavní stránky</h2><p class="slabe">Velká fotka nahoře s nadpisem a tlačítkem do Galerie.</p></header>
-  <div class="uvod-vyber">
-    <div class="uvod-nahled"><?php if ($uvod): ?><img src="media.php?id=<?= (int)$uvod['id'] ?>&amp;nahled=1&amp;v=<?= Ui::h(substr((string)$uvod['md5'], 0, 8)) ?>" alt="Úvodní fotka: <?= Ui::h($uvod['original_name']) ?>"><?php else: ?><span>Bez fotky – barevný přechod</span><?php endif; ?></div>
-    <?= Ui::vyber('Úvodní fotka', 'uvod_id', ['' => '— automaticky: obálka první veřejné galerie —'] + $web->moznosti(), $n['uvod_id'] ?? '', [],
-        'Jen obrázky se zapnutým veřejným odkazem (nejnovějších 500). Jde nastavit i tlačítkem v detailu média.'
-        . ($uvod ? ' Teď se ukazuje: <strong>' . Ui::h($uvod['original_name']) . '</strong>.' : '')) ?>
+  <header class="skupina-hlavicka"><h2 id="sk-uvod">Úvodní část hlavní stránky</h2><p class="slabe">Velká fotka nahoře s nadpisem a tlačítkem do Galerie.
+    Zvolte až <?= Web::MAX_UVODNI ?> fotek – při každém načtení stránky se náhodně ukáže jedna z nich.</p></header>
+  <?php /* 0.8.11: až pět úvodních fotek (uvod_1 … uvod_5), náhled se mění s výběrem (assets/app.js, data-uvod-vyber) */ ?>
+  <div class="uvod-sloty">
+  <?php for ($i = 1; $i <= Web::MAX_UVODNI; $i++):
+      $id = (int)($n['uvod_ids'][$i - 1] ?? 0);
+      $m = $uvodni[$id] ?? null;
+      $nahled = $m ? 'media.php?id=' . (int)$m['id'] . '&nahled=1&v=' . substr((string)$m['md5'], 0, 8) : ''; ?>
+    <div class="uvod-slot">
+      <div class="uvod-nahled" data-uvod-nahled="f-uvod_<?= $i ?>"><img src="<?= Ui::h($nahled) ?>" alt=""<?= $nahled === '' ? ' hidden' : '' ?>><span<?= $nahled !== '' ? ' hidden' : '' ?>><?= $i === 1 && $automaticka ? 'Automaticky: obálka první galerie' : 'Volné místo' ?></span></div>
+      <?= Ui::vyber('Fotka ' . $i, 'uvod_' . $i, ['' => $i === 1 ? '— automaticky: obálka první veřejné galerie —' : '— žádná —'] + $moznosti, $m ? (string)$id : '', ['data-uvod-vyber' => true]) ?>
+    </div>
+  <?php endfor; ?>
   </div>
+  <small class="slabe mala">Jen obrázky se zapnutým veřejným odkazem, které nejsou v archivu (nejnovějších 500). Přidat fotku jde i tlačítkem <em>Přidat mezi úvodní fotky</em> v detailu média.
+    Když nezvolíte žádnou, ukáže se obálka první veřejné galerie<?= $automaticka ? ' (teď <strong>' . Ui::h($automaticka['original_name']) . '</strong>)' : '' ?>.</small>
   <div class="radek radek-2">
     <?= Ui::pole('Štítek nad nadpisem', 'stitek', $n['stitek'], ['maxlength' => 60]) ?>
     <?= Ui::pole('Nadpis', 'nadpis', $n['nadpis'], ['required' => true, 'maxlength' => 120]) ?>

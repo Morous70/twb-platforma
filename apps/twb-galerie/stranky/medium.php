@@ -55,8 +55,14 @@ if ($post) {
                 $zprava = $akce === 'doporucit' ? 'Fotografie je doporučená.' : 'Doporučení zrušeno.';
                 break;
             case 'web-uvodni':
-                $app->web()->nastavUvodni($id);
-                $zprava = 'Obrázek je teď úvodní fotkou veřejného webu.';
+                // 0.8.11: úvodních fotek je až pět – tlačítko fotku přidá, nebo (je-li už mezi nimi) odebere
+                if ($app->web()->jeUvodni($id)) {
+                    $app->web()->odeberUvodni($id);
+                    $zprava = 'Fotka už není mezi úvodními fotkami webu.';
+                } else {
+                    $app->web()->nastavUvodni($id);
+                    $zprava = 'Fotka je mezi úvodními fotkami webu (' . count($app->web()->nastaveni()['uvod_ids']) . ' z ' . \MediaGalerie\Web::MAX_UVODNI . ').';
+                }
                 break;
             case 'komprimovat':
                 $z = $galerie->komprimuj($id, true);
@@ -122,7 +128,7 @@ $src = 'media.php?id=' . $id . '&v=' . substr((string)$m['md5'], 0, 8);
       <a class="tlacitko maly" href="<?= Ui::h($src . '&stahnout=1') ?>">Stáhnout</a>
       <?php if ($m['kind'] === 'image' && !$m['orig_filename']): ?><?= $ui->tlacitko('Zkomprimovat', 'komprimovat', [], 'maly') ?><?php endif; ?>
       <?php if ($m['orig_filename']): ?><?= $ui->tlacitko('Vrátit původní soubor', 'original', [], 'maly', 'Vrátit původní (nekomprimovaný) soubor?') ?><?php endif; ?>
-      <?php if ($m['kind'] === 'image' && $m['public_key'] && !$m['archived_at']): ?><?= $ui->tlacitko((int)($app->web()->nastaveni()['uvod_id'] ?? 0) === (int)$m['id'] ? 'Je úvodní fotkou webu' : 'Úvodní fotka webu', 'web-uvodni', [], 'maly') ?><?php endif; ?>
+      <?php if ($m['kind'] === 'image' && $m['public_key'] && !$m['archived_at']): ?><?= $app->web()->jeUvodni((int)$m['id']) ? $ui->tlacitko('Odebrat z úvodních fotek', 'web-uvodni', [], 'maly') : $ui->tlacitko('Přidat mezi úvodní fotky', 'web-uvodni', [], 'maly') ?><?php endif; ?>
       <?php if ($m['kind'] === 'image' || $m['featured']): ?><?= $m['featured'] ? $ui->tlacitko('★ Doporučená – zrušit', 'nedoporucit', [], 'maly') : $ui->tlacitko('☆ Označit jako doporučenou', 'doporucit', [], 'maly') ?><?php endif; ?>
     </div>
     <?php if ($m['featured'] && ($proc = $app->web()->procNeniNaWebu($m)) !== ''): ?><p class="slabe mala" style="margin:.5rem 0 0">Doporučená fotka se na webu zatím neukáže: <?= Ui::h($proc) ?></p><?php endif; ?>

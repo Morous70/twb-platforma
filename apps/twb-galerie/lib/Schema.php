@@ -9,11 +9,12 @@ use TWB\Licence\Licence;
  * Databázové schéma aplikace (SQLite). Verze se ukládá v module_versions pod „twb-galerie“
  * a do nastavení schema_version (podle ní moduly zalohy a aktualizace poznají starší data).
  * Tabulku media zakládá modul galerie, tabulky auth_tokens a passkeys modul prihlaseni.
+ * Tabulka web_files (0.8.11) drží soubory veřejného webu (vlastní logo) přímo v databázi – jsou malé a zálohují se s ní.
  * Aplikace k media přidává kategorii, poznámku, autora, licenci (text, kód a verzi), klíč veřejného odkazu a příznak doporučené (sloupce, které modul nezná a nečte).
  */
 final class Schema implements ModulMigrace
 {
-    public static function verze(): int { return 8; }
+    public static function verze(): int { return 9; }
 
     /** Tabulky, které musí existovat dřív než cokoli jiného (nastavení a protokol). */
     public static function zakladniTabulky(Db $db): void
@@ -102,6 +103,17 @@ final class Schema implements ModulMigrace
             $sloupce = array_column($db->q('PRAGMA table_info(media)')->fetchAll(), 'name');
             if (!in_array('featured', $sloupce, true)) $db->q('ALTER TABLE media ADD COLUMN featured INTEGER NOT NULL DEFAULT 0');
             $db->q('CREATE INDEX IF NOT EXISTS media_featured ON media (featured)');
+        }
+        if ($zVerze < 9) {
+            // 0.8.11: soubory veřejného webu (vlastní logo) – malé, proto v databázi (base64); obsah se načte jen při vydání souboru (logo.php)
+            $db->q('CREATE TABLE IF NOT EXISTS web_files (
+                name VARCHAR(40) PRIMARY KEY,
+                mime VARCHAR(40) NOT NULL,
+                data TEXT NOT NULL,          -- obsah v base64 (záloha je JSON, binární data by neprošla)
+                md5 CHAR(32) NOT NULL,
+                width INTEGER NULL, height INTEGER NULL,
+                updated_at INTEGER NOT NULL
+            )');
         }
     }
 }

@@ -748,3 +748,17 @@
   document.querySelectorAll('[data-stitek-vyber]').forEach(function (c) { c.addEventListener('change', obnov); });
   obnov();
 })();
+
+// 0.8.11: Veřejný web → Úvodní část – náhled vedle výběru úvodní fotky se mění s volbou
+(function () {
+  document.querySelectorAll('[data-uvod-vyber]').forEach(function (sel) {
+    var nahled = document.querySelector('[data-uvod-nahled="' + sel.id + '"]');
+    if (!nahled) return;
+    var img = nahled.querySelector('img'), text = nahled.querySelector('span');
+    sel.addEventListener('change', function () {
+      var id = parseInt(sel.value, 10);
+      if (id > 0) { img.src = 'media.php?id=' + id + '&nahled=1'; img.hidden = false; if (text) text.hidden = true; }
+      else { img.removeAttribute('src'); img.hidden = true; if (text) { text.hidden = false; text.textContent = 'Volné místo'; } }
+    });
+  });
+})();

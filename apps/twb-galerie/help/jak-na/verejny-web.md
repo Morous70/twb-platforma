@@ -4,7 +4,7 @@ sekce: jak-na
 admin: ne
 kontext: web
 souvisi: verejne-odkazy, kategorie-a-tagy
-klicova: web, hlavní stránka, veřejná galerie, reklama, banner, adsense, sklik, reklamní kód, ads.txt, měření návštěvnosti, matomo, gdpr, cookies, souhlas, zásady ochrany osobních údajů, o galerii, úvodní fotka, doporučené fotografie, doporučená, mřížka
+klicova: web, hlavní stránka, veřejná galerie, reklama, banner, adsense, sklik, reklamní kód, ads.txt, měření návštěvnosti, matomo, gdpr, cookies, souhlas, zásady ochrany osobních údajů, o galerii, úvodní fotka, úvodní fotky, logo, vlastní logo, doporučené fotografie, doporučená, mřížka
 ---
 # Veřejný web
 
@@ -22,7 +22,8 @@ Nic se nezveřejní samo. Na webu je jen to, co výslovně povolíte:
 - Prázdná veřejná kategorie se na webu nezobrazí.
 
 ## Hlavní stránka
-- **Úvodní fotka**: v **Veřejný web → Úvodní fotka**, nebo tlačítkem **Úvodní fotka webu** v detailu obrázku. Musí mít zapnutý veřejný odkaz.
+- **Úvodní fotky**: v **Veřejný web → Základ a texty → Úvodní část hlavní stránky** vyberte až **pět fotek** – při každém načtení hlavní stránky se náhodně ukáže jedna z nich (stejně tak na pozadí přihlášení). Přidat nebo odebrat fotku jde i tlačítkem **Přidat mezi úvodní fotky** / **Odebrat z úvodních fotek** v detailu obrázku. Fotka musí mít zapnutý veřejný odkaz a nesmí být v archivu. Když žádnou nevyberete, ukáže se obálka první veřejné galerie.
+- **Vlastní logo**: v **Veřejný web → Základ a texty → Logo a patička** nahrajte obrázek loga (PNG, JPG, WebP, GIF nebo SVG, nejvýš 1 MB) a uložte. Logo se ukáže v záhlaví webu, na přihlášení i v menu administrace. Když logo už obsahuje název, vypněte **Vedle loga zobrazit i název webu**. Zaškrtnutím **Odebrat vlastní logo** se vrátí původní znak s názvem.
   Když žádnou nezvolíte, použije se obálka první veřejné kategorie.
 - **Štítek, nadpis, podnadpis, text tlačítka a poznámka** se upravují tamtéž.
 - **Vybrané galerie** jsou karty prvních N veřejných kategorií (počet nastavíte, 0 = sekce se skryje). Každá karta má obálku a počet fotografií.

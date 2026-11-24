@@ -36,6 +36,27 @@ h1, h2, h3 { font-weight: 700; line-height: 1.12; color: #1c1b18; margin: 0; let
 .menu > a.aktivni { font-weight: 700; border-bottom-color: var(--zlata); }
 .menu > a:not(.tlacitko):hover { border-bottom-color: var(--zlata-svetla); }
 .menu .admin { margin-left: 4rem; font-size: 1rem; }
+/* 0.8.14: vyhledávání v záhlaví místo tlačítka Přihlášení do administrace (to je v patičce) */
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+.hledani { display: flex; align-items: stretch; background: var(--plocha); border: 1px solid var(--okraj); border-radius: .35rem; overflow: hidden; }
+.hledani:focus-within { border-color: var(--zlata); box-shadow: 0 0 0 2px var(--zlata-svetla); }
+.hledani input[type="search"] { flex: 1; min-width: 0; border: 0; background: transparent; font: inherit; font-size: 1rem; color: var(--text); padding: .5rem .75rem; outline: none; }
+.hledani input[type="search"]::placeholder { color: var(--slaby); }
+.hledani button { flex: none; display: grid; place-items: center; border: 0; background: var(--zelena); color: #fff; padding: 0 .8rem; cursor: pointer; }
+.hledani button:hover, .hledani button:focus-visible { background: var(--zelena-svetlejsi); }
+.menu .hlavicka-hledani { margin-left: 2rem; width: 15rem; }
+.hledani-stranka { margin: 0 0 1.4rem; }
+.hledani-velke { max-width: 40rem; }
+.hledani-velke input[type="search"] { font-size: 1.15rem; padding: .7rem 1rem; }
+.hledani-velke button { padding: 0 1.2rem; }
+.hledani-rezim { display: flex; flex-wrap: wrap; gap: .35rem; margin: .8rem 0 0; font-size: .95rem; }
+.hledani-rezim a, .hledani-rezim span { padding: .3rem .8rem; border: 1px solid var(--okraj); border-radius: 999px; text-decoration: none; background: var(--plocha); }
+.hledani-rezim span { background: var(--zelena); color: #fff; border-color: var(--zelena); font-weight: 700; }
+.hledani-nic { font-style: normal; }
+.hledani-nic p { margin: 0 0 1rem; }
+.hledani-nic .tlacitko { font-style: normal; }
+.hledat-mobil { display: none; place-items: center; margin-left: auto; padding: .4rem; color: var(--zelena); border: 1px solid var(--okraj); border-radius: .35rem; }
+.hledat-mobil + .menu-tlacitko { margin-left: -.9rem; } /* mezera v liště je 1.5rem, mezi ikonami stačí .6rem */
 .menu-tlacitko { display: none; margin-left: auto; background: none; border: 1px solid var(--okraj); border-radius: .35rem; padding: .35rem; color: var(--zelena); cursor: pointer; }
 
 /* ---------- úvodní fotka ---------- */
@@ -170,6 +191,7 @@ button.odkaz { font: inherit; color: #1c1b18; background: none; border: 0; paddi
 @media (max-width: 1100px) {
   .menu { gap: 1rem; }
   .menu .admin { margin-left: 1rem; }
+  .menu .hlavicka-hledani { margin-left: .5rem; width: 12rem; }
 }
 @media (max-width: 860px) {
   .logo { font-size: 1.4rem; }
@@ -182,6 +204,9 @@ button.odkaz { font: inherit; color: #1c1b18; background: none; border: 0; paddi
   .menu > a:not(.tlacitko) { border-bottom: 1px solid var(--okraj); padding: .75rem .25rem; }
   .menu > a.aktivni { border-bottom-color: var(--okraj); color: var(--zelena); }
   .menu .admin { margin: .8rem 0 0; justify-content: center; }
+  .menu .hlavicka-hledani { margin: .5rem 0 .6rem; width: auto; order: -1; }
+  .hledat-mobil { display: grid; }
+  .hledani input[type="search"] { font-size: 16px; }
   .hero { min-height: 0; flex-direction: column; align-items: stretch; }
   .hero-fotka { position: relative; height: 56vw; max-height: 360px; order: -1; }
   .hero::before { display: none; }

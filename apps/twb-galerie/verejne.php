@@ -7,6 +7,7 @@ declare(strict_types=1);
 // 0.8.3: reklamní pozice s kódem z reklamního systému, měřicí kód, cookie lišta se souhlasem (bez souhlasu je kód jen neživý <template>),
 // stránka ?s=zasady-ochrany-osobnich-udaju a ads.txt (?s=ads.txt; /ads.txt a /zasady-ochrany-osobnich-udaju přes .htaccess).
 // 0.8.12: volitelný štítek „Reklama“ nad bannerem (každá pozice zvlášť) a vlastní CSS jako samostatný soubor ?s=vlastni.css.
+// 0.8.14: vyhledávání ?s=hledat&q=…[&q_rezim=kterykoli][&strana=N] – fulltext jako API (Web::hledej), pole v záhlaví místo tlačítka administrace.
 use MediaGalerie\{App, Web, Media, VerejneRozvrzeni};
 use TWB\Napoveda\Markdown;
 
@@ -51,6 +52,8 @@ $titulek = '';
 $aktivni = $stranka;
 $obsah = '';
 $kod = 200;
+$q = '';          // 0.8.14: hledaný text (předvyplní pole v záhlaví)
+$noindex = false; // 0.8.14: stránku výsledků vyhledávače neindexují
 $kodNaStrance = false;   // stránka obsahuje reklamní nebo měřicí kód (kvůli CSP)
 $souhlas = Web::kategorieSouhlasu($n);   // na co se ptá cookie lišta; prázdné = kód se vkládá rovnou
 /** Kód reklamy nebo měření: se souhlasem jako neživý <template> (oživí ho verejne.js po povolení), jinak rovnou. */
@@ -158,6 +161,46 @@ switch ($stranka) {
         $obsah .= $reklama('pred_patickou') . '</div>';
         break;
 
+    case 'hledat':
+        // 0.8.14: fulltext jako v API (q, q_rezim) – jen to, co web smí ukázat (veřejné kategorie, veřejný odkaz, mimo archiv)
+        $q = trim(mb_substr((string)($_GET['q'] ?? ''), 0, Web::MAX_DOTAZ, 'UTF-8'));
+        $vse = !in_array($_GET['q_rezim'] ?? 'vse', ['kterykoli', 'any'], true);
+        $noindex = true;
+        $aktivni = '';
+        $titulek = $q !== '' ? 'Hledání: ' . $q : 'Hledání';
+        $f = $web->hledej($q, $vse, (int)($_GET['strana'] ?? 1));
+        $adresa = static fn(array $navic = []): string => '?' . http_build_query(['s' => 'hledat', 'q' => $q] + ($vse ? [] : ['q_rezim' => 'kterykoli']) + $navic);
+        $pod = !$f['vyrazy'] ? 'Zadejte, co hledáte – název, štítek, autora nebo popis fotografie.'
+            : ($f['celkem'] > 0 ? 'Nalezeno ' . $fotografii($f['celkem']) . '.' : '');
+        $obsah .= '<div class="obsah">' . $nadpisSekce($q !== '' ? 'Výsledky hledání „' . $q . '“' : 'Hledání', $pod, 'h1')
+            . '<div class="hledani-stranka">' . VerejneRozvrzeni::hledaciPole($q, 'hledani-velke', 'hledat-stranka');
+        if (count($f['vyrazy']) > 1) {
+            // stejné jako q_rezim v API: všechna slova (výchozí) nebo kterékoli
+            $obsah .= '<p class="hledani-rezim" role="group" aria-label="Hledaná slova">';
+            foreach (['vse' => 'Všechna slova', 'kterykoli' => 'Kterékoli slovo'] as $r => $text) {
+                $href = '?' . http_build_query(['s' => 'hledat', 'q' => $q] + ($r === 'vse' ? [] : ['q_rezim' => 'kterykoli']));
+                $obsah .= ($r === 'vse') === $vse ? '<span aria-current="true">' . $h($text) . '</span>' : '<a href="' . $h($href) . '">' . $h($text) . '</a>';
+            }
+            $obsah .= '</p>';
+        }
+        $obsah .= '</div>' . $reklama('pod_uvodem');
+        if ($f['polozky']) {
+            $obsah .= $mrizka($f['polozky'], true);
+            if ($f['stran'] > 1) {
+                $obsah .= '<nav class="strankovani" aria-label="Stránky">';
+                for ($i = 1; $i <= $f['stran']; $i++) {
+                    $obsah .= $i === $f['strana'] ? '<span aria-current="page">' . $i . '</span>' : '<a href="' . $h($adresa(['strana' => $i])) . '">' . $i . '</a>';
+                }
+                $obsah .= '</nav>';
+            }
+        } elseif ($f['vyrazy']) {
+            $obsah .= '<div class="prazdne hledani-nic"><p><strong>Nic jsme nenašli.</strong> Zkuste jiné nebo kratší slovo, na diakritice ani velikosti písmen nezáleží.</p>'
+                . ($vse && count($f['vyrazy']) > 1 ? '<p><a href="' . $h('?' . http_build_query(['s' => 'hledat', 'q' => $q, 'q_rezim' => 'kterykoli'])) . '">Hledat kterékoli ze slov</a></p>' : '')
+                . '<p><a class="tlacitko" href="?s=galerie">' . $ikona('obrazek', 18) . '<span>Prohlédnout galerie</span></a></p></div>';
+        }
+        $obsah .= $reklama('pred_patickou') . '</div>';
+        break;
+
     case 'o-galerii':
         $titulek = 'O galerii';
         $text = trim((string)$n['o_galerii']);
@@ -217,6 +260,7 @@ header('Cache-Control: ' . ($stranka === 'domu' ? 'no-cache' : 'public, max-age=
 header('X-Frame-Options: SAMEORIGIN');
 header('Content-Security-Policy: ' . Web::csp($kodNaStrance));
 if ($n['skryt_vyhledavacum']) header('X-Robots-Tag: noindex, nofollow');
+elseif ($noindex) header('X-Robots-Tag: noindex, follow');
 $v = $h($app->verze);
 $popisStranky = $n['podnadpis'] !== '' ? $n['podnadpis'] : $n['nadpis'];
 ?>
@@ -228,6 +272,7 @@ $popisStranky = $n['podnadpis'] !== '' ? $n['podnadpis'] : $n['nadpis'];
 <title><?= $h($titulek !== '' ? $titulek . ' – ' . $n['nazev'] : $n['nazev'] . ' – ' . $n['nadpis']) ?></title>
 <meta name="description" content="<?= $h($popisStranky) ?>">
 <?php if ($n['skryt_vyhledavacum']): ?><meta name="robots" content="noindex, nofollow">
+<?php elseif ($noindex): ?><meta name="robots" content="noindex, follow">
 <?php endif; ?>
 <link rel="stylesheet" href="assets/verejne.css?v=<?= $v ?>">
 <?php if (($cssAdresa = Web::vlastniCssAdresa($n)) !== ''): ?><link rel="stylesheet" href="<?= $h($cssAdresa) ?>">
@@ -237,7 +282,7 @@ $popisStranky = $n['podnadpis'] !== '' ? $n['podnadpis'] : $n['nadpis'];
 <?= $mereniHlavicka ?>
 </head>
 <body>
-<?= VerejneRozvrzeni::zahlavi($n, $aktivni, true, (bool)$n['odkaz_administrace'], $web->logoAdresa()) ?>
+<?= VerejneRozvrzeni::zahlavi($n, $aktivni, true, true, $web->logoAdresa(), $q) ?>
 <main>
 <?= $obsah ?>
 </main>

@@ -648,6 +648,33 @@ final class Web
         return '';
     }
 
+    /** 0.8.14: nejvýš tolik znaků dotazu vyhledávání na veřejném webu (zbytek se zahodí). */
+    public const MAX_DOTAZ = 200;
+
+    /**
+     * 0.8.14: vyhledávání na veřejném webu – stejný fulltext jako API (parametr q, Hledani): každé slovo v názvu, tazích, autorovi
+     * a poznámce, bez diakritiky, fráze v uvozovkách vcelku, řazení podle relevance (při shodě nejnovější). $vse = jako q_rezim=vse
+     * (každé slovo), jinak kterékoli. Hledá jen v tom, co web smí ukázat: obrázky s veřejným odkazem mimo archiv ve veřejných kategoriích.
+     * Po NA_STRANKU (36) na stránku, aby se mřížka dělila beze zbytku.
+     * @return array{polozky: list<array<string, mixed>>, celkem: int, strana: int, stran: int, vyrazy: list<string>}
+     */
+    public function hledej(string $q, bool $vse = true, int $strana = 1, int $naStranku = self::NA_STRANKU): array
+    {
+        $vyrazy = Hledani::vyrazy(mb_substr($q, 0, self::MAX_DOTAZ, 'UTF-8'));
+        $nalezene = [];
+        if ($vyrazy) {
+            foreach ($this->app->db->q('SELECT m.*, c.name AS kategorie_nazev FROM media m JOIN categories c ON c.id = m.category_id WHERE ' . self::VEREJNA)->fetchAll() as $r) {
+                $sk = Hledani::skore($r, $vyrazy, $vse);
+                if ($sk !== null) $nalezene[] = $r + ['_skore' => $sk];
+            }
+            usort($nalezene, fn($a, $b) => [$b['_skore'], (int)$b['id']] <=> [$a['_skore'], (int)$a['id']]);
+        }
+        $celkem = count($nalezene);
+        $stran = max(1, (int)ceil($celkem / max(1, $naStranku)));
+        $strana = min(max(1, $strana), $stran);
+        return ['polozky' => array_slice($nalezene, ($strana - 1) * $naStranku, $naStranku), 'celkem' => $celkem, 'strana' => $strana, 'stran' => $stran, 'vyrazy' => $vyrazy];
+    }
+
     /** Nejnovější fotky ze všech veřejných kategorií. @return list<array<string, mixed>> */
     public function nejnovejsi(int $n = 12): array
     {

@@ -286,6 +286,8 @@ final class Api
             'orientace' => Media::orientace($r),
             'archivovano' => $r['archived_at'] ? date('c', (int)strtotime((string)$r['archived_at'])) : null,
             'doporucena' => !empty($r['featured']),
+            'ohnisko' => Media::ohnisko($r),                 // 0.8.15: {x, y} v % (výřez na webu se drží kolem bodu), null = střed
+            'cela_fotka' => !empty($r['show_whole']),        // 0.8.15: web ukáže celou fotku s rozmazaným okolím
             'vytvoreno' => date('c', (int)strtotime((string)$r['created_at'])),
             'upraveno' => isset($r['edits']) && $r['edits'] !== '' ? (string)$r['edits'] : null,
             'komprimovano' => !empty($r['orig_filename']) ? ['velikost' => (int)$r['orig_size'], 'sirka' => (int)$r['orig_w'], 'vyska' => (int)$r['orig_h']] : null,
@@ -373,11 +375,12 @@ final class Api
         return ['hotovo' => true, 'medium' => $this->medium($this->app->media()->radek($id)), 'poznamka_komprese' => $vysledek['poznamka']];
     }
 
-    /** Úprava údajů: nazev, poznamka, kategorie (id nebo null), tagy (pole nebo text s čárkami), archiv (bool), doporucena (bool), autor, licence, licence_url, licence_kod, licence_verze. Vše se ověří před zápisem. */
+    /** Úprava údajů: nazev, poznamka, kategorie (id nebo null), tagy (pole nebo text s čárkami), archiv (bool), doporucena (bool), autor, licence, licence_url, licence_kod, licence_verze,
+     * ohnisko ({x, y} v % nebo null) a cela_fotka (bool) – 0.8.15. Vše se ověří před zápisem. */
     private function uprav(int $id, array $v): array
     {
         $r = $this->app->media()->radek($id);
-        $znama = ['nazev', 'poznamka', 'kategorie', 'tagy', 'archiv', 'doporucena', 'autor', 'licence', 'licence_url', 'licence_kod', 'licence_verze'];
+        $znama = ['nazev', 'poznamka', 'kategorie', 'tagy', 'archiv', 'doporucena', 'autor', 'licence', 'licence_url', 'licence_kod', 'licence_verze', 'ohnisko', 'cela_fotka'];
         if ($nezname = array_diff(array_keys($v), $znama)) throw new Chyba('Neznámé pole: ' . implode(', ', $nezname) . '. Povolená: ' . implode(', ', $znama) . '.');
         $nazev = array_key_exists('nazev', $v) ? Vstup::text($v, 'nazev', 'nazev', 200) : null;
         $pozn = array_key_exists('poznamka', $v) ? Vstup::text($v, 'poznamka', 'poznamka', 5000, false) : null;
@@ -395,8 +398,19 @@ final class Api
         if ($zmenaKodu) {
             try { [$kod, $verze] = Licence::vycisti($kod, $verze); } catch (\InvalidArgumentException $e) { throw new Chyba($e->getMessage()); }
         }
+        $ohnisko = Media::ohnisko($r);
+        if (array_key_exists('ohnisko', $v)) {
+            $o = $v['ohnisko'];
+            if ($o === null || $o === '') $ohnisko = null;
+            elseif (is_array($o) && isset($o['x'], $o['y']) && is_numeric($o['x']) && is_numeric($o['y']) && $o['x'] >= 0 && $o['x'] <= 100 && $o['y'] >= 0 && $o['y'] <= 100) {
+                $ohnisko = ['x' => (int)round((float)$o['x']), 'y' => (int)round((float)$o['y'])];
+            } else throw new Chyba('ohnisko musí být {"x": 0–100, "y": 0–100} (procenta zleva a shora) nebo null.');
+        }
+        $cela = array_key_exists('cela_fotka', $v) ? (bool)$v['cela_fotka'] : !empty($r['show_whole']);
+        $zmenaOhniska = array_key_exists('ohnisko', $v) || array_key_exists('cela_fotka', $v);
+        if ($zmenaOhniska && $r['kind'] !== 'image') throw new Chyba('Ohnisko a celou fotku jde nastavit jen u obrázku.');
         $g = $this->app->galerie();
-        $this->app->db->transakce(function () use ($g, $id, $r, $v, $nazev, $pozn, $kategorie, $tagy, $zmenaAutora, $autor, $licence, $licenceUrl, $zmenaKodu, $kod, $verze) {
+        $this->app->db->transakce(function () use ($zmenaOhniska, $ohnisko, $cela, $g, $id, $r, $v, $nazev, $pozn, $kategorie, $tagy, $zmenaAutora, $autor, $licence, $licenceUrl, $zmenaKodu, $kod, $verze) {
             if ($zmenaAutora) $this->app->media()->nastavAutora($id, $autor ?: null, $licence ?: null, $licenceUrl ?: null);
             if ($zmenaKodu) $this->app->media()->nastavLicenci($id, $kod, $verze);
             if ($nazev !== null && $nazev !== $r['original_name']) $g->prejmenuj($id, $nazev);
@@ -405,6 +419,7 @@ final class Api
             if ($tagy !== null) $g->tagy()->nastav($id, $tagy);
             if (array_key_exists('archiv', $v)) $g->archivuj([$id], (bool)$v['archiv']);
             if (array_key_exists('doporucena', $v)) $this->app->media()->nastavDoporucene([$id], (bool)$v['doporucena']);
+            if ($zmenaOhniska) $this->app->media()->nastavOhnisko($id, $ohnisko['x'] ?? null, $ohnisko['y'] ?? null, $cela);
         });
         return $this->medium($this->app->media()->radek($id));
     }

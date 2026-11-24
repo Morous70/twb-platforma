@@ -1,6 +1,7 @@
 <?php
 declare(strict_types=1);
-// Detail média: náhled, údaje, název, poznámka, kategorie, tagy, veřejný odkaz, nahrazení souboru, komprese, úprava obrázku (0.8.13), archiv, smazání.
+// Detail média: náhled, údaje, název, poznámka, kategorie, tagy, veřejný odkaz, nahrazení souboru, komprese, úprava obrázku (0.8.13),
+// ohnisko a zobrazení na webu (0.8.15), archiv, smazání.
 // Proměnné: $app, $ui, $post.
 use MediaGalerie\{App, Ui, Chyba, Media, Vstup};
 use TWB\Licence\Licence;
@@ -78,12 +79,33 @@ if ($post) {
                 catch (RuntimeException $e) { throw new Chyba($e->getMessage()); }
                 $media->uklidNahledy();
                 $zprava = 'Obrázek upraven: ' . $v['popis'] . '. Původní soubor zůstal uložený.';
+                if ($media->zrusOhnisko($id)) $zprava .= ' Ohnisko pro web bylo zrušeno (po úpravě by ukazovalo jinam) – nastavte ho znovu.';
+                break;
+            case 'ohnisko':
+                // 0.8.15: bod, kolem kterého se fotka na webu ořízne (procenta), a volba celé fotky s rozmazaným okolím
+                $sou = [];
+                foreach (['focus_x' => 'vodorovně', 'focus_y' => 'svisle'] as $pole => $popis) {
+                    $t = trim((string)($_POST[$pole] ?? ''));
+                    if ($t !== '' && !preg_match('~^\d{1,3}([.,]\d+)?$~', $t)) throw new Chyba("Ohnisko {$popis}: zadejte číslo 0–100.");
+                    $sou[] = $t === '' ? null : (int)round((float)str_replace(',', '.', $t));
+                }
+                $cela = !empty($_POST['cela']);
+                $media->nastavOhnisko($id, $sou[0], $sou[1], $cela);
+                $zprava = $cela ? 'Uloženo: na webu se ukáže celá fotka s rozmazaným okolím.'
+                    : ($sou[0] !== null ? "Ohnisko uloženo ({$sou[0]} % zleva, {$sou[1]} % shora). Web fotku ořízne kolem něj." : 'Ohnisko zrušeno, web fotku ořízne od středu.');
+                $kam .= '#ohnisko';
+                break;
+            case 'ohnisko-zrusit':
+                $media->nastavOhnisko($id, null, null, false);
+                $zprava = 'Ohnisko zrušeno, web fotku ořízne od středu.';
+                $kam .= '#ohnisko';
                 break;
             case 'original':
                 if (!$galerie->obnovPuvodni($id)) throw new Chyba('Původní soubor není k dispozici.');
                 $app->log('info', "Obnoven původní soubor: {$m['original_name']}");
                 $media->uklidNahledy();
                 $zprava = 'Vrácen původní soubor.';
+                if ($m['edits'] && $media->zrusOhnisko($id)) $zprava .= ' Ohnisko pro web bylo zrušeno – nastavte ho znovu.';
                 break;
             case 'archivovat':
             case 'vratit':
@@ -130,6 +152,7 @@ $lzeUpravit = $m['kind'] === 'image' && !($m['mime'] === 'image/gif' && Obrazky:
       <?php if ($m['orig_filename']): ?><dt>Originál</dt><dd><?= (int)$m['orig_w'] ?>×<?= (int)$m['orig_h'] ?> px, <?= Ui::h(Zalohy::velikost((int)$m['orig_size'])) ?>
         · <span data-okno-skupina<?= Ui::okno($m, null, $src . '&original=1', false, (int)$m['orig_w'] . '×' . (int)$m['orig_h'] . ' · originál před ' . ($m['edits'] ? 'úpravou' : 'kompresí')) ?>><a href="<?= Ui::h($src . '&original=1') ?>" data-otevrit-okno>zobrazit</a></span></dd><?php endif; ?>
       <?php if ($m['edits']): ?><dt>Upraveno</dt><dd><?= Ui::h((string)$m['edits']) ?></dd><?php endif; ?>
+      <?php if ($m['kind'] === 'image' && ($m['show_whole'] || $m['focus_x'] !== null)): $oh = Media::ohnisko($m); ?><dt>Na webu</dt><dd><?= $m['show_whole'] ? 'celá fotka s rozmazaným okolím' : 'ořez kolem ohniska ' . $oh['x'] . ' % zleva, ' . $oh['y'] . ' % shora' ?></dd><?php endif; ?>
       <dt>Nahráno</dt><dd><?= Ui::h(Ui::datum(strtotime((string)$m['created_at']))) ?><?= $m['upload_name'] && $m['upload_name'] !== $m['original_name'] ? ' jako ' . Ui::h($m['upload_name']) : '' ?></dd>
       <?php if ($m['author']): ?><dt>Autor</dt><dd><?= Ui::h($m['author']) ?></dd><?php endif; ?>
       <?php $licOdkaz = Licence::odkaz($m['license_code'], $m['license_version'], $m['license_url']); $licNazev = Licence::nazev($m['license_code'], $m['license_version']); ?>
@@ -142,6 +165,7 @@ $lzeUpravit = $m['kind'] === 'image' && !($m['mime'] === 'image/gif' && Obrazky:
       <a class="tlacitko maly" href="<?= Ui::h($src . '&stahnout=1') ?>">Stáhnout</a>
       <?php if ($m['kind'] === 'image' && !$m['orig_filename']): ?><?= $ui->tlacitko('Zkomprimovat', 'komprimovat', [], 'maly') ?><?php endif; ?>
       <?php if ($lzeUpravit): ?><a class="tlacitko maly" href="#uprava" data-otevrit-upravu>Upravit obrázek</a><?php endif; ?>
+      <?php if ($m['kind'] === 'image'): ?><a class="tlacitko maly" href="#ohnisko" data-otevrit-ohnisko>Ohnisko na webu</a><?php endif; ?>
       <?php if ($m['orig_filename']): ?><?= $ui->tlacitko('Vrátit původní soubor', 'original', [], 'maly', $m['edits'] ? 'Vrátit původní soubor? Úpravy (ořez, otočení) i komprese se zahodí.' : 'Vrátit původní (nekomprimovaný) soubor?') ?><?php endif; ?>
       <?php if ($m['kind'] === 'image' && $m['public_key'] && !$m['archived_at']): ?><?= $app->web()->jeUvodni((int)$m['id']) ? $ui->tlacitko('Odebrat z úvodních fotek', 'web-uvodni', [], 'maly') : $ui->tlacitko('Přidat mezi úvodní fotky', 'web-uvodni', [], 'maly') ?><?php endif; ?>
       <?php if ($m['kind'] === 'image' || $m['featured']): ?><?= $m['featured'] ? $ui->tlacitko('★ Doporučená – zrušit', 'nedoporucit', [], 'maly') : $ui->tlacitko('☆ Označit jako doporučenou', 'doporucit', [], 'maly') ?><?php endif; ?>
@@ -181,6 +205,38 @@ $lzeUpravit = $m['kind'] === 'image' && !($m['mime'] === 'image/gif' && Obrazky:
       <button type="button" class="maly" data-uprava-reset>Začít znovu</button>
     </form>
     <noscript><p class="hlaska hlaska-chyba">Úprava obrázku potřebuje zapnutý JavaScript.</p></noscript>
+  </details>
+  <?php endif; ?>
+  <?php if ($m['kind'] === 'image'): $oh = Media::ohnisko($m); $x = $oh['x'] ?? null; $y = $oh['y'] ?? null; $cela = (bool)$m['show_whole']; ?>
+  <details class="karta uprava ohnisko-karta" id="ohnisko" data-ohnisko>
+    <summary><h2>Ohnisko a zobrazení na webu</h2></summary>
+    <p class="slabe mala">Klikněte do fotky na místo, které musí zůstat vidět (třeba obličej). Úvodní fotka, mřížky fotek a karty galerií
+      na veřejném webu se pak oříznou kolem něj. Když nejde nic useknout (panorama), zapněte <em>Zobrazit celou fotku</em>. Soubor se nemění.</p>
+    <div class="ohnisko-plocha" data-ohnisko-plocha>
+      <img src="<?= Ui::h($src) ?>" alt="Fotka – kliknutím zvolíte ohnisko" loading="lazy" draggable="false">
+      <span class="ohnisko-bod" data-ohnisko-bod<?= $oh ? ' style="left:' . $x . '%;top:' . $y . '%"' : ' hidden' ?>></span>
+    </div>
+    <p class="slabe mala">Náhled na webu<span data-ohnisko-bez<?= $oh || $cela ? ' hidden' : '' ?>> (zatím bez ohniska – ořez od středu)</span>:</p>
+    <div class="ohnisko-nahledy<?= $cela ? ' cela' : '' ?>" data-ohnisko-nahledy>
+      <?php foreach ([['pc', 'Úvodní fotka – počítač', 60], ['mobil', 'Úvodní fotka – mobil', 60], ['mrizka', 'Mřížka fotek', 50], ['karta', 'Karta galerie', 50]] as [$k, $popis, $vy]): ?>
+      <figure class="ohnisko-nahled ohnisko-nahled-<?= $k ?>">
+        <div class="ohnisko-vyrez"><img class="pozadi" src="<?= Ui::h($src) ?>" alt="" loading="lazy"><img class="popredi" src="<?= Ui::h($src) ?>" alt="" loading="lazy" data-vychozi-y="<?= $vy ?>" style="object-position:<?= $x ?? 50 ?>% <?= $y ?? $vy ?>%"></div>
+        <figcaption class="mala slabe"><?= Ui::h($popis) ?></figcaption>
+      </figure>
+      <?php endforeach; ?>
+    </div>
+    <form method="post" class="ohnisko-formular" data-ohnisko-formular>
+      <?= $ui->csrf() ?>
+      <input type="hidden" name="akce" value="ohnisko">
+      <div class="tlacitka">
+        <?= Ui::pole('Ohnisko zleva (%)', 'focus_x', $x, ['type' => 'number', 'min' => 0, 'max' => 100, 'step' => 1, 'placeholder' => 'střed', 'data-ohnisko-x' => '']) ?>
+        <?= Ui::pole('Ohnisko shora (%)', 'focus_y', $y, ['type' => 'number', 'min' => 0, 'max' => 100, 'step' => 1, 'placeholder' => 'střed', 'data-ohnisko-y' => '']) ?>
+      </div>
+      <label class="mala ohnisko-cela"><input type="checkbox" name="cela" value="1" data-ohnisko-cela<?= $cela ? ' checked' : '' ?>>
+        <span><strong>Zobrazit celou fotku</strong> – nic se neusekne, prázdné okolí doplní rozmazaná kopie téže fotky</span></label>
+      <div class="tlacitka"><button type="submit" class="hlavni">Uložit</button></div>
+    </form>
+    <?php if ($oh || $cela): ?><div class="tlacitka"><?= $ui->tlacitko('Zrušit ohnisko', 'ohnisko-zrusit', [], 'maly') ?></div><?php endif; ?>
   </details>
   <?php endif; ?>
 </section>

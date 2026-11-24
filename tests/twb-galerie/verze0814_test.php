@@ -147,7 +147,7 @@ test('0.8.14 na serveru: stránka výsledků, režim slov, stránkování, práz
 });
 
 test('verze 0.8.14 a CSS stránky výsledků', function () {
-    eq('0.8.14', trim((string)file_get_contents(KOREN . '/apps/twb-galerie/VERSION')));
+    ok(version_compare(trim((string)file_get_contents(KOREN . '/apps/twb-galerie/VERSION')), '0.8.14', '>='));
     $css = (string)file_get_contents(KOREN . '/apps/twb-galerie/assets/verejne.css');
     foreach (['.hlavicka-hledani', '.hledani-velke', '.hledani-rezim', '.hledat-mobil', '.sr-only'] as $t) ok(str_contains($css, $t), $t);
     ok(!preg_match('/style="/', (string)file_get_contents(KOREN . '/apps/twb-galerie/lib/VerejneRozvrzeni.php')), 'bez style="" (CSP)');

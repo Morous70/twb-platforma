@@ -283,7 +283,7 @@ final class Ui
             . "<script src=\"assets/verejne.js?v=$v\" defer></script><script src=\"assets/app.js?v=$v\" defer></script></head><body class=\"stranka-prihlaseni\">"
             . VerejneRozvrzeni::zahlavi($n, '', (bool)$n['zapnuto'], true, $web->logoAdresa())
             . '<main class="prihlaseni' . ($foto === '' ? ' prihlaseni-bez-fotky' : '') . '">'
-            . ($foto !== '' ? '<img class="prihlaseni-fotka" src="' . self::h($foto) . '" alt="">' : '')
+            . ($foto !== '' ? Web::fotkaHtml($uvod, $foto, 'prihlaseni-fotka') : '')
             . '<section class="prihlaseni-karta" aria-labelledby="prihlaseni-nadpis">'
             . '<p class="nadtitulek">Administrace</p><h1 id="prihlaseni-nadpis">' . self::h($titulek) . '</h1>'
             . ($podnadpis !== '' ? '<p class="prihlaseni-pod">' . self::h($podnadpis) . '</p>' : '')

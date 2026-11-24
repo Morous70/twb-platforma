@@ -712,6 +712,26 @@ final class Web
         return (string)($this->app->media()->adresyNahledu($m)['adresy'][(string)$px] ?? '');
     }
 
+    /**
+     * 0.8.15: <img> výřezu fotky s ohniskem. CSP webu nepovoluje style="", proto ohnisko nesou třídy ox-N oy-N (0–100) a pravidlo img.ohnisko
+     * v assets/verejne.css (object-position: var(--ox) var(--oy)). S volbou „celá fotka“ (show_whole) obal <span class="… cela-obal">
+     * se dvěma obrázky: vzadu rozmazaná kopie přes celou plochu, vpředu celá fotka (object-fit: contain). $trida patří výřezu
+     * (u celé fotky obalu), $atributy jsou hotové HTML atributy pro hlavní obrázek (alt, loading…).
+     */
+    public static function fotkaHtml(array $m, string $src, string $trida = '', string $atributy = ''): string
+    {
+        $h = static fn(string $s): string => htmlspecialchars($s, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+        if (!preg_match('~\balt=~', $atributy)) $atributy = ' alt=""' . $atributy;
+        $lazy = str_contains($atributy, 'loading="lazy"') ? ' loading="lazy"' : '';
+        if (!empty($m['show_whole'])) {
+            return '<span class="' . $h(trim($trida . ' cela-obal')) . '"><img class="cela-pozadi" src="' . $h($src) . '" alt="" aria-hidden="true"' . $lazy . '>'
+                . '<img class="cela-popredi" src="' . $h($src) . '"' . $atributy . '></span>';
+        }
+        $o = Media::ohnisko($m);
+        if ($o !== null) $trida = trim($trida . " ohnisko ox-{$o['x']} oy-{$o['y']}");
+        return '<img' . ($trida !== '' ? ' class="' . $h($trida) . '"' : '') . ' src="' . $h($src) . '"' . $atributy . '>';
+    }
+
     /** Titulek fotky: název bez přípony. */
     public static function titulek(array $m): string
     {

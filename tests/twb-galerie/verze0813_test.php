@@ -19,7 +19,7 @@ function jpeg0813(int $w, int $h): string
 
 test('schéma 10: sloupec edits; galerie aplikace popis úprav ukládá', function () {
     $app = novaApp();
-    eq(10, Schema::verze());
+    ok(Schema::verze() >= 10);
     ok(in_array('edits', array_column($app->db->q('PRAGMA table_info(media)')->fetchAll(), 'name'), true));
     $app->nastaveni()->uloz('img_auto', '0');
     $f = docasna('f'); file_put_contents($f, jpeg0813(1600, 900));

@@ -974,3 +974,44 @@
   let cekani = null;
   window.addEventListener('resize', () => { clearTimeout(cekani); cekani = setTimeout(vykresli, 150); });
 })();
+
+// ---------- 0.8.15: ohnisko fotky pro web (detail média) ----------
+// Kliknutí (nebo tažení) do fotky nastaví bod v procentech; náhledy ukazují výřez úvodní fotky na počítači a mobilu, mřížky a karty galerie.
+(() => {
+  const box = document.querySelector('[data-ohnisko]');
+  if (!box) return;
+  const plocha = box.querySelector('[data-ohnisko-plocha]');
+  const bod = box.querySelector('[data-ohnisko-bod]');
+  const px = box.querySelector('[data-ohnisko-x]'), py = box.querySelector('[data-ohnisko-y]');
+  const cela = box.querySelector('[data-ohnisko-cela]');
+  const nahledy = box.querySelector('[data-ohnisko-nahledy]');
+  const cislo = (el) => { const v = el.value.trim(); if (v === '') return null; const n = Math.round(Number(v.replace(',', '.'))); return Number.isFinite(n) ? Math.max(0, Math.min(100, n)) : null; };
+  function ukaz() {
+    const x = cislo(px), y = cislo(py), ma = x !== null && y !== null;
+    bod.hidden = !ma;
+    if (ma) { bod.style.left = x + '%'; bod.style.top = y + '%'; }
+    nahledy.classList.toggle('cela', cela.checked);
+    const bez = box.querySelector('[data-ohnisko-bez]');
+    if (bez) bez.hidden = ma || cela.checked;
+    nahledy.querySelectorAll('img.popredi').forEach((i) => { i.style.objectPosition = (ma ? x : 50) + '% ' + (ma ? y : Number(i.dataset.vychoziY || 50)) + '%'; });
+  }
+  function nastav(e) {
+    const r = plocha.querySelector('img').getBoundingClientRect();
+    if (!r.width || !r.height) return;
+    px.value = Math.round(Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)) * 100);
+    py.value = Math.round(Math.max(0, Math.min(1, (e.clientY - r.top) / r.height)) * 100);
+    ukaz();
+  }
+  let tazeni = false;
+  plocha.addEventListener('pointerdown', (e) => { tazeni = true; plocha.setPointerCapture(e.pointerId); nastav(e); e.preventDefault(); });
+  plocha.addEventListener('pointermove', (e) => { if (tazeni) nastav(e); });
+  plocha.addEventListener('pointerup', () => { tazeni = false; });
+  plocha.addEventListener('pointercancel', () => { tazeni = false; });
+  [px, py].forEach((el) => el.addEventListener('input', ukaz));
+  cela.addEventListener('change', ukaz);
+  document.querySelectorAll('[data-otevrit-ohnisko]').forEach((a) => a.addEventListener('click', (e) => {
+    e.preventDefault(); box.open = true; box.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }));
+  if (location.hash === '#ohnisko') box.open = true;
+  ukaz();
+})();

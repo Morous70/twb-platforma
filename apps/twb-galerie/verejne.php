@@ -7,6 +7,7 @@ declare(strict_types=1);
 // 0.8.3: reklamní pozice s kódem z reklamního systému, měřicí kód, cookie lišta se souhlasem (bez souhlasu je kód jen neživý <template>),
 // stránka ?s=zasady-ochrany-osobnich-udaju a ads.txt (?s=ads.txt; /ads.txt a /zasady-ochrany-osobnich-udaju přes .htaccess).
 // 0.8.12: volitelný štítek „Reklama“ nad bannerem (každá pozice zvlášť) a vlastní CSS jako samostatný soubor ?s=vlastni.css.
+// 0.8.15: výřezy fotek (úvod, mřížky, karty galerií) podle ohniska fotky nebo celá fotka s rozmazaným okolím (Web::fotkaHtml).
 // 0.8.14: vyhledávání ?s=hledat&q=…[&q_rezim=kterykoli][&strana=N] – fulltext jako API (Web::hledej), pole v záhlaví místo tlačítka administrace.
 use MediaGalerie\{App, Web, Media, VerejneRozvrzeni};
 use TWB\Napoveda\Markdown;
@@ -75,7 +76,7 @@ $karty = static function (array $seznam) use ($web, $h, $ikona, $fotografii, $od
     foreach ($seznam as $k) {
         $src = $k['obalka'] ? $web->obrazek($k['obalka'], Web::PX_NAHLED) : '';
         $out .= '<a class="karta" href="' . $h($odkazKategorie($k)) . '">'
-            . '<span class="karta-obrazek">' . ($src !== '' ? '<img src="' . $h($src) . '" alt="" loading="lazy">' : '') . '</span>'
+            . '<span class="karta-obrazek">' . ($src !== '' ? Web::fotkaHtml($k['obalka'], $src, '', ' loading="lazy"') : '') . '</span>'
             . '<span class="karta-text"><strong>' . $h($k['name']) . '</strong><span class="karta-pocet">' . $ikona('obrazek', 16) . $h($fotografii((int)$k['pocet'])) . '</span>'
             . ($k['web_description'] ? '<span class="karta-popis">' . $h($k['web_description']) . '</span>' : '')
             . '</span><span class="karta-sipka">' . $ikona('dalsi') . '</span></a>';
@@ -92,8 +93,8 @@ $mrizka = static function (array $fotky, bool $sKategorii = false, string $trida
         $uv = Media::uvedeni($m)['text'];
         $popis = implode(' · ', array_filter([$sKategorii ? (string)($m['kategorie_nazev'] ?? '') : '', $uv]));
         $out .= '<a class="foto' . $skryt . '" href="' . $h($web->obrazek($m, Web::PX_VELKY)) . '" data-foto data-titulek="' . $h(Web::titulek($m)) . '" data-popis="' . $h($popis) . '">'
-            . '<img src="' . $h($web->obrazek($m, Web::PX_NAHLED)) . '" alt="' . $h(Web::titulek($m)) . '" loading="lazy"'
-            . ($m['width'] ? ' width="' . (int)$m['width'] . '" height="' . (int)$m['height'] . '"' : '') . '></a>';
+            . Web::fotkaHtml($m, $web->obrazek($m, Web::PX_NAHLED), '', ' alt="' . $h(Web::titulek($m)) . '" loading="lazy"'
+                . ($m['width'] ? ' width="' . (int)$m['width'] . '" height="' . (int)$m['height'] . '"' : '')) . '</a>';
     }
     return $out . '</div></div>';
 };
@@ -106,7 +107,7 @@ switch ($stranka) {
         $uvod = $web->uvodni($kategorie);   // 0.8.11: náhodně jedna z až pěti úvodních fotek
         $foto = $uvod ? $web->obrazek($uvod, Web::PX_VELKY) : '';
         $obsah .= '<section class="hero' . ($foto === '' ? ' hero-bez-fotky' : '') . '">'
-            . ($foto !== '' ? '<img class="hero-fotka" src="' . $h($foto) . '" alt="" fetchpriority="high">' : '')
+            . ($foto !== '' ? Web::fotkaHtml($uvod, $foto, 'hero-fotka', ' fetchpriority="high"') : '')   // 0.8.15: ohnisko / celá fotka
             . '<div class="hero-text">'
             . ($n['stitek'] !== '' ? '<p class="nadtitulek">' . $h($n['stitek']) . '</p>' : '')
             . '<h1>' . $h($n['nadpis']) . '</h1>'

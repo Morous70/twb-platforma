@@ -10,11 +10,11 @@ use TWB\Licence\Licence;
  * a do nastavení schema_version (podle ní moduly zalohy a aktualizace poznají starší data).
  * Tabulku media zakládá modul galerie, tabulky auth_tokens a passkeys modul prihlaseni.
  * Tabulka web_files (0.8.11) drží soubory veřejného webu (vlastní logo) přímo v databázi – jsou malé a zálohují se s ní.
- * Aplikace k media přidává kategorii, poznámku, autora, licenci (text, kód a verzi), klíč veřejného odkazu, příznak doporučené a popis úprav obrázku edits (sloupce, které modul nezná a nečte).
+ * Aplikace k media přidává kategorii, poznámku, autora, licenci (text, kód a verzi), klíč veřejného odkazu, příznak doporučené, popis úprav obrázku edits a ohnisko focus_x/focus_y s volbou show_whole (sloupce, které modul nezná a nečte).
  */
 final class Schema implements ModulMigrace
 {
-    public static function verze(): int { return 10; }
+    public static function verze(): int { return 11; }
 
     /** Tabulky, které musí existovat dřív než cokoli jiného (nastavení a protokol). */
     public static function zakladniTabulky(Db $db): void
@@ -119,6 +119,13 @@ final class Schema implements ModulMigrace
             // 0.8.13: úprava obrázku (ořez, otočení) – popis úprav; podle něj komprese vychází z upravené verze, ne z originálu
             $sloupce = array_column($db->q('PRAGMA table_info(media)')->fetchAll(), 'name');
             if (!in_array('edits', $sloupce, true)) $db->q('ALTER TABLE media ADD COLUMN edits TEXT NULL');
+        }
+        if ($zVerze < 11) {
+            // 0.8.15: ohnisko fotky (0–100 % šířky a výšky; NULL = výchozí střed) a volba „zobrazit celou fotku“ pro výřezy na veřejném webu
+            $sloupce = array_column($db->q('PRAGMA table_info(media)')->fetchAll(), 'name');
+            if (!in_array('focus_x', $sloupce, true)) $db->q('ALTER TABLE media ADD COLUMN focus_x INTEGER NULL');
+            if (!in_array('focus_y', $sloupce, true)) $db->q('ALTER TABLE media ADD COLUMN focus_y INTEGER NULL');
+            if (!in_array('show_whole', $sloupce, true)) $db->q('ALTER TABLE media ADD COLUMN show_whole INTEGER NOT NULL DEFAULT 0');
         }
     }
 }

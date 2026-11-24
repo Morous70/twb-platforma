@@ -144,7 +144,7 @@ final class Media
     public const ZIP_MAX_SOUBORU = 2000;
 
     /**
-     * Nahraje hotový soubor $cesta (přesune se) do galerie. U nového obrázku načte metadata: název (když $nazevPevny je false),
+     * Nahraje hotový soubor $cesta (přesune se) do galerie. Nahrazení souboru zruší ohnisko (0.8.15), volba celé fotky zůstane. U nového obrázku načte metadata: název (když $nazevPevny je false),
      * štítky (přidají se k $tagy), autora a licenci. Nahrazení souboru ($nahradit) metadata nečte, údaje média zůstanou.
      * @param list<string> $tagy
      * @return array{id:int, poznamka:?string, nahrazeno:bool, nazev:string}
@@ -164,6 +164,7 @@ final class Media
         }
         $v = $this->app->galerie()->uloz($cesta, $nazev, $tagy, $nahradit);
         $this->poNahrani($v['id'], $nahradit === null ? $kategorie : null);
+        if ($nahradit !== null) $this->zrusOhnisko($v['id']);   // 0.8.15: jiný snímek = ohnisko by ukazovalo jinam
         if ($md && ($md['autor'] !== null || $md['licence'] !== null || $md['licence_url'] !== null)) {
             $this->nastavAutora($v['id'], $md['autor'] !== null ? mb_substr($md['autor'], 0, 200) : null,
                 $md['licence'] !== null ? mb_substr($md['licence'], 0, 2000) : null, $md['licence_url'] !== null ? mb_substr($md['licence_url'], 0, 500) : null);
@@ -332,6 +333,32 @@ final class Media
         $n = 0;
         foreach ($ids as $id) $n += $this->app->db->q('UPDATE media SET featured = ? WHERE id = ? AND featured <> ?', [(int)$doporucene, (int)$id, (int)$doporucene])->rowCount();
         return $n;
+    }
+
+    /**
+     * 0.8.15: ohnisko fotky pro výřezy na veřejném webu (úvodní fotka, mřížky, karty galerií) v celých procentech šířky a výšky
+     * (0 = levý/horní okraj, 100 = pravý/dolní). $x a $y null = bez ohniska (výchozí střed). $cela = ukázat celou fotku a okolí doplnit
+     * její rozmazanou kopií (nic se neusekne). Soubor se nemění.
+     */
+    public function nastavOhnisko(int $id, ?int $x, ?int $y, bool $cela): void
+    {
+        if (($x === null) !== ($y === null)) throw new Chyba('Ohnisko potřebuje obě souřadnice (vodorovně i svisle), nebo žádnou.');
+        foreach ([$x, $y] as $v) if ($v !== null && ($v < 0 || $v > 100)) throw new Chyba('Souřadnice ohniska musí být 0–100 %.');
+        $this->radek($id);
+        $this->app->db->q('UPDATE media SET focus_x = ?, focus_y = ?, show_whole = ? WHERE id = ?', [$x, $y, (int)$cela, $id]);
+    }
+
+    /** Zruší ohnisko (po ořezu, otočení, vrácení původního souboru nebo nahrazení souboru by ukazovalo jinam). Vrací true, když nějaké bylo. */
+    public function zrusOhnisko(int $id): bool
+    {
+        return $this->app->db->q('UPDATE media SET focus_x = NULL, focus_y = NULL WHERE id = ? AND focus_x IS NOT NULL', [$id])->rowCount() > 0;
+    }
+
+    /** Ohnisko řádku média, nebo null (není nastavené). @return ?array{x: int, y: int} */
+    public static function ohnisko(array $m): ?array
+    {
+        if (!isset($m['focus_x'], $m['focus_y'])) return null;
+        return ['x' => max(0, min(100, (int)$m['focus_x'])), 'y' => max(0, min(100, (int)$m['focus_y']))];
     }
 
     public function nastavPoznamku(int $id, ?string $poznamka): void

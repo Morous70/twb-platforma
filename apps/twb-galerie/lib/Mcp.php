@@ -99,7 +99,7 @@ final class Mcp
                 ]],
                 fn(array $a) => ['medium' => $this->medium($a)]),
             new Nastroj('uprav_medium', 'Upravit údaje média',
-                'Změní údaje existujícího média: název, poznámku, kategorii, tagy (nahradí dosavadní), autora, licenci, archiv, doporučení pro veřejný web. Zadej jen pole, která se mají změnit; '
+                'Změní údaje existujícího média: název, poznámku, kategorii, tagy (nahradí dosavadní), autora, licenci, archiv, doporučení pro veřejný web, ohnisko a celou fotku. Zadej jen pole, která se mají změnit; '
                 . 'prázdný text nebo null pole vymaže. Soubor ani médium nemaže.',
                 ['type' => 'object', 'required' => ['id'], 'properties' => [
                     'id' => ['type' => 'integer', 'minimum' => 1],
@@ -109,6 +109,10 @@ final class Mcp
                     'tagy' => $tagy + ['description' => 'Nový seznam tagů (nahradí dosavadní)'],
                     'archiv' => ['type' => 'boolean', 'description' => 'true = přesunout do archivu, false = vrátit z archivu'],
                     'doporucena' => ['type' => 'boolean', 'description' => 'true = doporučená fotografie (veřejný web z doporučených ukazuje náhodný výběr), false = zrušit doporučení'],
+                    'ohnisko' => ['type' => ['object', 'null'], 'required' => ['x', 'y'], 'additionalProperties' => false,
+                        'properties' => ['x' => ['type' => 'number', 'minimum' => 0, 'maximum' => 100], 'y' => ['type' => 'number', 'minimum' => 0, 'maximum' => 100]],
+                        'description' => 'Ohnisko obrázku v % zleva (x) a shora (y): výřezy na veřejném webu (úvodní fotka, mřížky) se drží kolem něj; null = střed'],
+                    'cela_fotka' => ['type' => 'boolean', 'description' => 'true = veřejný web ukáže celou fotku (okolí doplní rozmazaná kopie), false = ořez kolem ohniska'],
                     'licence' => ['type' => ['string', 'null'], 'maxLength' => 2000, 'description' => 'Licence jako text (původní znění z metadat)'],
                 ] + array_map(fn($p) => ['type' => [$p['type'], 'null']] + (isset($p['enum']) ? ['enum' => array_merge($p['enum'], [null])] : []) + $p, $licence)],
                 fn(array $a) => $this->uprav($a), 'write', zapis: true),
@@ -279,6 +283,7 @@ final class Mcp
             'kategorie' => $m['kategorie']['nazev'] ?? null, 'tagy' => $m['tagy'], 'poznamka' => $poz,
             'autor' => $m['autor'], 'licence' => $m['licence_nazev'], 'atribuce' => $m['atribuce']['text'] ?? null,
             'archivovano' => $m['archivovano'] !== null, 'doporucena' => $m['doporucena'] ?? false, 'vytvoreno' => $m['vytvoreno'],
+            'ohnisko' => $m['ohnisko'] ?? null, 'cela_fotka' => $m['cela_fotka'] ?? false,
             'stranka_url' => $m['stranka_url'], 'verejny_odkaz' => $m['verejny_odkaz'],
             'nahled' => $m['nahledy']['640'] ?? null,
         ];

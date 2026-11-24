@@ -4,12 +4,16 @@ sekce: jak-na
 admin: ne
 kontext: web
 souvisi: verejne-odkazy, kategorie-a-tagy
-klicova: web, hlavní stránka, veřejná galerie, reklama, banner, adsense, sklik, reklamní kód, ads.txt, měření návštěvnosti, matomo, gdpr, cookies, souhlas, zásady ochrany osobních údajů, o galerii, úvodní fotka, úvodní fotky, logo, vlastní logo, vlastní css, css, styly, vzhled, štítek reklama, označení reklamy, doporučené fotografie, doporučená, mřížka
+klicova: web, vyhledávání, hledání, hledat, fulltext, hlavní stránka, veřejná galerie, reklama, banner, adsense, sklik, reklamní kód, ads.txt, měření návštěvnosti, matomo, gdpr, cookies, souhlas, zásady ochrany osobních údajů, o galerii, úvodní fotka, úvodní fotky, logo, vlastní logo, vlastní css, css, styly, vzhled, štítek reklama, označení reklamy, doporučené fotografie, doporučená, mřížka
 ---
 # Veřejný web
 
 Na adrese `https://galerie.kazbo.eu/` je veřejná stránka galerie pro návštěvníky: **Domů**, **Galerie** a **O galerii**.
-Administrace zůstává na `https://galerie.kazbo.eu/index.php` (tlačítko **Přihlášení do administrace** v hlavičce a v patičce).
+Administrace zůstává na `https://galerie.kazbo.eu/index.php` (odkaz **Přihlášení do administrace** v patičce, vypnout ho jde v **Veřejný web → Základ a texty → Stav webu**).
+
+## Vyhledávání
+V záhlaví každé stránky webu je **pole pro hledání** (na mobilu ikona lupy vedle menu). Hledá stejně jako hledání v galerii a v API: každé slovo v **názvu**, **štítcích**, **autorovi** a **poznámce**, bez ohledu na diakritiku a velká písmena („zluty kun“ najde „Žlutý kůň“), fráze v uvozovkách vcelku. Výsledky jsou seřazené podle shody, po 36 fotkách na stránku. Při více slovech jde přepnout **Všechna slova** / **Kterékoli slovo**.
+Najde se jen to, co web smí ukázat – obrázky s veřejným odkazem mimo archiv ve veřejných kategoriích. Stránku výsledků vyhledávače neindexují.
 
 ## Co se na webu ukáže
 Nic se nezveřejní samo. Na webu je jen to, co výslovně povolíte:

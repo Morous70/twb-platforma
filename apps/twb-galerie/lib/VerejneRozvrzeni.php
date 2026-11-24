@@ -18,6 +18,7 @@ final class VerejneRozvrzeni
         'zpet' => '<polyline points="15 18 9 12 15 6"/>',
         'zavrit' => '<line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>',
         'menu' => '<line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>',
+        'hledat' => '<circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>',
         'zamek' => '<rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>',
     ];
 
@@ -40,11 +41,12 @@ final class VerejneRozvrzeni
 
     /**
      * Záhlaví: logo a menu Domů / Galerie / O galerii (?s=… funguje i z index.php, ten veřejné stránky předá verejne.php).
-     * $menu false = jen logo (vypnutý web). $admin = tlačítko Přihlášení do administrace.
+     * $menu false = jen logo (vypnutý web). $hledani (0.8.14) = vyhledávací pole na konci menu – nahradilo tlačítko Přihlášení do administrace
+     * (odkaz na přihlášení zůstává v patičce a administrace na adrese …/index.php); $q = hledaný text, který se v poli předvyplní.
      * $logo (0.8.11) = adresa vlastního loga (Web::logoAdresa); bez něj znak a název. S logem se název ukáže, jen když je zapnutý logo_nazev.
      * @param array<string, mixed> $n nastavení webu (Web::nastaveni)
      */
-    public static function zahlavi(array $n, string $aktivni = '', bool $menu = true, bool $admin = true, string $logo = ''): string
+    public static function zahlavi(array $n, string $aktivni = '', bool $menu = true, bool $hledani = true, string $logo = '', string $q = ''): string
     {
         $nav = '';
         if ($menu) {
@@ -52,12 +54,26 @@ final class VerejneRozvrzeni
                 $nav .= '<a href="' . self::h($href) . '"' . ($aktivni === $k ? ' class="aktivni" aria-current="page"' : '') . '>' . self::h($text) . '</a>';
             }
         }
-        if ($admin) $nav .= '<a class="tlacitko admin" href="index.php?p=prehled">' . self::ikona('prihlasit', 18) . '<span>Přihlášení do administrace</span></a>';
+        if ($menu && $hledani) $nav .= self::hledaciPole($q, 'hlavicka-hledani');
         return '<header class="hlavicka"><div class="hlavicka-obal">'
             . '<a class="logo' . ($logo !== '' ? ' logo-vlastni' : '') . '" href="' . ($menu ? './' : 'index.php') . '">' . self::znak($n, $logo) . '</a>'
+            . ($menu && $hledani ? '<a class="hledat-mobil" href="verejne.php?s=hledat" aria-label="Hledat fotografie">' . self::ikona('hledat', 22) . '</a>' : '')
             . ($nav !== '' ? '<button type="button" class="menu-tlacitko" aria-label="Menu" aria-expanded="false" aria-controls="hlavni-menu" data-menu>' . self::ikona('menu', 24) . '</button>'
                 . '<nav id="hlavni-menu" class="menu" aria-label="Hlavní menu">' . $nav . '</nav>' : '')
             . '</div></header>';
+    }
+
+    /**
+     * 0.8.14: formulář vyhledávání (GET ?s=hledat&q=…, bez JavaScriptu, CSP form-action 'self'). Odesílá se na verejne.php,
+     * aby fungoval i ze stránky přihlášení (index.php). $trida = třída formuláře (záhlaví / stránka výsledků).
+     */
+    public static function hledaciPole(string $q, string $trida, string $id = 'hledat-q'): string
+    {
+        return '<form class="hledani ' . self::h($trida) . '" role="search" action="verejne.php" method="get">'
+            . '<input type="hidden" name="s" value="hledat">'
+            . '<label class="sr-only" for="' . self::h($id) . '">Hledat fotografie</label>'
+            . '<input type="search" id="' . self::h($id) . '" name="q" value="' . self::h($q) . '" placeholder="Hledat fotografie…" maxlength="200" autocomplete="off" enterkeyhint="search">'
+            . '<button type="submit" aria-label="Hledat">' . self::ikona('hledat', 18) . '</button></form>';
     }
 
     /**

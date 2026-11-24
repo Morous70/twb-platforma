@@ -281,7 +281,7 @@ final class Ui
             . '<meta name="robots" content="noindex, nofollow"><title>' . self::h($titulek) . ' – ' . self::h($n['nazev']) . '</title>'
             . "<link rel=\"stylesheet\" href=\"assets/verejne.css?v=$v\"><link rel=\"icon\" href=\"assets/ikona.svg\" type=\"image/svg+xml\">"
             . "<script src=\"assets/verejne.js?v=$v\" defer></script><script src=\"assets/app.js?v=$v\" defer></script></head><body class=\"stranka-prihlaseni\">"
-            . VerejneRozvrzeni::zahlavi($n, '', (bool)$n['zapnuto'], false, $web->logoAdresa())
+            . VerejneRozvrzeni::zahlavi($n, '', (bool)$n['zapnuto'], true, $web->logoAdresa())
             . '<main class="prihlaseni' . ($foto === '' ? ' prihlaseni-bez-fotky' : '') . '">'
             . ($foto !== '' ? '<img class="prihlaseni-fotka" src="' . self::h($foto) . '" alt="">' : '')
             . '<section class="prihlaseni-karta" aria-labelledby="prihlaseni-nadpis">'

@@ -70,7 +70,7 @@ $adresaZasad = $app->url(Web::ZASADY);
 <section class="karta formular web-skupina" aria-labelledby="sk-stav">
   <header class="skupina-hlavicka"><h2 id="sk-stav">Stav webu</h2><p class="slabe">Zapnutí webu a co uvidí návštěvníci a vyhledávače.</p></header>
   <?= $vypinac('zapnuto', 'Veřejný web zapnutý', (bool)$n['zapnuto'], 'Vypnutý web přesměruje návštěvníky na přihlášení do administrace.') ?>
-  <?= $vypinac('odkaz_administrace', 'Tlačítko „Přihlášení do administrace“', (bool)$n['odkaz_administrace'], 'Bez tlačítka se do administrace dostanete na adrese …/index.php.') ?>
+  <?= $vypinac('odkaz_administrace', 'Odkaz „Přihlášení do administrace“ v patičce', (bool)$n['odkaz_administrace'], 'V záhlaví je místo tlačítka vyhledávání (od 0.8.14). Bez odkazu se do administrace dostanete na adrese …/index.php.') ?>
   <?= $vypinac('skryt_vyhledavacum', 'Skrýt web před vyhledávači (noindex)', (bool)$n['skryt_vyhledavacum']) ?>
 </section>
 

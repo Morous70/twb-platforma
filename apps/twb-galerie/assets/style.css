@@ -595,3 +595,41 @@ body.vybirani, body.vybirani * { user-select: none; cursor: crosshair; }
 .ohnisko-formular .pole input { width: 9rem; }
 .ohnisko-cela { display: flex; gap: .5rem; align-items: flex-start; margin: .25rem 0 .5rem; }
 .ohnisko-cela input { margin-top: .2rem; }
+
+/* 0.8.16: řádek ikon u spodního okraje karty média (mřížka a seznam Galerie) – Upravit, Kopírovat odkaz, Do archivu, Smazat.
+   Karta je sloupec (flex), popisek se roztáhne, takže ikony sedí u spodního okraje i u karet s kratším popiskem. */
+.galerie.zobrazeni-mrizka figure { display: flex; flex-direction: column; }
+.galerie.zobrazeni-mrizka figcaption { flex: 1 1 auto; align-content: start; }
+.akce-medium { display: flex; align-items: center; gap: .25rem; padding: .35rem .5rem .5rem; margin-top: auto; }
+.akce-medium .akce-ikona { width: 2.25rem; height: 2.25rem; min-height: 0; padding: 0; border: 1px solid transparent; border-radius: var(--polomer); background: transparent;
+  color: var(--slaby); display: inline-flex; align-items: center; justify-content: center; text-decoration: none; }
+.akce-medium .akce-ikona:hover, .akce-medium .akce-ikona:focus-visible { background: var(--kod); color: var(--hlavni); border-color: var(--okraj); }
+.akce-medium .akce-ikona.ikona-smazat:hover, .akce-medium .akce-ikona.ikona-smazat:focus-visible { color: var(--chyba); }
+.akce-medium .akce-ikona:disabled { opacity: .35; background: transparent; border-color: transparent; color: var(--slaby); }
+.akce-medium .akce-ikona.zkopirovano { color: var(--ok, #198754); }
+.akce-medium .akce-ikona.zkopirovano .ikona { display: none; }
+.akce-medium .akce-ikona.zkopirovano::after { content: "✓"; font-weight: 700; font-size: 1.1rem; }
+.galerie.zobrazeni-media .akce-medium { display: none; }
+.galerie.zobrazeni-seznam figure { grid-template-columns: 2.2rem 96px minmax(0, 1fr) auto; }
+.galerie.zobrazeni-seznam .akce-medium { padding: .25rem .6rem .25rem 0; margin: 0; }
+@media (max-width: 575.98px) { .galerie.zobrazeni-seznam figure { grid-template-columns: 2rem 64px minmax(0, 1fr); }
+  .galerie.zobrazeni-seznam .akce-medium { grid-column: 3; padding: 0 .5rem .4rem; } }
+
+/* 0.8.16: Přehled – úvodní fotky webu. Všechny zvolené (nejvýš 5) v jednom řádku, každá široká 16:9 s ohniskem jako na webu;
+   na užší ploše posuvný pás (žádná fotka se neskryje ani nevznikne neúplný řádek). */
+.prehled-uvodni { container-type: inline-size; }
+.prehled-uvodni-popis { margin: -.4rem 0 .75rem; }
+.uvodni-fotky { display: grid; gap: .75rem; grid-auto-flow: column; grid-auto-columns: minmax(220px, 72%); overflow-x: auto; scroll-snap-type: x mandatory; padding-bottom: .25rem; }
+.uvodni-fotky figure { margin: 0; scroll-snap-align: start; min-width: 0; }
+.uvodni-nahled { position: relative; display: block; aspect-ratio: 16 / 9; border-radius: var(--polomer); overflow: hidden; background: var(--kod); }
+.uvodni-nahled img { width: 100%; height: 100%; object-fit: cover; display: block; pointer-events: none; }
+.uvodni-nahled img.cela { object-fit: contain; }
+.uvodni-poradi { position: absolute; left: .4rem; top: .4rem; min-width: 1.5rem; height: 1.5rem; padding: 0 .35rem; border-radius: 999px; background: rgba(0, 0, 0, .6); color: #fff;
+  font-size: .75rem; font-weight: 600; display: inline-flex; align-items: center; justify-content: center; }
+.uvodni-fotky figcaption { margin-top: .35rem; font-size: .8rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.uvodni-fotky figcaption a { color: var(--nadpis); text-decoration: none; }
+.prehled-uvodni-varovani { margin: .75rem 0 0; }
+@container (min-width: 640px) {
+  .uvodni-fotky { grid-auto-flow: row; grid-auto-columns: auto; overflow: visible; grid-template-columns: repeat(5, minmax(0, 1fr)); }
+  .uvodni-fotky.pocet-1, .uvodni-fotky.pocet-2 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}

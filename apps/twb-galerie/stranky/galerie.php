@@ -1,6 +1,9 @@
 <?php
 declare(strict_types=1);
 // Galerie: nahrávání (po částech, přetažením), filtry, zobrazení mřížka / seznam / jen média, větší náhled v okně, hromadné akce.
+// 0.8.16: v mřížce a seznamu řádek ikon u spodního okraje karty – Upravit (detail), Kopírovat odkaz, Do archivu / Vrátit z archivu, Smazat.
+// Archiv a smazání jednoho média posílá samostatný formulář #akce-medium (tlačítka s form="akce-medium", name="medium" value="akce:id"),
+// aby se nemíchal se zaškrtnutými položkami hromadného výběru.
 // Proměnné: $app, $ui, $post.
 use MediaGalerie\{App, Ui, Chyba, Media, Komprese};
 
@@ -28,8 +31,20 @@ $zpet = Ui::odkaz('galerie', array_filter($f, fn($v) => $v !== '' && $v !== 'nov
 
 if ($post) {
     $akce = (string)($_POST['akce'] ?? '');
+    $jedno = null;   // 0.8.16: akce z ikony u karty jednoho média
+    if (preg_match('/^(archivovat|vratit|smazat):(\d+)$/', (string)($_POST['medium'] ?? ''), $mm)) { $akce = $mm[1]; $jedno = (int)$mm[2]; }
     $zprava = 'Uloženo.';
-    if ($ui->zpracuj(function () use ($akce, $app, $galerie, $media, $ui, $zpet, &$zprava) {
+    if ($ui->zpracuj(function () use ($akce, $jedno, $app, $galerie, $media, $ui, $zpet, &$zprava) {
+        if ($jedno !== null) {
+            $m = $media->radek($jedno);
+            $nazev = '„' . $m['original_name'] . '“';
+            switch ($akce) {
+                case 'archivovat': $galerie->archivuj([$jedno], true); $zprava = "{$nazev} je v archivu."; break;
+                case 'vratit': $galerie->archivuj([$jedno], false); $zprava = "{$nazev} je zpět v galerii."; break;
+                default: $galerie->smaz([$jedno]); $media->uklidNahledy(); $zprava = "{$nazev} smazáno.";
+            }
+            return;
+        }
         $ids = array_values(array_filter(array_map('intval', (array)($_POST['ids'] ?? []))));
         if (!$ids) throw new Chyba('Vyberte aspoň jedno médium.');
         switch ($akce) {
@@ -171,12 +186,21 @@ $titulek = $f['archiv'] ? 'Archiv' : 'Galerie';
           <span><a class="stitek stitek-kategorie" href="<?= $odkazFiltru(['kategorie' => (string)$m['category_id'], 'strana' => 1]) ?>"><?= Ui::h($nazvyKategorii[(int)$m['category_id']]) ?></a></span>
         <?php endif; ?>
         <?php if ($t = Media::tagy($m)): ?><span class="stitky"><?php foreach ($t as $tag): ?><a class="stitek" href="<?= $odkazFiltru(['tag' => $tag, 'strana' => 1]) ?>"><?= Ui::h($tag) ?></a><?php endforeach; ?></span><?php endif; ?>
-        <?php if ($url): ?><span><button type="button" class="maly" data-kopirovat-text="<?= Ui::h($url) ?>">Kopírovat odkaz</button></span><?php endif; ?>
       </figcaption>
+      <div class="akce-medium">
+        <a class="akce-ikona" href="<?= Ui::h(Ui::odkaz('medium', ['id' => $id])) ?>" title="Upravit" aria-label="Upravit <?= Ui::h($m['original_name']) ?>"><?= Ui::ikona('upravit') ?></a>
+        <?php if ($url): ?><button type="button" class="akce-ikona" data-kopirovat-text="<?= Ui::h($url) ?>" title="Kopírovat odkaz" aria-label="Kopírovat odkaz"><?= Ui::ikona('odkaz') ?></button>
+        <?php else: ?><button type="button" class="akce-ikona" disabled title="Veřejný odkaz je vypnutý (zapnete ho v detailu)" aria-label="Kopírovat odkaz – veřejný odkaz je vypnutý"><?= Ui::ikona('odkaz') ?></button><?php endif; ?>
+        <?php if ($m['archived_at']): ?><button type="submit" form="akce-medium" name="medium" value="vratit:<?= $id ?>" class="akce-ikona" title="Vrátit z archivu" aria-label="Vrátit z archivu"><?= Ui::ikona('vratit') ?></button>
+        <?php else: ?><button type="submit" form="akce-medium" name="medium" value="archivovat:<?= $id ?>" class="akce-ikona" title="Do archivu" aria-label="Do archivu"><?= Ui::ikona('archiv') ?></button><?php endif; ?>
+        <button type="submit" form="akce-medium" name="medium" value="smazat:<?= $id ?>" class="akce-ikona ikona-smazat" title="Smazat" aria-label="Smazat"
+          data-potvrdit-tlacitko="<?= Ui::h('Smazat „' . $m['original_name'] . '“? Veřejný odkaz přestane fungovat.') ?>"><?= Ui::ikona('smazat') ?></button>
+      </div>
     </figure>
     <?php endforeach; ?>
   </div></div>
 </form>
+<form method="post" id="akce-medium" action="<?= Ui::h($zpet) ?>"><?= $ui->csrf() ?></form>
 <?php if ($vysledek['stran'] > 1): ?>
 <nav class="strankovani tlacitka" aria-label="Stránky">
   <?php for ($i = 1; $i <= $vysledek['stran']; $i++): ?>

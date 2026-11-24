@@ -3,6 +3,8 @@ declare(strict_types=1);
 // Přehled: počty médií, upozornění (e-mail pro obnovu, zálohy, cron, nová verze), naposledy nahrané (0.8.8: mřížka 8 × 2 = 16 médií;
 // na užší ploše 4 × 4 nebo 2 × 8 – počet sloupců je vždy dělitel 16, takže žádné médium nezmizí ani nezůstane neúplný řádek).
 // 0.8.10: pod nimi seznam kategorií (počet, odkaz do Galerie) a rychlé nahrání (stejné nahrávání po částech jako v Galerii, assets/app.js #nahravani).
+// 0.8.16: pod nimi úvodní fotky veřejného webu (Veřejný web → Úvodní část, až Web::MAX_UVODNI), všechny v jednom řádku (na mobilu posuvný pás),
+// s ohniskem jako na webu; kliknutím větší náhled, odkaz do detailu. Zvolené fotky, které se teď ukázat nemůžou, jsou vypsané zvlášť.
 // Proměnné: $app, $ui.
 use MediaGalerie\{App, Ui, Media};
 use TWB\Zalohy\Zalohy;
@@ -13,6 +15,10 @@ $posledni = $app->media()->seznam(['razeni' => 'nove'], Media::NA_PREHLEDU)['pol
 $kategorie = $app->kategorie()->seznam();
 $bezKategorie = (int)$app->db->q('SELECT COUNT(*) FROM media WHERE category_id IS NULL AND archived_at IS NULL')->fetchColumn();
 $n = $app->nastaveni();
+$web = $app->web();
+$uvodni = $web->uvodniFotky();
+$uvodNeukaze = count($web->nastaveni()['uvod_ids']) - count($uvodni);
+$uvodAuto = $uvodni ? null : $web->uvodni();
 $upozorneni = [];
 if ($app->emailObnovy() === '') $upozorneni[] = ['Není nastavený e-mail pro obnovu hesla.', Ui::odkaz('nastaveni', ['karta' => 'zabezpeceni']) . '#zabezpeceni'];
 if ((string)$n->dej('backup_password', '') === '') $upozorneni[] = ['Zálohy nejsou nastavené – zadejte heslo záloh.', Ui::odkaz('nastaveni', ['karta' => 'zalohy']) . '#zalohy'];
@@ -41,6 +47,27 @@ if ($dalsi = $app->aktualizace()->stav()['available'] ?? null) $upozorneni[] = [
   <?php endforeach; ?>
 </div></div>
 <?php endif; ?>
+<section class="karta prehled-uvodni" aria-labelledby="h-uvodni">
+  <div class="karta-hlavicka"><h2 id="h-uvodni">Úvodní fotky webu<?php if ($uvodni): ?> <span class="slabe mala"><?= count($uvodni) ?> z <?= \MediaGalerie\Web::MAX_UVODNI ?></span><?php endif; ?></h2>
+    <a href="<?= Ui::h(Ui::odkaz('web')) ?>#sk-uvod">Spravovat</a></div>
+  <?php if ($uvodni): ?>
+  <p class="slabe mala prehled-uvodni-popis">Na hlavní stránce webu se při každém načtení náhodně ukáže jedna z nich.</p>
+  <div class="uvodni-fotky pocet-<?= count($uvodni) ?>" data-okno-skupina>
+    <?php foreach ($uvodni as $i => $m): $o = Media::ohnisko($m); ?>
+    <figure<?= Ui::okno($m, $app->media()->verejnaAdresa($m)) ?>><a class="uvodni-nahled" href="<?= Ui::h(Ui::odkaz('medium', ['id' => $m['id']])) ?>" data-otevrit-okno title="<?= Ui::h($m['original_name']) ?>">
+      <img src="media.php?id=<?= (int)$m['id'] ?>&amp;nahled=640&amp;v=<?= Ui::h(substr((string)$m['md5'], 0, 8)) ?>" alt="" loading="lazy"<?= $o ? ' style="object-position:' . $o['x'] . '% ' . $o['y'] . '%"' : '' ?><?= !empty($m['show_whole']) ? ' class="cela"' : '' ?>>
+      <span class="uvodni-poradi"><?= $i + 1 ?></span></a>
+      <figcaption><a href="<?= Ui::h(Ui::odkaz('medium', ['id' => $m['id']])) ?>"><?= Ui::h($m['original_name']) ?></a></figcaption></figure>
+    <?php endforeach; ?>
+  </div>
+  <?php else: ?>
+  <p class="slabe" style="margin:0">Žádná úvodní fotka není zvolená<?= $uvodAuto ? ' – web teď ukazuje obálku první veřejné galerie (<strong>' . Ui::h($uvodAuto['original_name']) . '</strong>)' : '' ?>.
+    Vyberte až <?= \MediaGalerie\Web::MAX_UVODNI ?> fotek na stránce <a href="<?= Ui::h(Ui::odkaz('web')) ?>#sk-uvod">Veřejný web</a> nebo tlačítkem <em>Přidat mezi úvodní fotky</em> v detailu obrázku.</p>
+  <?php endif; ?>
+  <?php if ($uvodNeukaze > 0): ?>
+  <p class="hlaska hlaska-varovani prehled-uvodni-varovani"><?= $uvodNeukaze === 1 ? '1 zvolená fotka se na webu neukáže' : ($uvodNeukaze < 5 ? $uvodNeukaze . ' zvolené fotky se na webu neukážou' : $uvodNeukaze . ' zvolených fotek se na webu neukáže') ?> (vypnutý veřejný odkaz, archiv nebo smazaná). <a href="<?= Ui::h(Ui::odkaz('web')) ?>#sk-uvod">Upravit výběr</a></p>
+  <?php endif; ?>
+</section>
 <div class="prehled-dole">
 <section class="karta prehled-kategorie" aria-labelledby="h-kategorie">
   <div class="karta-hlavicka"><h2 id="h-kategorie">Kategorie</h2><a href="<?= Ui::h(Ui::odkaz('kategorie')) ?>">Spravovat</a></div>

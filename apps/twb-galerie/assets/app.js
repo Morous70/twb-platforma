@@ -8,6 +8,11 @@
     var f = e.target;
     if (f.dataset && f.dataset.potvrdit && !window.confirm(f.dataset.potvrdit)) e.preventDefault();
   });
+  // 0.8.16: potvrzení u jednoho tlačítka (Smazat u karty média v Galerii)
+  document.addEventListener('click', function (e) {
+    var b = e.target.closest && e.target.closest('[data-potvrdit-tlacitko]');
+    if (b && !window.confirm(b.dataset.potvrditTlacitko)) e.preventDefault();
+  });
 
   // Přepínač postranního menu: na počítači menu skryje (zapamatuje se), na mobilu ho vysune přes obsah (klik na závoj ho zavře)
   var uzky = window.matchMedia('(max-width: 991.98px)');
@@ -97,6 +102,12 @@
     e.preventDefault();
     var text = b.dataset.kopirovatText;
     (navigator.clipboard ? navigator.clipboard.writeText(text) : Promise.reject()).then(function () {
+      if (b.classList.contains('akce-ikona')) {
+        // 0.8.16: ikona u karty média – na chvíli fajfka a popisek Zkopírováno
+        var t = b.title; b.title = 'Zkopírováno'; b.classList.add('zkopirovano');
+        setTimeout(function () { b.title = t; b.classList.remove('zkopirovano'); }, 1500);
+        return;
+      }
       var p = b.textContent; b.textContent = 'Zkopírováno'; setTimeout(function () { b.textContent = p; }, 1500);
     }, function () { window.prompt('Odkaz:', text); });
   });
